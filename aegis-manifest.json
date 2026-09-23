@@ -1,0 +1,12 @@
+{
+  "name": "aegis-engineering-os",
+  "version": "0.1.0-alpha.1",
+  "release_channel": "alpha",
+  "status": "experimental",
+  "canonical_language": "en",
+  "user_interaction_language": "ru",
+  "skill_format": "agentskills",
+  "openhands_project_skill_path": ".agents/skills",
+  "canonical_skill_library_path": "skills",
+  "active_knowledge_model": "known-good"
+}
