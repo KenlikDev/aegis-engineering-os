@@ -22,8 +22,7 @@ class AegisPolicyTests(unittest.TestCase):
         )
 
     def test_user_claims_are_not_external_state_evidence(self) -> None:
-        combined = "
-".join(
+        combined = "\n".join(
             (
                 self.read("AGENTS.md"),
                 self.read("00-constitution/core-principles.md"),
