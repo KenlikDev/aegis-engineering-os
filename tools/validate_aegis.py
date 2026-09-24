@@ -120,6 +120,7 @@ def main() -> int:
         "templates/work-item.md",
         "templates/AGENTS.md",
         "tools/bootstrap_project.py",
+        "tools/verify_project.py",
         "skills/registry.json",
     ]
 
