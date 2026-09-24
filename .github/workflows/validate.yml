@@ -53,3 +53,4 @@ jobs:
           test -f "$temp_project/project/.aegis/aegis-version.json"
           test -f "$temp_project/project/.agents/skills/aegis-orchestrator/SKILL.md"
           test -f "$temp_project/project/.agents/skills/software-engineer/SKILL.md"
+          test -f "$temp_project/project/.agents/skills/state-verification/SKILL.md"
