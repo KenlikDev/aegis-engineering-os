@@ -1,5 +1,6 @@
 {
   "name": "aegis-engineering-os",
+  "repository": "KenlikDev/aegis-engineering-os",
   "version": "0.1.0-alpha.1",
   "release_channel": "alpha",
   "status": "experimental",
@@ -9,5 +10,11 @@
   "openhands_project_skill_path": ".agents/skills",
   "canonical_skill_library_path": "skills",
   "skill_registry_path": "skills/registry.json",
+  "default_work_item_provider": "github-issues",
+  "work_item_strategy": "provider-adaptive",
+  "optional_integrations": [
+    "jira",
+    "confluence"
+  ],
   "active_knowledge_model": "known-good"
 }
