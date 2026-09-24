@@ -19,6 +19,16 @@ The agent owns routine engineering decisions and should make them autonomously w
 
 Ask the user when a decision has material product, business, security, privacy, cost, compliance, or irreversible-data consequences. When the user explicitly delegates a decision area, record the scope and proceed within it.
 
+## AI provider policy
+
+- Keep Aegis model-agnostic.
+- The user explicitly chooses the active AI provider, agent surface, and model.
+- Do not rank providers or silently switch providers after quota, network, or model failures.
+- Keep provider origins explicit; the default registry may contain US-origin cloud providers and LOCAL backends such as Ollama.
+- Treat subscription login and API-key access as separate billing/authentication modes.
+- Never commit provider API keys, OAuth tokens, or cached credentials.
+- Do not assume that a consumer subscription includes API usage.
+
 ## Evidence and state verification
 
 - User statements are authoritative for intent, preferences, and delegated decisions, but are not proof of independently observable state.

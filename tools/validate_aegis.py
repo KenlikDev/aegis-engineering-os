@@ -8,6 +8,8 @@ import re
 import sys
 from pathlib import Path
 
+from validate_ai_config import load_registry, validate_profile_config
+
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = re.compile(r"^0\.\d+\.\d+-alpha\.\d+$")
@@ -85,6 +87,15 @@ def main() -> int:
     if not isinstance(registry.get("skills"), list):
         fail("skills/registry.json must contain a skills list.")
 
+    try:
+        ai_registry = load_registry()
+        validate_profile_config(
+            ROOT / "templates" / "ai-profiles.example.json",
+            ai_registry,
+        )
+    except (OSError, ValueError) as exc:
+        fail(f"AI backend configuration is invalid: {exc}")
+
     required = [
         "AGENTS.md",
         "00-constitution/core-principles.md",
@@ -112,6 +123,7 @@ def main() -> int:
         "08-offline/offline-architecture.md",
         "docs/architecture/overview.md",
         "docs/architecture/work-management.md",
+        "docs/architecture/ai-backends.md",
         "docs/governance/state-verification.md",
         "docs/product/discovery-mode.md",
         "docs/product/user-decision-model.md",
@@ -119,8 +131,12 @@ def main() -> int:
         "templates/product-decision-questionnaire.md",
         "templates/work-item.md",
         "templates/AGENTS.md",
+        "templates/ai-profiles.example.json",
         "tools/bootstrap_project.py",
         "tools/verify_project.py",
+        "tools/validate_ai_config.py",
+        "tools/render_openhands_profile.py",
+        "config/ai-backends.json",
         "skills/registry.json",
     ]
 

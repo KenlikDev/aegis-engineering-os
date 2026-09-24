@@ -18,6 +18,22 @@ Aegis defines the engineering rules, roles, workflows, skills, quality gates, de
 - New knowledge is treated as candidate knowledge until validated.
 - A known-good local Aegis version remains usable when GitHub or the internet is unavailable.
 - The agent must verify the actual technology versions used by a project before implementing against version-sensitive APIs or behavior.
+- AI provider and model selection remains explicitly controlled by the user.
+
+## AI backends
+
+Aegis is intentionally model-agnostic. The default backend registry describes explicitly classified providers without ranking them or selecting a preferred model:
+
+- OpenAI / Codex;
+- Anthropic / Claude Code;
+- Google / Gemini CLI;
+- Meta / Muse Code and Model API;
+- xAI / Grok API;
+- Ollama / local model runtime.
+
+Subscription login and direct API access are represented as separate connection modes. API credentials never belong in the repository.
+
+See `docs/architecture/ai-backends.md` and `templates/ai-profiles.example.json` for the provider contract and user-selectable profile format.
 
 ## Repository structure
 

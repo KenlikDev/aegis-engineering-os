@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "policy": {
+    "selection": "user-controlled",
+    "secret_storage": "environment-or-provider-login",
+    "automatic_model_selection": false,
+    "allowed_provider_origins": [
+      "US",
+      "LOCAL"
+    ]
+  },
+  "providers": {
+    "openai": {
+      "display_name": "OpenAI",
+      "surfaces": {
+        "codex": {
+          "integration": "openhands_acp",
+          "connection_modes": [
+            "subscription_login",
+            "api_key"
+          ],
+          "api_key_env": "OPENAI_API_KEY",
+          "subscription_scope": "ChatGPT plan quota"
+        }
+      },
+      "origin": "US"
+    },
+    "anthropic": {
+      "display_name": "Anthropic",
+      "surfaces": {
+        "claude-code": {
+          "integration": "openhands_acp",
+          "connection_modes": [
+            "subscription_login",
+            "api_key"
+          ],
+          "api_key_env": "ANTHROPIC_API_KEY",
+          "subscription_scope": "Claude Pro/Max quota"
+        }
+      },
+      "origin": "US"
+    },
+    "google": {
+      "display_name": "Google",
+      "surfaces": {
+        "gemini-cli": {
+          "integration": "openhands_acp",
+          "connection_modes": [
+            "subscription_login",
+            "api_key"
+          ],
+          "api_key_env": "GEMINI_API_KEY",
+          "subscription_scope": "Google account or Google AI plan quota"
+        }
+      },
+      "origin": "US"
+    },
+    "meta": {
+      "display_name": "Meta",
+      "surfaces": {
+        "muse-code": {
+          "integration": "custom_agent",
+          "connection_modes": [
+            "subscription_login",
+            "api_key"
+          ],
+          "api_key_env": "MODEL_API_KEY",
+          "subscription_scope": "Muse Code subscription quota"
+        },
+        "model-api": {
+          "integration": "openhands_llm_openai_compatible",
+          "connection_modes": [
+            "api_key"
+          ],
+          "api_key_env": "MODEL_API_KEY",
+          "base_url": "https://api.meta.ai/v1",
+          "model_prefix": "openai/"
+        }
+      },
+      "origin": "US"
+    },
+    "xai": {
+      "display_name": "xAI",
+      "surfaces": {
+        "grok-api": {
+          "integration": "openhands_llm_openai_compatible",
+          "connection_modes": [
+            "api_key"
+          ],
+          "api_key_env": "XAI_API_KEY",
+          "base_url": "https://api.x.ai/v1",
+          "model_prefix": "xai/"
+        }
+      },
+      "origin": "US"
+    },
+    "ollama": {
+      "display_name": "Ollama",
+      "origin": "LOCAL",
+      "surfaces": {
+        "local": {
+          "integration": "openhands_llm_ollama",
+          "connection_modes": [
+            "local"
+          ],
+          "ollama_base_url": "http://127.0.0.1:11434"
+        }
+      }
+    }
+  }
+}
