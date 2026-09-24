@@ -6,8 +6,6 @@ on:
     branches:
       - main
       - develop
-      - ai/integration
-      - "ai/**"
   pull_request:
     branches:
       - main
@@ -54,3 +52,4 @@ jobs:
           test -f "$temp_project/project/.agents/skills/aegis-orchestrator/SKILL.md"
           test -f "$temp_project/project/.agents/skills/software-engineer/SKILL.md"
           test -f "$temp_project/project/.agents/skills/state-verification/SKILL.md"
+          python tools/verify_project.py "$temp_project/project"
