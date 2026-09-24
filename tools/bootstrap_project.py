@@ -128,8 +128,7 @@ def main() -> int:
             "status": "active",
         }
         (state_root / "aegis-version.json").write_text(
-            json.dumps(state, indent=2) + "
-",
+            json.dumps(state, indent=2) + "\n",
             encoding="utf-8",
         )
 
