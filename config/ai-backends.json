@@ -103,7 +103,8 @@
           "connection_modes": [
             "local"
           ],
-          "ollama_base_url": "http://127.0.0.1:11434"
+          "ollama_base_url": "http://127.0.0.1:11434",
+          "docker_ollama_base_url": "http://host.docker.internal:11434"
         }
       }
     }
