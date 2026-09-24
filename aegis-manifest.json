@@ -8,5 +8,6 @@
   "skill_format": "agentskills",
   "openhands_project_skill_path": ".agents/skills",
   "canonical_skill_library_path": "skills",
+  "skill_registry_path": "skills/registry.json",
   "active_knowledge_model": "known-good"
 }

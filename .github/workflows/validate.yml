@@ -1,0 +1,52 @@
+name: Aegis Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+      - ai/integration
+      - "ai/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+      - ai/integration
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aegis-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Aegis
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Compile Aegis tools
+        run: python -m py_compile tools/*.py
+
+      - name: Validate repository structure
+        run: python tools/validate_aegis.py
+
+      - name: Exercise project bootstrap
+        run: |
+          temp_project="$(mktemp -d)"
+          mkdir -p "$temp_project/project"
+          python tools/bootstrap_project.py "$temp_project/project" --preset all
+          test -f "$temp_project/project/AGENTS.md"
+          test -f "$temp_project/project/.aegis/aegis-version.json"
+          test -f "$temp_project/project/.agents/skills/aegis-orchestrator/SKILL.md"
+          test -f "$temp_project/project/.agents/skills/software-engineer/SKILL.md"
