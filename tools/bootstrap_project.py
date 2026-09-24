@@ -19,6 +19,8 @@ SKILL_SOURCES = {
     "product-discovery": Path("skills/product-discovery/SKILL.md"),
     "skill-authoring": Path("skills/skill-authoring/SKILL.md"),
     "knowledge-gap": Path("skills/knowledge-gap/SKILL.md"),
+    "work-item-lifecycle": Path("skills/workflows/work-item-lifecycle/SKILL.md"),
+    "github-issues": Path("skills/integrations/github-issues/SKILL.md"),
     "project-discovery": Path("skills/workflows/project-discovery/SKILL.md"),
     "feature-implementation": Path("skills/workflows/feature-implementation/SKILL.md"),
     "bug-fix": Path("skills/workflows/bug-fix/SKILL.md"),
@@ -36,6 +38,11 @@ ROLE_SKILLS = {
     "devops-engineer": Path("skills/roles/devops-engineer/SKILL.md"),
 }
 
+OPTIONAL_INTEGRATIONS = {
+    "jira": Path("skills/integrations/jira/SKILL.md"),
+    "confluence": Path("skills/integrations/confluence/SKILL.md"),
+}
+
 CORE_NAMES = (
     "aegis-orchestrator",
     "version-verification",
@@ -44,6 +51,8 @@ CORE_NAMES = (
     "offline-operation",
     "skill-authoring",
     "knowledge-gap",
+    "work-item-lifecycle",
+    "github-issues",
     "project-discovery",
     "feature-implementation",
     "bug-fix",
@@ -64,20 +73,35 @@ def parse_args() -> argparse.Namespace:
         choices=("core", "product", "all"),
         default="core",
     )
+    parser.add_argument(
+        "--integration",
+        action="append",
+        choices=tuple(OPTIONAL_INTEGRATIONS),
+        default=[],
+        help="Optional external integration to install; repeat for multiple integrations.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
 
-def selected_sources(preset: str) -> dict[str, Path]:
+def selected_sources(preset: str, integrations: list[str]) -> dict[str, Path]:
     names = list(CORE_NAMES)
     if preset in ("product", "all"):
         names.extend(PRODUCT_NAMES)
-    if preset == "all":
-        names.extend(ROLE_SKILLS.keys())
+    selected = {
+        name: SKILL_SOURCES[name]
+        for name in names
+        if name in SKILL_SOURCES
+    }
 
-    return {name: SKILL_SOURCES[name] for name in names if name in SKILL_SOURCES} | (
-        ROLE_SKILLS if preset == "all" else {}
-    )
+    if preset == "all":
+        selected.update(ROLE_SKILLS)
+        selected.update(OPTIONAL_INTEGRATIONS)
+
+    for integration in integrations:
+        selected[integration] = OPTIONAL_INTEGRATIONS[integration]
+
+    return selected
 
 
 def main() -> int:
@@ -91,7 +115,7 @@ def main() -> int:
     target_root = project / ".agents" / "skills"
     state_root = project / ".aegis"
 
-    for name, relative_source in selected_sources(args.preset).items():
+    for name, relative_source in selected_sources(args.preset, args.integration).items():
         source = root / relative_source
         destination = target_root / name / "SKILL.md"
 
@@ -120,11 +144,16 @@ def main() -> int:
             capture_output=True,
         ).stdout.strip()
 
+        source_repository = manifest.get(
+            "repository",
+            "KenlikDev/aegis-engineering-os",
+        )
         state = {
             "aegis_version": manifest["version"],
-            "source_repository": "KenlikDev/aegis-engineering-os",
+            "source_repository": source_repository,
             "source_commit": commit,
             "preset": args.preset,
+            "integrations": sorted(set(args.integration)),
             "status": "active",
         }
         (state_root / "aegis-version.json").write_text(
