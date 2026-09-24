@@ -26,6 +26,10 @@ The canonical reusable library is stored under skills/. OpenHands-compatible pro
 
 Stores validated guidance, candidates, references, decisions, and lessons.
 
+### Runtime boundary
+
+Separates Aegis orchestration from OpenHands execution. The local Ollama path has a read-only preflight that verifies the selected profile, runtime version, and exact installed model before execution is attempted.
+
 ### Governance
 
 Defines user authority, Git and GitHub policy, version pinning, and offline behavior.
