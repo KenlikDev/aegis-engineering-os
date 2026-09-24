@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "active_profile": "development",
+  "profiles": {
+    "development": {
+      "provider": "openai",
+      "surface": "codex",
+      "model": null,
+      "connection_mode": "subscription_login"
+    },
+    "review": {
+      "provider": "anthropic",
+      "surface": "claude-code",
+      "model": null,
+      "connection_mode": "subscription_login"
+    },
+    "multimodal": {
+      "provider": "google",
+      "surface": "gemini-cli",
+      "model": null,
+      "connection_mode": "subscription_login"
+    },
+    "meta-agent": {
+      "provider": "meta",
+      "surface": "muse-code",
+      "model": null,
+      "connection_mode": "subscription_login"
+    },
+    "meta-api": {
+      "provider": "meta",
+      "surface": "model-api",
+      "model": "muse-spark-1.3",
+      "connection_mode": "api_key"
+    },
+    "grok-api": {
+      "provider": "xai",
+      "surface": "grok-api",
+      "model": "grok-4.7",
+      "connection_mode": "api_key"
+    }
+  }
+}
