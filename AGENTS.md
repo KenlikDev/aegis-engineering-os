@@ -24,7 +24,7 @@ Ask the user when a decision has material product, business, security, privacy, 
 - Keep Aegis model-agnostic.
 - The user explicitly chooses the active AI provider, agent surface, and model.
 - Do not rank providers or silently switch providers after quota, network, or model failures.
-- Keep the default provider registry restricted to US-origin providers.
+- Keep provider origins explicit; the default registry may contain US-origin cloud providers and LOCAL backends such as Ollama.
 - Treat subscription login and API-key access as separate billing/authentication modes.
 - Never commit provider API keys, OAuth tokens, or cached credentials.
 - Do not assume that a consumer subscription includes API usage.

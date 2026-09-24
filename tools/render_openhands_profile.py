@@ -50,6 +50,8 @@ def main() -> int:
                 "acp_model": profile["model"],
             }
         )
+    elif integration == "openhands_llm_ollama":
+        result.update({"openhands_agent_kind": "llm", "llm_model": f'ollama/{profile["model"]}', "ollama_base_url": surface["ollama_base_url"]})
     elif integration == "openhands_llm_openai_compatible":
         result.update(
             {

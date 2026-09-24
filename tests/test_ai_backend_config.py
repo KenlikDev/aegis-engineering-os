@@ -15,9 +15,11 @@ class AIBackendConfigurationTests(unittest.TestCase):
     def test_registry_contains_expected_us_providers(self):
         registry = validate_ai_config.load_registry()
         self.assertEqual(
-            {"openai", "anthropic", "google", "meta", "xai"},
+            {"openai", "anthropic", "google", "meta", "xai", "ollama"},
             set(registry["providers"]),
         )
+        self.assertEqual("US", registry["providers"]["openai"]["origin"])
+        self.assertEqual("LOCAL", registry["providers"]["ollama"]["origin"])
         self.assertTrue(
             all(
                 provider.get("display_name")
@@ -49,6 +51,19 @@ class AIBackendConfigurationTests(unittest.TestCase):
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaises(validate_ai_config.ConfigurationError):
                 validate_ai_config.validate_profile_config(path)
+
+    def test_local_ollama_profile_is_valid(self):
+        registry = validate_ai_config.load_registry()
+        profile = {"provider": "ollama", "surface": "local", "model": "gemma4:31b", "connection_mode": "local"}
+        validate_ai_config.validate_profile("development-local", profile, registry)
+
+    def test_renderer_outputs_ollama_settings(self):
+        profile_path = ROOT / "templates" / "ai-profiles.example.json"
+        result = subprocess.run([sys.executable, str(ROOT / "tools" / "render_openhands_profile.py"), str(profile_path), "development-local"], check=True, capture_output=True, text=True)
+        rendered = json.loads(result.stdout)
+        self.assertEqual("llm", rendered["openhands_agent_kind"])
+        self.assertEqual("ollama/gemma4:31b", rendered["llm_model"])
+        self.assertEqual("http://127.0.0.1:11434", rendered["ollama_base_url"])
 
     def test_meta_model_api_accepts_only_api_key(self):
         registry = validate_ai_config.load_registry()

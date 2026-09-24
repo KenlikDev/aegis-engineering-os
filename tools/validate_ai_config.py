@@ -15,10 +15,11 @@ PROFILE_SCHEMA_VERSION = 2
 PROVIDER_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SURFACE_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PROFILE_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-ALLOWED_CONNECTION_MODES = {"subscription_login", "api_key"}
+ALLOWED_CONNECTION_MODES = {"subscription_login", "api_key", "local"}
 ALLOWED_INTEGRATIONS = {
     "openhands_acp",
     "openhands_llm_openai_compatible",
+    "openhands_llm_ollama",
     "custom_agent",
 }
 
@@ -49,8 +50,9 @@ def load_registry() -> dict:
     if not isinstance(policy, dict) or not isinstance(providers, dict) or not providers:
         raise ConfigurationError("AI backend registry must contain policy and providers.")
 
-    if policy.get("provider_origin") != "US":
-        raise ConfigurationError("AI backend registry is restricted to US-origin providers.")
+    allowed_origins = policy.get("allowed_provider_origins")
+    if allowed_origins != ["US", "LOCAL"]:
+        raise ConfigurationError("AI backend registry must explicitly allow US and LOCAL provider origins.")
     if policy.get("selection") != "user-controlled":
         raise ConfigurationError("AI backend selection must remain user-controlled.")
     if policy.get("secret_storage") != "environment-or-provider-login":
@@ -63,6 +65,10 @@ def load_registry() -> dict:
             raise ConfigurationError(f"Invalid provider name: {provider_name!r}.")
         if not isinstance(provider, dict):
             raise ConfigurationError(f"Provider {provider_name!r} must be an object.")
+
+        origin = provider.get("origin")
+        if origin not in allowed_origins:
+            raise ConfigurationError(f"Provider {provider_name!r} has unsupported origin: {origin!r}.")
 
         surfaces = provider.get("surfaces")
         if not isinstance(surfaces, dict) or not surfaces:
@@ -93,6 +99,16 @@ def load_registry() -> dict:
                 raise ConfigurationError(
                     f"Invalid connection modes for {provider_name}/{surface_name}."
                 )
+
+            if "local" in modes and origin != "LOCAL":
+                raise ConfigurationError(f"{provider_name}/{surface_name} uses local mode but provider origin is not LOCAL.")
+            if origin == "LOCAL" and "local" not in modes:
+                raise ConfigurationError(f"{provider_name}/{surface_name} must declare local connection mode.")
+
+            if integration == "openhands_llm_ollama":
+                ollama_base_url = surface.get("ollama_base_url")
+                if "local" not in modes or not isinstance(ollama_base_url, str) or not ollama_base_url.startswith(("http://", "https://")):
+                    raise ConfigurationError(f"{provider_name}/{surface_name} requires local mode and a valid ollama_base_url.")
 
             if integration == "openhands_llm_openai_compatible":
                 base_url = surface.get("base_url")
@@ -169,7 +185,7 @@ def validate_profile(profile_name: str, profile: dict, registry: dict) -> None:
             f"Profile {profile_name!r} model must be null or a non-empty string."
         )
 
-    if surface["integration"] == "openhands_llm_openai_compatible" and model is None:
+    if surface["integration"] in {"openhands_llm_openai_compatible", "openhands_llm_ollama"} and model is None:
         raise ConfigurationError(
             f"Profile {profile_name!r} requires an explicit model for "
             "OpenHands OpenAI-compatible transport."

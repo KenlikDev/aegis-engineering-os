@@ -22,13 +22,14 @@ Aegis defines the engineering rules, roles, workflows, skills, quality gates, de
 
 ## AI backends
 
-Aegis is intentionally model-agnostic. The default backend registry describes US-origin providers without ranking them or selecting a preferred model:
+Aegis is intentionally model-agnostic. The default backend registry describes explicitly classified providers without ranking them or selecting a preferred model:
 
 - OpenAI / Codex;
 - Anthropic / Claude Code;
 - Google / Gemini CLI;
 - Meta / Muse Code and Model API;
-- xAI / Grok API.
+- xAI / Grok API;
+- Ollama / local model runtime.
 
 Subscription login and direct API access are represented as separate connection modes. API credentials never belong in the repository.
 

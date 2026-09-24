@@ -4,13 +4,14 @@ Aegis is model-agnostic. The engineering workflow, governance, quality gates, an
 
 ## Provider policy
 
-The default backend registry contains only US-origin providers:
+The default backend registry contains explicitly classified US-origin cloud providers and a LOCAL Ollama backend:
 
 - OpenAI;
 - Anthropic;
 - Google;
 - Meta;
-- xAI.
+- xAI;
+- Ollama (LOCAL).
 
 The registry does not rank providers or models and never chooses a preferred model.
 
@@ -23,6 +24,12 @@ A connection mode describes how the provider credential is obtained:
 
 These modes are intentionally distinct. A consumer subscription does not imply free API usage.
 
+## Local Ollama
+
+Ollama is a first-class LOCAL provider. A profile records the exact local model tag, such as `gemma4:31b`, and Aegis must verify that model is actually available locally before activation. The default local endpoint is `http://127.0.0.1:11434`; an environment-specific endpoint may be used when explicitly configured.
+
+OpenHands exposes Ollama-specific LLM configuration through its LLM settings, and its SDK models the local endpoint as `ollama_base_url`.
+
 ## Current provider surfaces
 
 | Provider | Surface | OpenHands path | Login/API mode |
@@ -33,6 +40,7 @@ These modes are intentionally distinct. A consumer subscription does not imply f
 | Meta | Muse Code | Custom agent boundary | Meta subscription login or API key |
 | Meta | Model API / Muse Spark | OpenAI-compatible LLM | API key |
 | xAI | Grok API | OpenAI/LiteLLM-compatible LLM | API key |
+| Ollama | Local | Ollama LLM | Local |
 
 OpenHands currently documents built-in ACP support for Claude Code, Codex, and Gemini CLI. Other agent surfaces must use a compatible custom agent/adapter or the OpenHands LLM interface.
 

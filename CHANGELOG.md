@@ -4,7 +4,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
 
-- add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, and xAI;
+- add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;
 - distinguish subscription login from direct API authentication and billing;
 - model provider surfaces individually so subscription/API modes cannot be confused;

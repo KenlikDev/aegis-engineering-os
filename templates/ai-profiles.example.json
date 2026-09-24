@@ -2,6 +2,12 @@
   "schema_version": 2,
   "active_profile": "development",
   "profiles": {
+    "development-local": {
+      "provider": "ollama",
+      "surface": "local",
+      "model": "gemma4:31b",
+      "connection_mode": "local"
+    },
     "development": {
       "provider": "openai",
       "surface": "codex",
