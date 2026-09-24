@@ -41,6 +41,9 @@ jobs:
       - name: Validate repository structure
         run: python tools/validate_aegis.py
 
+      - name: Run policy tests
+        run: python -m unittest discover -s tests
+
       - name: Exercise project bootstrap
         run: |
           temp_project="$(mktemp -d)"
