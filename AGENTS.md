@@ -19,12 +19,21 @@ The agent owns routine engineering decisions and should make them autonomously w
 
 Ask the user when a decision has material product, business, security, privacy, cost, compliance, or irreversible-data consequences. When the user explicitly delegates a decision area, record the scope and proceed within it.
 
+## Evidence and state verification
+
+- User statements are authoritative for intent, preferences, and delegated decisions, but are not proof of independently observable state.
+- Verify current state from the strongest available authoritative source before relying on a state-dependent claim.
+- After material mutations, read the resulting state back when supported.
+- Distinguish verified facts, user-provided claims, assumptions, and unresolved uncertainty.
+- Never turn model memory, stale observations, or confident wording into evidence.
+- When state-dependent evidence conflicts, investigate the discrepancy before making the state-dependent decision.
+
 ## Work management
 
 - Every non-trivial task must have a stable work item before substantial implementation.
 - GitHub Issues is the default work-management provider.
 - Jira may be used when it is configured and is the project's established authoritative tracker.
-- Confluence may be used for persistent external knowledge; it is not a task queue unless the project explicitly defines it as one.
+- Confluence may be used for persistent external knowledge; it is not a task queue unless the project explicitly defines it as such.
 - Select exactly one authoritative work-management provider for each task.
 - Link the work item to its task branch, pull request, verification evidence, and final outcome.
 - Do not create duplicate backlogs across providers unless explicit synchronization is configured.
