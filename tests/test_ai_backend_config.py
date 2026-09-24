@@ -63,7 +63,9 @@ class AIBackendConfigurationTests(unittest.TestCase):
         rendered = json.loads(result.stdout)
         self.assertEqual("llm", rendered["openhands_agent_kind"])
         self.assertEqual("ollama/gemma4:31b", rendered["llm_model"])
-        self.assertEqual("http://127.0.0.1:11434", rendered["ollama_base_url"])
+        self.assertEqual("openai/gemma4:31b", rendered["llm_model"])
+        self.assertEqual("http://host.docker.internal:11434/v1", rendered["llm_base_url"])
+        self.assertEqual("local-llm", rendered["api_key_placeholder"])
 
     def test_meta_model_api_accepts_only_api_key(self):
         registry = validate_ai_config.load_registry()

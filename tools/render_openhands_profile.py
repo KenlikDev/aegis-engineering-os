@@ -51,7 +51,14 @@ def main() -> int:
             }
         )
     elif integration == "openhands_llm_ollama":
-        result.update({"openhands_agent_kind": "llm", "llm_model": f'ollama/{profile["model"]}', "ollama_base_url": surface["ollama_base_url"]})
+        result.update(
+            {
+                "openhands_agent_kind": "llm",
+                "llm_model": f'openai/{profile["model"]}',
+                "llm_base_url": f'{surface["docker_ollama_base_url"].rstrip("/")}/v1',
+                "api_key_placeholder": "local-llm",
+            }
+        )
     elif integration == "openhands_llm_openai_compatible":
         result.update(
             {
