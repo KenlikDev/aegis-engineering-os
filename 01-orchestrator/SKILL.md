@@ -59,7 +59,13 @@ Invoke work-item-lifecycle for every non-trivial task.
 - Create subtasks when multiple independent deliverables or specialist roles justify them.
 - Associate the work item with the current Aegis session.
 
-### 4. Skill selection
+### 4. Verification and skill selection
+
+Before acting on any state-dependent claim, classify it as user intent, user claim, observed fact, assumption, or unresolved uncertainty. Use current authoritative evidence to resolve claims before mutation or reporting.
+
+Invoke state-verification when the task depends on current external or repository state.
+
+Load only the skills required by the task:
 
 Load only the skills required by the task:
 - role skills;
