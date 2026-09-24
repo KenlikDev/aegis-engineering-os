@@ -19,7 +19,7 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
-def validate_skill(path: Path, seen_names: set[str]) -> None:
+def validate_skill(path: Path, seen_names: dict[str, str]) -> None:
     text = path.read_text(encoding="utf-8")
 
     if not text.startswith("---\n"):
@@ -44,7 +44,7 @@ def validate_skill(path: Path, seen_names: set[str]) -> None:
 
     if name in seen_names:
         fail(f"Duplicate skill name: {name}")
-    seen_names.add(name)
+    seen_names[name] = path.relative_to(ROOT).as_posix()
 
     if re.search(r"[А-Яа-яЁё]", text):
         fail(f"{path}: canonical skills must be English; Cyrillic text found.")
@@ -69,10 +69,21 @@ def main() -> int:
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     if manifest.get("version") != version:
         fail("VERSION and aegis-manifest.json disagree.")
+    for key in (
+        "repository",
+        "default_work_item_provider",
+        "work_item_strategy",
+        "optional_integrations",
+        "active_knowledge_model",
+    ):
+        if key not in manifest:
+            fail(f"aegis-manifest.json is missing required key: {key}")
 
     registry = json.loads(registry_file.read_text(encoding="utf-8"))
     if registry.get("version") != version:
         fail("VERSION and skills/registry.json disagree.")
+    if not isinstance(registry.get("skills"), list):
+        fail("skills/registry.json must contain a skills list.")
 
     required = [
         "AGENTS.md",
@@ -89,16 +100,22 @@ def main() -> int:
         "skills/workflows/feature-implementation/SKILL.md",
         "skills/workflows/bug-fix/SKILL.md",
         "skills/workflows/code-review/SKILL.md",
+        "skills/workflows/work-item-lifecycle/SKILL.md",
         "skills/workflows/aegis-update-validation/SKILL.md",
+        "skills/integrations/github-issues/SKILL.md",
+        "skills/integrations/jira/SKILL.md",
+        "skills/integrations/confluence/SKILL.md",
         "05-quality-gates/README.md",
         "06-git-github/branching-policy.md",
         "07-knowledge/knowledge-lifecycle.md",
         "08-offline/offline-architecture.md",
         "docs/architecture/overview.md",
+        "docs/architecture/work-management.md",
         "docs/product/discovery-mode.md",
         "docs/product/user-decision-model.md",
         "templates/product-brief.md",
         "templates/product-decision-questionnaire.md",
+        "templates/work-item.md",
         "templates/AGENTS.md",
         "tools/bootstrap_project.py",
         "skills/registry.json",
@@ -108,12 +125,12 @@ def main() -> int:
     if missing:
         fail("Missing required files: " + ", ".join(missing))
 
-    seen_names: set[str] = set()
+    discovered: dict[str, str] = {}
     for skill in sorted((ROOT / "skills").rglob("SKILL.md")):
-        validate_skill(skill, seen_names)
+        validate_skill(skill, discovered)
 
     registry_names: set[str] = set()
-    for entry in registry.get("skills", []):
+    for entry in registry["skills"]:
         name = entry.get("name")
         path = entry.get("path")
         if not name or not path:
@@ -121,12 +138,28 @@ def main() -> int:
         if name in registry_names:
             fail(f"Duplicate registry skill name: {name}")
         registry_names.add(name)
-        if not (ROOT / path).is_file():
-            fail(f"Registry path does not exist: {path}")
+        discovered_path = discovered.get(name)
+        if discovered_path is None:
+            fail(f"Registry skill does not exist under skills/: {name}")
+        if discovered_path != path:
+            fail(
+                f"Registry path mismatch for {name}: "
+                f"expected {discovered_path}, got {path}"
+            )
 
-    missing_from_registry = seen_names - registry_names
+    missing_from_registry = set(discovered) - registry_names
     if missing_from_registry:
-        fail("Skills missing from registry: " + ", ".join(sorted(missing_from_registry)))
+        fail(
+            "Skills missing from registry: "
+            + ", ".join(sorted(missing_from_registry))
+        )
+
+    extra_registry = registry_names - set(discovered)
+    if extra_registry:
+        fail(
+            "Registry contains unknown skills: "
+            + ", ".join(sorted(extra_registry))
+        )
 
     print(f"Aegis {version}: structural validation passed.")
     return 0
