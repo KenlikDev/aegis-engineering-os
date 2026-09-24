@@ -9,7 +9,7 @@ This file is generated for a project using Aegis Engineering OS.
 
 ## Aegis
 
-Record the active Aegis version and commit SHA in the project Aegis manifest.
+Record the active Aegis version, source commit, installed skills, and their checksums in .aegis/aegis-version.json.
 
 ## Work management
 

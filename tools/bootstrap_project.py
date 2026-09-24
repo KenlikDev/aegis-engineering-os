@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
+
+
+SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 SKILL_SOURCES = {
@@ -106,6 +111,141 @@ def selected_sources(preset: str, integrations: list[str]) -> dict[str, Path]:
     return selected
 
 
+def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
+    version_file = root / "VERSION"
+    manifest_file = root / "aegis-manifest.json"
+    registry_file = root / "skills" / "registry.json"
+
+    if not version_file.is_file():
+        raise SystemExit(f"Missing Aegis VERSION file: {version_file}")
+    if not manifest_file.is_file():
+        raise SystemExit(f"Missing Aegis manifest: {manifest_file}")
+    if not registry_file.is_file():
+        raise SystemExit(f"Missing Aegis skill registry: {registry_file}")
+
+    version = version_file.read_text(encoding="utf-8").strip()
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    registry = json.loads(registry_file.read_text(encoding="utf-8"))
+
+    if manifest.get("version") != version:
+        raise SystemExit("Aegis VERSION and aegis-manifest.json disagree.")
+    if registry.get("version") != version:
+        raise SystemExit("Aegis VERSION and skills/registry.json disagree.")
+    if not isinstance(registry.get("skills"), list):
+        raise SystemExit("Aegis skill registry must contain a skills list.")
+
+    required_manifest_keys = (
+        "repository",
+        "default_work_item_provider",
+        "work_item_strategy",
+        "optional_integrations",
+        "active_knowledge_model",
+    )
+    missing_manifest_keys = [
+        key for key in required_manifest_keys if key not in manifest
+    ]
+    if missing_manifest_keys:
+        raise SystemExit(
+            "Aegis manifest is missing required keys: "
+            + ", ".join(missing_manifest_keys)
+        )
+
+    registry_names: set[str] = set()
+    for entry in registry["skills"]:
+        name = entry.get("name")
+        path = entry.get("path")
+        if not name or not path:
+            raise SystemExit("Every Aegis registry entry must contain name and path.")
+        if name in registry_names:
+            raise SystemExit(f"Duplicate Aegis registry skill name: {name}")
+        registry_names.add(name)
+
+        registry_path = root / path
+        if not registry_path.is_file():
+            raise SystemExit(
+                f"Aegis registry points to a missing skill: {name} -> {path}"
+            )
+
+    return version, manifest, registry
+
+
+
+def load_previous_state(state_path: Path) -> dict | None:
+    if not state_path.is_file():
+        return None
+
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(
+            f"Existing Aegis state is not valid JSON: {exc}"
+        ) from exc
+
+    if not isinstance(state, dict):
+        raise SystemExit("Existing Aegis state must contain a JSON object.")
+    if state.get("schema_version") != 1:
+        raise SystemExit(
+            f"Unsupported existing Aegis state schema: {state.get('schema_version')!r}"
+        )
+
+    skills = state.get("skills")
+    if not isinstance(skills, list) or not all(
+        isinstance(name, str) for name in skills
+    ):
+        raise SystemExit("Existing Aegis state must contain a string skills list.")
+    if skills != sorted(set(skills)):
+        raise SystemExit("Existing Aegis state skills must be sorted and unique.")
+
+    for name in skills:
+        if not SKILL_NAME_PATTERN.fullmatch(name):
+            raise SystemExit(f"Invalid skill name in existing Aegis state: {name!r}")
+
+    return state
+
+
+def reconcile_previous_skills(
+    target_root: Path,
+    previous_skills: set[str],
+    selected_skills: set[str],
+    dry_run: bool,
+) -> None:
+    stale_skills = sorted(previous_skills - selected_skills)
+    for name in stale_skills:
+        destination = target_root / name
+        if not destination.exists():
+            continue
+        if not destination.is_dir():
+            raise SystemExit(
+                f"Refusing to remove non-directory managed skill path: {destination}"
+            )
+
+        entries = list(destination.iterdir())
+        unexpected = [
+            entry.name
+            for entry in entries
+            if entry.name != "SKILL.md" or entry.is_dir()
+        ]
+        if unexpected:
+            raise SystemExit(
+                f"Refusing to remove customized managed skill {name}; "
+                f"unexpected entries: {', '.join(sorted(unexpected))}"
+            )
+
+        if dry_run:
+            print(f"Would remove stale Aegis skill {destination}")
+        else:
+            shutil.rmtree(destination)
+            print(f"Removed stale Aegis skill {destination}")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -114,15 +254,29 @@ def main() -> int:
     if not project.is_dir():
         raise SystemExit(f"Project directory does not exist: {project}")
 
+    manifest_version, manifest, _registry = load_source_metadata(root)
+    selected = selected_sources(args.preset, args.integration)
+
     target_root = project / ".agents" / "skills"
     state_root = project / ".aegis"
+    state_path = state_root / "aegis-version.json"
+    previous_state = load_previous_state(state_path)
+    previous_skills = set(previous_state["skills"]) if previous_state else set()
 
-    for name, relative_source in selected_sources(args.preset, args.integration).items():
+    reconcile_previous_skills(
+        target_root=target_root,
+        previous_skills=previous_skills,
+        selected_skills=set(selected),
+        dry_run=args.dry_run,
+    )
+
+    for name, relative_source in selected.items():
         source = root / relative_source
-        destination = target_root / name / "SKILL.md"
 
         if not source.is_file():
             raise SystemExit(f"Missing Aegis skill source: {source}")
+
+        destination = target_root / name / "SKILL.md"
 
         if args.dry_run:
             print(f"Would install {source} -> {destination}")
@@ -133,9 +287,6 @@ def main() -> int:
         print(f"Installed {destination}")
 
     if not args.dry_run:
-        manifest = json.loads(
-            (root / "aegis-manifest.json").read_text(encoding="utf-8")
-        )
         state_root.mkdir(parents=True, exist_ok=True)
 
         commit = subprocess.run(
@@ -150,16 +301,26 @@ def main() -> int:
             "repository",
             "KenlikDev/aegis-engineering-os",
         )
+        skill_names = sorted(selected)
+        skill_checksums = {
+            name: sha256_file(target_root / name / "SKILL.md")
+            for name in skill_names
+        }
         state = {
-            "aegis_version": manifest["version"],
+            "schema_version": 1,
+            "aegis_version": manifest_version,
             "source_repository": source_repository,
             "source_commit": commit,
             "preset": args.preset,
-            "integrations": sorted(set(args.integration)),
+            "integrations": sorted(
+                name for name in selected if name in OPTIONAL_INTEGRATIONS
+            ),
+            "skills": skill_names,
+            "skill_checksums": skill_checksums,
             "status": "active",
         }
         (state_root / "aegis-version.json").write_text(
-            json.dumps(state, indent=2) + "\n",
+            json.dumps(state, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
 

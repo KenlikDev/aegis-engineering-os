@@ -26,9 +26,24 @@ For product-discovery work:
 
 Use --dry-run before changing an unfamiliar project.
 
-## Pinning
+## Pinning and verification
 
-After each deliberate Aegis update, record the exact Aegis commit SHA in the target project's .aegis/aegis-version.json.
+After each deliberate Aegis update, the target project's .aegis/aegis-version.json records:
+
+- the exact Aegis version and source commit;
+- the selected preset and effective integrations;
+- the exact installed skill set;
+- a SHA-256 checksum for every installed skill.
+
+Verify an installed project after recovery or when integrity is uncertain:
+
+    python3 tools/verify_project.py /path/to/project
+
+Changing presets during a later bootstrap removes only skills previously recorded
+as managed by Aegis, and refuses to delete customized managed skill directories.
+Project-local skills not recorded in Aegis state are left untouched.
+
+The verifier does not need network access or the Aegis source clone because it validates the installed files against the recorded checksums.
 
 Do not replace the active Aegis knowledge during a running session.
 
@@ -45,5 +60,6 @@ External facts that cannot be verified offline must be marked pending and rechec
 3. Review changes.
 4. Promote the candidate only after validation.
 5. Pin new sessions to the promoted version.
+6. Verify each bootstrapped project after recovery or an integrity-sensitive update.
 
 Never replace the only known-good local copy with an unvalidated update.
