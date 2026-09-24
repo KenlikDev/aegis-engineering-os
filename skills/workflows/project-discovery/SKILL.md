@@ -1,6 +1,6 @@
 ---
 name: project-discovery
-description: Inspect an existing repository and establish a trustworthy technical baseline before implementation work begins.
+description: Inspect an existing repository and establish a trustworthy technical baseline before implementation work begins, including work-management and external knowledge configuration.
 ---
 
 # Project Discovery
@@ -18,7 +18,9 @@ Determine:
 - deployment and container configuration;
 - project instructions;
 - architecture documentation;
-- relevant Git history.
+- relevant Git history;
+- configured work-management provider;
+- available external knowledge integrations.
 
 ## Output
 
@@ -27,8 +29,10 @@ Produce a project baseline containing:
 - technology/version inventory;
 - build and test commands;
 - important conventions;
+- work-management system and source-of-truth rules;
+- external knowledge integrations;
 - risks and constraints;
 - missing knowledge;
 - unresolved decisions.
 
-Do not begin substantial implementation until the baseline is sufficient for the task.
+Do not begin substantial implementation until the baseline is sufficient for the task and the work-management source of truth is known.
