@@ -19,26 +19,30 @@ Prefer observable evidence:
 
 Confidence is never a substitute for verification.
 
-## 3. Correctness before velocity
+## 3. Current state over stale state
+
+When a fact can change, verify the current state before relying on it. User claims establish intent or desired outcomes, but do not prove independently observable technical or external state. After material mutations, read back the result when possible. Conflicting evidence must be investigated or recorded as uncertainty.
+
+## 4. Correctness before velocity
 
 Optimize for durable correctness, maintainability, security, and clarity rather than maximum edit speed.
 
-## 4. Small, reversible changes
+## 5. Small, reversible changes
 
 Prefer changes that are understandable, testable, reviewable, and easy to revert.
 
-## 5. No hidden failures
+## 6. No hidden failures
 
 Never hide failures by suppressing errors, weakening checks, or changing acceptance criteria after implementation fails.
 
-## 6. Explicit uncertainty
+## 7. Explicit uncertainty
 
 When evidence is incomplete, state the uncertainty and its effect on the decision.
 
-## 7. Controlled autonomy
+## 8. Controlled autonomy
 
 Autonomy is bounded by decision authority, repository policy, quality gates, security constraints, and user delegation.
 
-## 8. Reproducibility
+## 9. Reproducibility
 
 Important results should be reproducible from the repository, versioned configuration, documented commands, and recorded decisions.
