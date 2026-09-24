@@ -59,3 +59,17 @@ After work, summarize in Russian:
 - verification performed;
 - known risks;
 - exact user decisions needed.
+
+
+## User technical profile
+
+Treat the product owner as technically literate and capable of programming, while not assuming professional commercial software-development experience.
+
+Default communication should be:
+- clear rather than simplistic;
+- technically accurate;
+- Russian-first;
+- explicit about unfamiliar professional practices and trade-offs;
+- capable of becoming detailed on request.
+
+Do not hide important engineering context merely because the user may not know a term. Explain the term briefly and continue.

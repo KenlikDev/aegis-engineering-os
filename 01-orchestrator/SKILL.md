@@ -1,6 +1,6 @@
 ---
 name: aegis-orchestrator
-description: Coordinate autonomous software development by selecting roles and skills, managing decision authority, enforcing quality gates, and controlling Git and GitHub workflow.
+description: Coordinate autonomous software development by selecting roles and skills, managing decision authority, enforcing quality gates, and controlling work-management, Git, and GitHub workflow.
 ---
 
 # Aegis Orchestrator
@@ -30,7 +30,8 @@ Inspect:
 - deployment files;
 - project instructions;
 - architecture documentation;
-- relevant Git history.
+- relevant Git history;
+- configured work-management and knowledge integrations.
 
 Do not make product changes during discovery.
 
@@ -47,28 +48,46 @@ Convert the request into:
 
 If the user has no idea and delegates discovery, invoke product-discovery instead of inventing a random feature.
 
-### 3. Skill selection
+### 3. Work intake and task assignment
+
+Invoke work-item-lifecycle for every non-trivial task.
+
+- Reuse an existing work item when it already represents the request.
+- Otherwise create a work item before substantial implementation.
+- Select exactly one authoritative work-management provider.
+- Record goal, scope, acceptance criteria, dependencies, risks, roles, and verification plan.
+- Create subtasks when multiple independent deliverables or specialist roles justify them.
+- Associate the work item with the current Aegis session.
+
+### 4. Verification and skill selection
+
+Before acting on any state-dependent claim, classify it as user intent, user claim, observed fact, assumption, or unresolved uncertainty. Use current authoritative evidence to resolve claims before mutation or reporting.
+
+Invoke state-verification when the task depends on current external or repository state.
+
+Load only the skills required by the task:
 
 Load only the skills required by the task:
 - role skills;
 - technology skills;
 - workflow skills;
 - quality and security skills;
-- project-local skills.
+- project-local skills;
+- selected work-management and external knowledge integrations.
 
 If a required skill is missing, invoke knowledge-gap handling.
 
-### 4. Plan
+### 5. Plan
 
 Create a concise plan with dependency order, affected components, tests, documentation, risks, and rollback considerations.
 
 For material architecture decisions, create or update an ADR.
 
-### 5. Implement
+### 6. Implement
 
-Work only on an ai/* task branch. Never directly modify main or develop.
+Work only on an ai/* task branch. Preserve the work-item identifier in the branch name when practical. Never directly modify main or develop.
 
-### 6. Verify
+### 7. Verify
 
 Run applicable quality gates:
 - formatting;
@@ -82,11 +101,11 @@ Run applicable quality gates:
 
 If a gate fails, diagnose and fix the root cause. Do not weaken the gate.
 
-### 7. Review
+### 8. Review
 
 Perform an independent review pass that assumes the implementation may contain defects. Check correctness, edge cases, concurrency, error handling, security, performance risks, duplicated logic, unnecessary complexity, testing, documentation, and scope.
 
-### 8. Git hygiene
+### 9. Git hygiene
 
 Before commit:
 - inspect status;
@@ -97,18 +116,28 @@ Before commit:
 
 If a mistake is found before push, clean local history using amend, fixup, or rebase when appropriate.
 
-### 9. Remote workflow
+### 10. Remote workflow
 
 Push only clean, verified checkpoints.
 
 Target flow:
+
 ai/* -> ai/integration -> develop -> main
 
-The agent may prepare and update PRs, but human approval controls protected branches according to repository policy.
+The agent may prepare and update task work items and pull requests. Each PR must identify its work item, verification evidence, and remaining risks. Protected-branch promotion remains governed by repository policy.
 
-### 10. Report
+### 11. Work-item closure
 
-Return a Russian report covering completed work, important decisions, verification evidence, unresolved items, and required user input.
+Before terminal completion:
+
+- verify every acceptance criterion;
+- ensure the linked PR and relevant verification evidence are identifiable;
+- record material decisions, blockers, and exceptions;
+- transition the work item to its terminal state only after the definition of done is satisfied.
+
+### 12. Report
+
+Return a Russian report covering the work-item ID, completed work, important decisions, verification evidence, unresolved items, and required user input.
 
 ## Stop conditions
 
@@ -118,4 +147,5 @@ Ask the user when:
 - production credentials or access are required and unavailable;
 - a security boundary is unclear;
 - the user must choose between materially different business outcomes;
-- external facts are necessary but cannot be verified.
+- external facts are necessary but cannot be verified;
+- a required external integration is unavailable and the task cannot proceed safely without it.

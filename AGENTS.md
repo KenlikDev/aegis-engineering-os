@@ -19,6 +19,36 @@ The agent owns routine engineering decisions and should make them autonomously w
 
 Ask the user when a decision has material product, business, security, privacy, cost, compliance, or irreversible-data consequences. When the user explicitly delegates a decision area, record the scope and proceed within it.
 
+## AI provider policy
+
+- Keep Aegis model-agnostic.
+- The user explicitly chooses the active AI provider, agent surface, and model.
+- Do not rank providers or silently switch providers after quota, network, or model failures.
+- Keep provider origins explicit; the default registry may contain US-origin cloud providers and LOCAL backends such as Ollama.
+- Treat subscription login and API-key access as separate billing/authentication modes.
+- Never commit provider API keys, OAuth tokens, or cached credentials.
+- Do not assume that a consumer subscription includes API usage.
+
+## Evidence and state verification
+
+- User statements are authoritative for intent, preferences, and delegated decisions, but are not proof of independently observable state.
+- Verify current state from the strongest available authoritative source before relying on a state-dependent claim.
+- After material mutations, read the resulting state back when supported.
+- Distinguish verified facts, user-provided claims, assumptions, and unresolved uncertainty.
+- Never turn model memory, stale observations, or confident wording into evidence.
+- When state-dependent evidence conflicts, investigate the discrepancy before making the state-dependent decision.
+
+## Work management
+
+- Every non-trivial task must have a stable work item before substantial implementation.
+- GitHub Issues is the default work-management provider.
+- Jira may be used when it is configured and is the project's established authoritative tracker.
+- Confluence may be used for persistent external knowledge; it is not a task queue unless the project explicitly defines it as such.
+- Select exactly one authoritative work-management provider for each task.
+- Link the work item to its task branch, pull request, verification evidence, and final outcome.
+- Do not create duplicate backlogs across providers unless explicit synchronization is configured.
+- Create subtasks only when they clarify ownership, independent deliverables, or dependencies.
+
 ## Engineering rules
 
 1. Inspect the existing repository before changing it.
@@ -43,6 +73,7 @@ Ask the user when a decision has material product, business, security, privacy, 
 - Target flow: ai/* -> ai/integration -> develop -> main.
 - Treat develop and main as human-controlled protected branches.
 - Prefer coherent, atomic commits.
+- Preserve work-item identity in branch and pull-request metadata.
 - If an error is discovered before a commit is pushed, prefer amend, fixup, or local history cleanup instead of noisy corrective commits.
 - Once a commit has been pushed to a shared remote branch, do not rewrite history unless an explicit repository policy allows it.
 - Do not push every minor change. Push at meaningful, verified checkpoints.
@@ -65,4 +96,4 @@ When current external information cannot be verified offline, say so explicitly 
 
 ## Completion gate
 
-A task is complete only when the applicable quality gates pass or an explicit, documented exception exists.
+A task is complete only when the applicable quality gates pass or an explicit, documented exception exists, and its authoritative work item reflects the resulting state.

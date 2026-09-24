@@ -1,0 +1,149 @@
+{
+  "version": "0.1.0-alpha.1",
+  "skills": [
+    {
+      "name": "version-verification",
+      "path": "skills/version-verification/SKILL.md",
+      "domain": "engineering",
+      "stability": "core"
+    },
+    {
+      "name": "git-hygiene",
+      "path": "skills/git-hygiene/SKILL.md",
+      "domain": "operations",
+      "stability": "core"
+    },
+    {
+      "name": "user-communication",
+      "path": "skills/user-communication/SKILL.md",
+      "domain": "product",
+      "stability": "core"
+    },
+    {
+      "name": "product-discovery",
+      "path": "skills/product-discovery/SKILL.md",
+      "domain": "product",
+      "stability": "core"
+    },
+    {
+      "name": "offline-operation",
+      "path": "skills/offline-operation/SKILL.md",
+      "domain": "operations",
+      "stability": "core"
+    },
+    {
+      "name": "skill-authoring",
+      "path": "skills/skill-authoring/SKILL.md",
+      "domain": "meta",
+      "stability": "core"
+    },
+    {
+      "name": "knowledge-gap",
+      "path": "skills/knowledge-gap/SKILL.md",
+      "domain": "meta",
+      "stability": "core"
+    },
+    {
+      "name": "state-verification",
+      "path": "skills/state-verification/SKILL.md",
+      "domain": "meta",
+      "stability": "core"
+    },
+    {
+      "name": "work-item-lifecycle",
+      "path": "skills/workflows/work-item-lifecycle/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "github-issues",
+      "path": "skills/integrations/github-issues/SKILL.md",
+      "domain": "integration",
+      "stability": "core"
+    },
+    {
+      "name": "jira",
+      "path": "skills/integrations/jira/SKILL.md",
+      "domain": "integration",
+      "stability": "optional"
+    },
+    {
+      "name": "confluence",
+      "path": "skills/integrations/confluence/SKILL.md",
+      "domain": "integration",
+      "stability": "optional"
+    },
+    {
+      "name": "product-manager",
+      "path": "skills/roles/product-manager/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "software-architect",
+      "path": "skills/roles/software-architect/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "software-engineer",
+      "path": "skills/roles/software-engineer/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "qa-engineer",
+      "path": "skills/roles/qa-engineer/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "security-engineer",
+      "path": "skills/roles/security-engineer/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "code-reviewer",
+      "path": "skills/roles/code-reviewer/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "devops-engineer",
+      "path": "skills/roles/devops-engineer/SKILL.md",
+      "domain": "role",
+      "stability": "core"
+    },
+    {
+      "name": "project-discovery",
+      "path": "skills/workflows/project-discovery/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "feature-implementation",
+      "path": "skills/workflows/feature-implementation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "bug-fix",
+      "path": "skills/workflows/bug-fix/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "code-review",
+      "path": "skills/workflows/code-review/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "aegis-update-validation",
+      "path": "skills/workflows/aegis-update-validation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    }
+  ]
+}

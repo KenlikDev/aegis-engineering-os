@@ -9,7 +9,18 @@ This file is generated for a project using Aegis Engineering OS.
 
 ## Aegis
 
-Record the active Aegis version and commit SHA in the project Aegis manifest.
+Record the active Aegis version, source commit, installed skills, and their checksums in .aegis/aegis-version.json.
+
+## Work management
+
+Every non-trivial task must have a work item before substantial implementation.
+
+- GitHub Issues is the default provider.
+- Jira may be selected when configured and already used as the project's authoritative tracker.
+- Confluence may be selected as an external knowledge backend.
+- Select exactly one authoritative work-management provider for each task.
+- Link the work item to the task branch, pull request, verification evidence, and final outcome.
+- Do not maintain duplicate independent backlogs.
 
 ## Repository workflow
 
@@ -27,7 +38,7 @@ Before version-sensitive work, inspect the project's source-of-truth manifests a
 
 ## Quality
 
-Do not claim completion without running the applicable tests, lint/static analysis, build, and security checks.
+Do not claim completion without running the applicable tests, lint/static analysis, build, and security checks, or recording an explicit documented exception.
 
 ## User interaction
 
