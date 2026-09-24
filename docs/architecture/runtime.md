@@ -73,3 +73,19 @@ Aegis must distinguish:
 - actual OpenHands execution state.
 
 A successful preflight proves that the selected local runtime is reachable and that the exact model tag is installed. It does not prove that OpenHands can execute a task successfully with that model.
+
+## OpenHands Agent Server preflight
+
+When the local OpenHands Agent Server is available, the same preflight can verify the execution boundary without assuming a default port.
+
+Provide the exact server URL explicitly:
+
+    python3 tools/preflight_runtime.py templates/ai-profiles.example.json development-local --agent-server-url "$AEGIS_OPENHANDS_AGENT_SERVER_URL"
+
+The preflight reads:
+
+- /alive to verify liveness;
+- /ready to verify completed initialization;
+- /server_info to capture the reported Agent Server, SDK, tools, and workspace versions.
+
+A reachable but not-ready server is a hard failure. The runtime URL is never inferred from a default port.

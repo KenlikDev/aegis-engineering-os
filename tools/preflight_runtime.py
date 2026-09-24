@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -46,7 +47,12 @@ def _get_ollama_models(base_url: str, timeout: int) -> list[dict[str, Any]]:
     return [model for model in models if isinstance(model, dict)]
 
 
-def preflight(profile_config: Path, profile_name: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
+def preflight(
+    profile_config: Path,
+    profile_name: str,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    openhands_agent_server_url: str | None = None,
+) -> dict[str, Any]:
     registry = load_registry()
     config = validate_profile_config(profile_config, registry)
 
@@ -84,7 +90,7 @@ def preflight(profile_config: Path, profile_name: str, timeout: int = DEFAULT_TI
             f"Available models: {', '.join(available_models) or '(none)'}."
         )
 
-    return {
+    result = {
         "status": "verified",
         "provider": profile["provider"],
         "surface": profile["surface"],
@@ -96,6 +102,53 @@ def preflight(profile_config: Path, profile_name: str, timeout: int = DEFAULT_TI
         "model_available": True,
     }
 
+    if openhands_agent_server_url:
+        agent_server_base_url = _normalize_base_url(openhands_agent_server_url)
+
+        alive = _request_json(f"{agent_server_base_url}/alive", timeout)
+        if alive.get("status") != "ok":
+            raise RuntimePreflightError(
+                "OpenHands Agent Server /alive did not report status=ok."
+            )
+
+        ready = _request_json(f"{agent_server_base_url}/ready", timeout)
+        if ready.get("status") != "ready":
+            raise RuntimePreflightError(
+                "OpenHands Agent Server is reachable but not ready."
+            )
+
+        server_info = _request_json(
+            f"{agent_server_base_url}/server_info",
+            timeout,
+        )
+        for field in (
+            "version",
+            "sdk_version",
+            "tools_version",
+            "workspace_version",
+        ):
+            if not isinstance(server_info.get(field), str) or not server_info[field]:
+                raise RuntimePreflightError(
+                    f"OpenHands Agent Server /server_info is missing {field}."
+                )
+
+        result["openhands_agent_server"] = {
+            "status": "verified",
+            "base_url": agent_server_base_url,
+            "version": server_info["version"],
+            "sdk_version": server_info["sdk_version"],
+            "tools_version": server_info["tools_version"],
+            "workspace_version": server_info["workspace_version"],
+            "build_git_sha": server_info.get("build_git_sha", "unknown"),
+            "build_git_ref": server_info.get("build_git_ref", "unknown"),
+            "conversation_runtime": server_info.get(
+                "conversation_runtime",
+                "unknown",
+            ),
+        }
+
+    return result
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -103,6 +156,11 @@ def main() -> int:
     )
     parser.add_argument("profile_config", type=Path)
     parser.add_argument("profile_name")
+    parser.add_argument(
+        "--agent-server-url",
+        default=os.environ.get("AEGIS_OPENHANDS_AGENT_SERVER_URL"),
+        help="Explicit OpenHands Agent Server base URL; may also be set via AEGIS_OPENHANDS_AGENT_SERVER_URL.",
+    )
     parser.add_argument(
         "--timeout",
         type=int,
@@ -115,7 +173,12 @@ def main() -> int:
         parser.error("--timeout must be greater than zero.")
 
     try:
-        result = preflight(args.profile_config, args.profile_name, args.timeout)
+        result = preflight(
+            args.profile_config,
+            args.profile_name,
+            args.timeout,
+            args.agent_server_url,
+        )
     except (ValueError, RuntimePreflightError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

@@ -66,6 +66,82 @@ class RuntimePreflightTests(unittest.TestCase):
                 "development",
             )
 
+    def test_preflight_verifies_openhands_agent_server(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+            "http://127.0.0.1:9000/alive": {"status": "ok"},
+            "http://127.0.0.1:9000/ready": {"status": "ready"},
+            "http://127.0.0.1:9000/server_info": {
+                "version": "0.12.1",
+                "sdk_version": "1.2.3",
+                "tools_version": "1.2.4",
+                "workspace_version": "1.2.5",
+                "build_git_sha": "abc123",
+                "build_git_ref": "main",
+                "conversation_runtime": "local",
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout: responses[url],
+        ):
+            result = preflight_runtime.preflight(
+                self.profile_path,
+                "development-local",
+                openhands_agent_server_url="http://127.0.0.1:9000/",
+            )
+
+        self.assertEqual("verified", result["openhands_agent_server"]["status"])
+        self.assertEqual(
+            "http://127.0.0.1:9000",
+            result["openhands_agent_server"]["base_url"],
+        )
+        self.assertEqual(
+            "0.12.1",
+            result["openhands_agent_server"]["version"],
+        )
+        self.assertEqual(
+            "1.2.3",
+            result["openhands_agent_server"]["sdk_version"],
+        )
+        self.assertEqual(
+            "abc123",
+            result["openhands_agent_server"]["build_git_sha"],
+        )
+
+    def test_preflight_rejects_unready_openhands_agent_server(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+            "http://127.0.0.1:9000/alive": {"status": "ok"},
+        }
+
+        def request_json(url: str, timeout: int) -> dict:
+            if url.endswith("/ready"):
+                raise preflight_runtime.RuntimePreflightError(
+                    "OpenHands Agent Server is reachable but not ready."
+                )
+            return responses[url]
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=request_json,
+        ):
+            with self.assertRaises(preflight_runtime.RuntimePreflightError):
+                preflight_runtime.preflight(
+                    self.profile_path,
+                    "development-local",
+                    openhands_agent_server_url="http://127.0.0.1:9000",
+                )
+
     def test_preflight_rejects_invalid_ollama_payload(self) -> None:
         responses = {
             "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
