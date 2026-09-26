@@ -62,7 +62,6 @@ class AIBackendConfigurationTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(ROOT / "tools" / "render_openhands_profile.py"), str(profile_path), "development-local"], check=True, capture_output=True, text=True)
         rendered = json.loads(result.stdout)
         self.assertEqual("llm", rendered["openhands_agent_kind"])
-        self.assertEqual("ollama/gemma4:31b", rendered["llm_model"])
         self.assertEqual("openai/gemma4:31b", rendered["llm_model"])
         self.assertEqual("http://host.docker.internal:11434/v1", rendered["llm_base_url"])
         self.assertEqual("local-llm", rendered["api_key_placeholder"])
