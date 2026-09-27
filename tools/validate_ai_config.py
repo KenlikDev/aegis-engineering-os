@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,8 +40,39 @@ def load_json(path: Path) -> dict:
     return value
 
 
-def load_registry() -> dict:
-    registry = load_json(REGISTRY_PATH)
+def validate_http_url(
+    value: object,
+    *,
+    field_name: str,
+    allowed_schemes: set[str],
+    root_path_only: bool = False,
+) -> None:
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        raise ConfigurationError(f"{field_name} must be a non-empty URL.")
+
+    parsed = urlparse(value)
+    if (
+        parsed.scheme not in allowed_schemes
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        schemes = ", ".join(sorted(allowed_schemes))
+        raise ConfigurationError(
+            f"{field_name} must be a valid HTTP URL using {schemes} "
+            "without credentials, query, or fragment."
+        )
+
+    if root_path_only and parsed.path not in ("", "/"):
+        raise ConfigurationError(
+            f"{field_name} must identify the service root without a path."
+        )
+
+
+def load_registry(registry_path: Path = REGISTRY_PATH) -> dict:
+    registry = load_json(registry_path)
 
     if registry.get("schema_version") != 2:
         raise ConfigurationError("Unsupported AI backend registry schema version.")
@@ -107,16 +139,32 @@ def load_registry() -> dict:
 
             if integration == "openhands_llm_ollama":
                 ollama_base_url = surface.get("ollama_base_url")
-                if "local" not in modes or not isinstance(ollama_base_url, str) or not ollama_base_url.startswith(("http://", "https://")):
-                    raise ConfigurationError(f"{provider_name}/{surface_name} requires local mode and a valid ollama_base_url.")
+                docker_ollama_base_url = surface.get("docker_ollama_base_url")
+                if "local" not in modes:
+                    raise ConfigurationError(
+                        f"{provider_name}/{surface_name} requires local connection mode."
+                    )
+                validate_http_url(
+                    ollama_base_url,
+                    field_name=f"{provider_name}/{surface_name}.ollama_base_url",
+                    allowed_schemes={"http", "https"},
+                    root_path_only=True,
+                )
+                validate_http_url(
+                    docker_ollama_base_url,
+                    field_name=f"{provider_name}/{surface_name}.docker_ollama_base_url",
+                    allowed_schemes={"http", "https"},
+                    root_path_only=True,
+                )
 
             if integration == "openhands_llm_openai_compatible":
                 base_url = surface.get("base_url")
                 model_prefix = surface.get("model_prefix")
-                if not isinstance(base_url, str) or not base_url.startswith("https://"):
-                    raise ConfigurationError(
-                        f"{provider_name}/{surface_name} requires an HTTPS base_url."
-                    )
+                validate_http_url(
+                    base_url,
+                    field_name=f"{provider_name}/{surface_name}.base_url",
+                    allowed_schemes={"https"},
+                )
                 if not isinstance(model_prefix, str) or not model_prefix:
                     raise ConfigurationError(
                         f"{provider_name}/{surface_name} requires model_prefix."

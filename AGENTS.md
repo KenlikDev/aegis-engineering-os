@@ -71,9 +71,11 @@ Ask the user when a decision has material product, business, security, privacy, 
 - Use task branches under ai/.
 - The shared AI integration branch is ai/integration.
 - Target flow: ai/* -> ai/integration -> develop -> main.
+- Short-lived promotion branches are prepared from the target branch for develop/main promotion.
 - Treat develop and main as human-controlled protected branches.
 - Prefer coherent, atomic commits.
 - Preserve work-item identity in branch and pull-request metadata.
+- Every pull request must identify its authoritative work item and verification evidence.
 - If an error is discovered before a commit is pushed, prefer amend, fixup, or local history cleanup instead of noisy corrective commits.
 - Once a commit has been pushed to a shared remote branch, do not rewrite history unless an explicit repository policy allows it.
 - Do not push every minor change. Push at meaningful, verified checkpoints.

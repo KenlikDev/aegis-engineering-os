@@ -66,6 +66,21 @@ class AIBackendConfigurationTests(unittest.TestCase):
         self.assertEqual("http://host.docker.internal:11434/v1", rendered["llm_base_url"])
         self.assertEqual("local-llm", rendered["api_key_placeholder"])
 
+    def test_ollama_registry_requires_docker_base_url(self):
+        registry = json.loads(
+            (ROOT / "config" / "ai-backends.json").read_text(encoding="utf-8")
+        )
+        del registry["providers"]["ollama"]["surfaces"]["local"][
+            "docker_ollama_base_url"
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ai-backends.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+
+            with self.assertRaises(validate_ai_config.ConfigurationError):
+                validate_ai_config.load_registry(path)
+
     def test_meta_model_api_accepts_only_api_key(self):
         registry = validate_ai_config.load_registry()
         profile = {
