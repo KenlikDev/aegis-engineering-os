@@ -112,9 +112,9 @@ The preflight reads:
 - /alive to verify liveness;
 - /ready to verify completed initialization;
 - /server_info to capture the reported Agent Server, SDK, tools, workspace versions, and local conversation runtime;
-- /api/v1/models to verify that the exact selected model is exposed through OpenHands' OpenAI-compatible LLM surface through the Agent Canvas unified ingress.
+- /api/settings to verify the active OpenHands agent configuration, including the exact selected model, the LLM base URL, and the presence of the configured LLM API key.
 
-The /api/v1/models check is read-only. The selected model is accepted when the server reports either the raw model tag or the OpenAI-compatible \`openai/<model-tag>\` identifier.
+The /api/settings check is read-only. The selected local model is accepted only when the active OpenHands LLM model is exactly \`openai/<model-tag>\`, its base URL is the validated Docker-to-host Ollama endpoint, and an LLM API key is configured. The key value itself is never read into Aegis evidence.
 
 A session API key may be supplied to authenticated Agent Server APIs through the environment; the key is never printed in evidence.
 

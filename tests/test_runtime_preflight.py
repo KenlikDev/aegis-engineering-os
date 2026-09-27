@@ -83,8 +83,15 @@ class RuntimePreflightTests(unittest.TestCase):
                 "build_git_ref": "main",
                 "conversation_runtime": "local",
             },
-            "http://127.0.0.1:9000/api/v1/models": {
-                "data": [{"id": "openai/gemma4:31b"}]
+            "http://127.0.0.1:9000/api/settings": {
+                "agent_settings": {
+                    "agent_kind": "openhands",
+                    "llm": {
+                        "model": "openai/gemma4:31b",
+                        "base_url": "http://host.docker.internal:11434/v1",
+                    },
+                },
+                "llm_api_key_is_set": True,
             },
         }
 
@@ -118,14 +125,15 @@ class RuntimePreflightTests(unittest.TestCase):
         )
         self.assertEqual(
             "openai/gemma4:31b",
-            result["openhands_agent_server"]["openai_compatible_model"],
+            result["openhands_agent_server"]["active_llm_model"],
         )
         self.assertEqual(
-            "verified",
-            result["openhands_agent_server"]["openai_compatible_model_surface"],
+            "http://host.docker.internal:11434/v1",
+            result["openhands_agent_server"]["llm_base_url"],
         )
+        self.assertTrue(result["openhands_agent_server"]["llm_api_key_is_set"])
 
-    def test_preflight_rejects_missing_openai_compatible_model(self) -> None:
+    def test_preflight_rejects_mismatched_active_llm_base_url(self) -> None:
         responses = {
             "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
             "http://127.0.0.1:11434/api/tags": {
@@ -140,8 +148,54 @@ class RuntimePreflightTests(unittest.TestCase):
                 "workspace_version": "1.2.5",
                 "conversation_runtime": "local",
             },
-            "http://127.0.0.1:9000/api/v1/models": {
-                "data": [{"id": "openai/other-model"}]
+            "http://127.0.0.1:9000/api/settings": {
+                "agent_settings": {
+                    "agent_kind": "openhands",
+                    "llm": {
+                        "model": "openai/gemma4:31b",
+                        "base_url": "http://127.0.0.1:11434/v1",
+                    },
+                },
+                "llm_api_key_is_set": True,
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout, headers=None: responses[url],
+        ):
+            with self.assertRaises(preflight_runtime.RuntimePreflightError):
+                preflight_runtime.preflight(
+                    self.profile_path,
+                    "development-local",
+                    openhands_agent_server_url="http://127.0.0.1:9000",
+                )
+
+    def test_preflight_rejects_mismatched_active_model(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+            "http://127.0.0.1:9000/alive": {"status": "ok"},
+            "http://127.0.0.1:9000/ready": {"status": "ready"},
+            "http://127.0.0.1:9000/server_info": {
+                "version": "0.12.1",
+                "sdk_version": "1.2.3",
+                "tools_version": "1.2.4",
+                "workspace_version": "1.2.5",
+                "conversation_runtime": "local",
+            },
+            "http://127.0.0.1:9000/api/settings": {
+                "agent_settings": {
+                    "agent_kind": "openhands",
+                    "llm": {
+                        "model": "openai/other-model",
+                        "base_url": "http://host.docker.internal:11434/v1",
+                    },
+                },
+                "llm_api_key_is_set": True,
             },
         }
 
@@ -201,14 +255,21 @@ class RuntimePreflightTests(unittest.TestCase):
                 "workspace_version": "1.2.5",
                 "conversation_runtime": "local",
             },
-            "http://127.0.0.1:9000/api/v1/models": {
-                "data": [{"id": "gemma4:31b"}]
+            "http://127.0.0.1:9000/api/settings": {
+                "agent_settings": {
+                    "agent_kind": "openhands",
+                    "llm": {
+                        "model": "openai/gemma4:31b",
+                        "base_url": "http://host.docker.internal:11434/v1",
+                    },
+                },
+                "llm_api_key_is_set": True,
             },
         }
         captured_headers = []
 
         def request_json(url: str, timeout: int, headers=None) -> dict:
-            if url.endswith("/api/v1/models"):
+            if url.endswith("/api/settings"):
                 captured_headers.append(headers)
             return responses[url]
 
