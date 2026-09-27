@@ -26,7 +26,7 @@ These modes are intentionally distinct. A consumer subscription does not imply f
 
 ## Local Ollama
 
-Ollama is a first-class LOCAL provider. A profile records the exact local model tag, such as `gemma4:31b`, and Aegis must verify that model is actually available locally before activation. The default local endpoint is `http://127.0.0.1:11434`; an environment-specific endpoint may be used when explicitly configured.
+Ollama is a first-class LOCAL provider. A profile records the exact local model tag, such as `gemma4:31b`, and Aegis must verify that model is actually available locally before activation. The host-side Ollama evidence endpoint is `http://127.0.0.1:11434`. For the Dockerized OpenHands runtime, the renderer uses the explicit container-to-host endpoint `http://host.docker.internal:11434/v1` and the OpenAI-compatible model identifier `openai/<model-tag>`.
 
 OpenHands exposes Ollama-specific LLM configuration through its LLM settings, and its SDK models the local endpoint as `ollama_base_url`.
 

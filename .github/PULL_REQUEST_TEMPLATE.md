@@ -1,3 +1,7 @@
+## Work item
+
+Issue:
+
 ## Summary
 
 Describe what changed and why.
@@ -11,6 +15,10 @@ Describe what changed and why.
 - [ ] Version compatibility was verified
 - [ ] Documentation was updated when needed
 - [ ] Final diff was reviewed
+
+## Verification evidence
+
+Link the relevant CI runs, test output, build evidence, or external verification.
 
 ## User-facing impact
 
