@@ -171,6 +171,7 @@ class RuntimePreflightTests(unittest.TestCase):
                     "development-local",
                     openhands_agent_server_url="http://127.0.0.1:9000",
                 )
+
     def test_preflight_rejects_mismatched_active_model(self) -> None:
         responses = {
             "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
@@ -263,7 +264,7 @@ class RuntimePreflightTests(unittest.TestCase):
                     },
                 },
                 "llm_api_key_is_set": True,
-            },,
+            },
         }
         captured_headers = []
 
