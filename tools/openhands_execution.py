@@ -236,6 +236,30 @@ def _validate_request(request: OpenHandsExecutionRequest) -> None:
         raise ValueError("poll_interval_seconds must be greater than zero.")
 
 
+def _redact_sensitive_state(value: Any) -> Any:
+    """Redact common credential fields from returned execution evidence."""
+
+    sensitive_keys = {
+        "api_key",
+        "authorization",
+        "session_api_key",
+        "access_token",
+        "refresh_token",
+    }
+    if isinstance(value, dict):
+        return {
+            key: (
+                "[REDACTED]"
+                if key.lower() in sensitive_keys
+                else _redact_sensitive_state(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_sensitive_state(item) for item in value]
+    return value
+
+
 class OpenHandsExecutionClient:
     """Execute one explicitly configured local task through Agent Server."""
 
