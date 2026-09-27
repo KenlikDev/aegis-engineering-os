@@ -112,9 +112,9 @@ The preflight reads:
 - /alive to verify liveness;
 - /ready to verify completed initialization;
 - /server_info to capture the reported Agent Server, SDK, tools, workspace versions, and local conversation runtime;
-- /v1/models to verify that the exact selected model is exposed through OpenHands' OpenAI-compatible LLM surface.
+- /api/v1/models to verify that the exact selected model is exposed through OpenHands' OpenAI-compatible LLM surface through the Agent Canvas unified ingress.
 
-The /v1/models check is read-only. The selected model is accepted when the server reports either the raw model tag or the OpenAI-compatible \`openai/<model-tag>\` identifier.
+The /api/v1/models check is read-only. The selected model is accepted when the server reports either the raw model tag or the OpenAI-compatible \`openai/<model-tag>\` identifier.
 
 A session API key may be supplied to authenticated Agent Server APIs through the environment; the key is never printed in evidence.
 

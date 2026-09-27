@@ -83,7 +83,7 @@ class RuntimePreflightTests(unittest.TestCase):
                 "build_git_ref": "main",
                 "conversation_runtime": "local",
             },
-            "http://127.0.0.1:9000/v1/models": {
+            "http://127.0.0.1:9000/api/v1/models": {
                 "data": [{"id": "openai/gemma4:31b"}]
             },
         }
@@ -140,7 +140,7 @@ class RuntimePreflightTests(unittest.TestCase):
                 "workspace_version": "1.2.5",
                 "conversation_runtime": "local",
             },
-            "http://127.0.0.1:9000/v1/models": {
+            "http://127.0.0.1:9000/api/v1/models": {
                 "data": [{"id": "openai/other-model"}]
             },
         }
@@ -201,14 +201,14 @@ class RuntimePreflightTests(unittest.TestCase):
                 "workspace_version": "1.2.5",
                 "conversation_runtime": "local",
             },
-            "http://127.0.0.1:9000/v1/models": {
+            "http://127.0.0.1:9000/api/v1/models": {
                 "data": [{"id": "gemma4:31b"}]
             },
         }
         captured_headers = []
 
         def request_json(url: str, timeout: int, headers=None) -> dict:
-            if url.endswith("/v1/models"):
+            if url.endswith("/api/v1/models"):
                 captured_headers.append(headers)
             return responses[url]
 

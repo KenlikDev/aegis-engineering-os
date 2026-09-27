@@ -154,14 +154,14 @@ def preflight(
             else None
         )
         openai_models = _request_json(
-            f"{agent_server_base_url}/v1/models",
+            f"{agent_server_base_url}/api/v1/models",
             timeout,
             headers=server_headers,
         )
         model_entries = openai_models.get("data")
         if not isinstance(model_entries, list):
             raise RuntimePreflightError(
-                "OpenHands Agent Server /v1/models response does not contain a data list."
+                "OpenHands Agent Server /api/v1/models response does not contain a data list."
             )
 
         exposed_model_ids = sorted(
@@ -176,7 +176,7 @@ def preflight(
         if not matching_model_ids:
             raise RuntimePreflightError(
                 f"Selected model {model!r} is not exposed by the OpenHands "
-                f"OpenAI-compatible /v1/models endpoint. "
+                f"OpenAI-compatible /api/v1/models endpoint. "
                 f"Available models: {', '.join(exposed_model_ids) or '(none)'}."
             )
 
