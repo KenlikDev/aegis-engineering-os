@@ -26,6 +26,7 @@ from openhands_execution import OpenHandsExecutionClient, OpenHandsExecutionRequ
 from preflight_runtime import RuntimePreflightError, preflight
 
 DEFAULT_OLLAMA_VERSION = "0.34.3"
+DEFAULT_MODEL = "gemma4:31b"
 DEFAULT_OPENHANDS_AGENT_SERVER_VERSION = "1.49.5"
 DEFAULT_OPENHANDS_IMAGE = "ghcr.io/openhands/agent-canvas:1.23.0"
 DEFAULT_WORKSPACE_ROOT = Path.home() / "openhands_workspace"
@@ -50,6 +51,7 @@ class LiveE2EConfig:
     host_workspace_root: Path
     openhands_container: str
     expected_ollama_version: str = DEFAULT_OLLAMA_VERSION
+    expected_model: str = DEFAULT_MODEL
     expected_openhands_version: str = DEFAULT_OPENHANDS_AGENT_SERVER_VERSION
     expected_openhands_image: str = DEFAULT_OPENHANDS_IMAGE
     max_iterations: int = DEFAULT_MAX_ITERATIONS
@@ -295,6 +297,8 @@ def run_live_smoke_test(
         )
     if not config.expected_ollama_version.strip():
         raise LiveE2EError("expected_ollama_version must not be empty.")
+    if not config.expected_model.strip():
+        raise LiveE2EError("expected_model must not be empty.")
     if not config.expected_openhands_version.strip():
         raise LiveE2EError("expected_openhands_version must not be empty.")
     if not config.expected_openhands_image.strip():
@@ -319,6 +323,12 @@ def run_live_smoke_test(
             f"{config.expected_ollama_version!r}, got "
             f"{preflight_result.get('ollama_version')!r}."
         )
+    if preflight_result.get("model") != config.expected_model:
+        raise LiveE2EError(
+            f"Ollama model mismatch: expected "
+            f"{config.expected_model!r}, got "
+            f"{preflight_result.get('model')!r}."
+        )
 
     server_evidence = preflight_result.get("openhands_agent_server")
     if not isinstance(server_evidence, Mapping):
@@ -340,6 +350,13 @@ def run_live_smoke_test(
         profile_config,
         config.profile_name,
     )
+    expected_openai_model = f"openai/{config.expected_model}"
+    rendered_model = agent.get("llm", {}).get("model")
+    if rendered_model != expected_openai_model:
+        raise LiveE2EError(
+            f"OpenHands model mismatch: expected "
+            f"{expected_openai_model!r}, got {rendered_model!r}."
+        )
     workspace: Path | None = None
     evidence: dict[str, Any] | None = None
     try:
@@ -467,6 +484,11 @@ def parse_args() -> LiveE2EConfig:
         default=DEFAULT_OLLAMA_VERSION,
     )
     parser.add_argument(
+        "--expected-model",
+        default=DEFAULT_MODEL,
+        help="Exact local Ollama model tag required for live verification.",
+    )
+    parser.add_argument(
         "--expected-openhands-version",
         default=DEFAULT_OPENHANDS_AGENT_SERVER_VERSION,
     )
@@ -512,6 +534,7 @@ def parse_args() -> LiveE2EConfig:
         host_workspace_root=args.host_workspace_root,
         openhands_container=args.openhands_container,
         expected_ollama_version=args.expected_ollama_version,
+        expected_model=args.expected_model,
         expected_openhands_version=args.expected_openhands_version,
         expected_openhands_image=args.expected_openhands_image,
         max_iterations=args.max_iterations,

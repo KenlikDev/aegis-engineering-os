@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from live_e2e_smoke_test import (  # noqa: E402
     EXPECTED_FILE_CONTENT,
+    DEFAULT_MODEL,
     EXPECTED_FILE_NAME,
     LiveE2EConfig,
     LiveE2EError,
@@ -208,6 +209,10 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 captured["request"].confirmation_policy["kind"],
             )
             self.assertEqual(
+                f"openai/{DEFAULT_MODEL}",
+                captured["request"].agent["llm"]["model"],
+            )
+            self.assertEqual(
                 "10",
                 str(captured["request"].max_iterations),
             )
@@ -215,6 +220,99 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 "removed",
                 evidence["workspace"]["cleanup"]["status"],
             )
+            self.assertEqual([], list(host_root.iterdir()))
+
+    def test_model_mismatch_fails_closed_before_workspace_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            host_root = Path(root)
+
+            def fake_preflight(*args, **kwargs):  # noqa: ANN002, ANN003
+                return {
+                    "ollama_version": "0.34.3",
+                    "model": "different-model:latest",
+                    "openhands_agent_server": {
+                        "version": "1.49.5",
+                        "sdk_version": "1.49.5",
+                        "tools_version": "1.49.5",
+                        "workspace_version": "1.49.5",
+                        "conversation_runtime": "local",
+                    },
+                }
+
+            def fake_inspect(name):  # noqa: ANN001
+                return "ghcr.io/openhands/agent-canvas:1.23.0"
+
+            with self.assertRaises(LiveE2EError):
+                run_live_smoke_test(
+                    LiveE2EConfig(
+                        profile_config=ROOT / "profiles.json",
+                        profile_name="development-local",
+                        agent_server_url="http://127.0.0.1:8000",
+                        host_workspace_root=host_root,
+                        openhands_container="openhands",
+                    ),
+                    preflight_fn=fake_preflight,
+                    inspect_image_fn=fake_inspect,
+                )
+
+            self.assertEqual([], list(host_root.iterdir()))
+
+    def test_rendered_model_mismatch_fails_closed_before_workspace_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            host_root = Path(root)
+
+            def fake_preflight(*args, **kwargs):  # noqa: ANN002, ANN003
+                return {
+                    "ollama_version": "0.34.3",
+                    "model": DEFAULT_MODEL,
+                    "openhands_agent_server": {
+                        "version": "1.49.5",
+                        "sdk_version": "1.49.5",
+                        "tools_version": "1.49.5",
+                        "workspace_version": "1.49.5",
+                        "conversation_runtime": "local",
+                    },
+                }
+
+            def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
+                return (
+                    {
+                        "kind": "Agent",
+                        "llm": {
+                            "model": "openai/different-model:latest",
+                            "base_url": "http://host.docker.internal:11434/v1",
+                            "api_key": "local-llm",
+                        },
+                    },
+                    {
+                        "provider": "ollama",
+                        "surface": "local",
+                        "connection_mode": "local",
+                        "integration": "openhands_llm_ollama",
+                        "openhands_agent_kind": "llm",
+                        "llm_model": "openai/different-model:latest",
+                        "llm_base_url": "http://host.docker.internal:11434/v1",
+                        "api_key_placeholder": "local-llm",
+                    },
+                )
+
+            def fake_inspect(name):  # noqa: ANN001
+                return "ghcr.io/openhands/agent-canvas:1.23.0"
+
+            with self.assertRaises(LiveE2EError):
+                run_live_smoke_test(
+                    LiveE2EConfig(
+                        profile_config=ROOT / "profiles.json",
+                        profile_name="development-local",
+                        agent_server_url="http://127.0.0.1:8000",
+                        host_workspace_root=host_root,
+                        openhands_container="openhands",
+                    ),
+                    preflight_fn=fake_preflight,
+                    inspect_image_fn=fake_inspect,
+                    render_agent_fn=fake_render,
+                )
+
             self.assertEqual([], list(host_root.iterdir()))
 
     def test_failed_execution_still_cleans_workspace(self) -> None:
