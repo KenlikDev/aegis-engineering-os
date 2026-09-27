@@ -7,35 +7,25 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from validate_ai_config import load_registry, validate_profile_config
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("profile_config", type=Path)
-    parser.add_argument("profile_name")
-    args = parser.parse_args()
+def render_profile(profile_config: Path, profile_name: str) -> dict[str, Any]:
+    """Render one validated Aegis AI profile into OpenHands settings."""
 
-    try:
-        registry = load_registry()
-        config = validate_profile_config(args.profile_config, registry)
-    except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+    registry = load_registry()
+    config = validate_profile_config(profile_config, registry)
 
-    profile = config["profiles"].get(args.profile_name)
+    profile = config["profiles"].get(profile_name)
     if profile is None:
-        print(
-            f"ERROR: unknown profile {args.profile_name!r}.",
-            file=sys.stderr,
-        )
-        return 1
+        raise ValueError(f"unknown profile {profile_name!r}.")
 
     surface = registry["providers"][profile["provider"]]["surfaces"][profile["surface"]]
     integration = surface["integration"]
 
-    result = {
+    result: dict[str, Any] = {
         "provider": profile["provider"],
         "surface": profile["surface"],
         "connection_mode": profile["connection_mode"],
@@ -75,6 +65,21 @@ def main() -> int:
                 "note": "Use a provider-specific agent or ACP adapter; Aegis does not invent a transport.",
             }
         )
+
+    return result
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("profile_config", type=Path)
+    parser.add_argument("profile_name")
+    args = parser.parse_args()
+
+    try:
+        result = render_profile(args.profile_config, args.profile_name)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
     print(json.dumps(result, indent=2))
     return 0
