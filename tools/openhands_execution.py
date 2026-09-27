@@ -122,9 +122,9 @@ def _request_json(
                 return response.status, {}
             parsed = json.loads(raw.decode("utf-8"))
     except HTTPError as exc:
-        raise OpenHandsExecutionError(
-            f"OpenHands HTTP request failed at {url} with status {exc.code}."
-        ) from exc
+        # Preserve the HTTP status so callers can intentionally accept a documented
+        # non-2xx response such as 409 Conflict from the run endpoint.
+        return exc.code, {}
     except (
         URLError,
         TimeoutError,
@@ -301,8 +301,8 @@ class OpenHandsExecutionClient:
             conversation_id=conversation_id,
             execution_status=status,
             outcome=outcome,
-            state=state,
-            events=tuple(events),
+            state=_redact_sensitive_state(state),
+            events=tuple(_redact_sensitive_state(events)),
         )
 
     def _verify_server_contract(
