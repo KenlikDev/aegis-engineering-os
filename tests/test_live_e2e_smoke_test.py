@@ -4,10 +4,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, "/tmp/aegis32/stubs")
-sys.path.insert(0, "/tmp/aegis30/tools")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
 
 from live_e2e_smoke_test import (  # noqa: E402
     EXPECTED_FILE_CONTENT,
