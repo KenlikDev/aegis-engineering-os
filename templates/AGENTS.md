@@ -30,6 +30,8 @@ Target promotion flow:
 
 ai/* -> ai/integration -> develop -> main
 
+Short-lived promotion branches may be created from the promotion target for develop/main delivery.
+
 Never directly modify develop or main.
 
 ## Version verification

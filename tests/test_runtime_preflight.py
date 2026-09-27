@@ -114,6 +114,35 @@ class RuntimePreflightTests(unittest.TestCase):
             result["openhands_agent_server"]["build_git_sha"],
         )
 
+    def test_preflight_rejects_non_local_openhands_agent_server(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+            "http://127.0.0.1:9000/alive": {"status": "ok"},
+            "http://127.0.0.1:9000/ready": {"status": "ready"},
+            "http://127.0.0.1:9000/server_info": {
+                "version": "0.12.1",
+                "sdk_version": "1.2.3",
+                "tools_version": "1.2.4",
+                "workspace_version": "1.2.5",
+                "conversation_runtime": "remote",
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout: responses[url],
+        ):
+            with self.assertRaises(preflight_runtime.RuntimePreflightError):
+                preflight_runtime.preflight(
+                    self.profile_path,
+                    "development-local",
+                    openhands_agent_server_url="http://127.0.0.1:9000",
+                )
+
     def test_preflight_rejects_unready_openhands_agent_server(self) -> None:
         responses = {
             "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},

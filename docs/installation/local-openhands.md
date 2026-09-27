@@ -6,6 +6,71 @@ Keep Aegis in a local Git clone, pin a known-good version, and install selected 
 
 OpenHands recognizes project-local AGENTS.md and skills under .agents/skills/ when they are present in the project workspace.
 
+## Verified local OpenHands runtime
+
+The validated local setup uses:
+
+- OpenHands Agent Canvas image: `ghcr.io/openhands/agent-canvas:1.23.0`;
+- unified local entry point: `127.0.0.1:8000`;
+- OpenHands Agent Server: `1.49.5`;
+- Ollama: `0.34.3`;
+- local model: `gemma4:31b`.
+
+The container image runs its `openhands` user as UID/GID `10001:10001`. Bind-mounted state directories therefore must be writable by that identity.
+
+Prepare the local directories:
+
+    mkdir -p "$HOME/.openhands" "$HOME/openhands_workspace"
+    sudo chown -R 10001:10001 "$HOME/.openhands" "$HOME/openhands_workspace"
+    sudo chmod -R u+rwX,g+rwX "$HOME/.openhands" "$HOME/openhands_workspace"
+
+Run OpenHands locally:
+
+    docker run -d \
+      --name openhands \
+      --restart unless-stopped \
+      --add-host host.docker.internal:host-gateway \
+      -p 127.0.0.1:8000:8000 \
+      -v "$HOME/.openhands:/home/openhands/.openhands" \
+      -v "$HOME/openhands_workspace:/projects" \
+      ghcr.io/openhands/agent-canvas:1.23.0
+
+Open:
+
+    http://127.0.0.1:8000/canvas
+
+Keep the published port bound to 127.0.0.1 for a local-only installation.
+
+## Ollama connection
+
+For Dockerized OpenHands, do not use `127.0.0.1:11434` inside the container. Use the Docker host alias:
+
+    http://host.docker.internal:11434/v1
+
+OpenHands should use the OpenAI-compatible model identifier:
+
+    openai/gemma4:31b
+
+Use a non-secret placeholder API key such as:
+
+    local-llm
+
+Verify the network boundary:
+
+    curl -sS http://127.0.0.1:11434/api/version
+    ollama list
+    docker exec openhands python -c 'import urllib.request; print(urllib.request.urlopen("http://host.docker.internal:11434/api/version", timeout=5).read().decode())'
+
+The host-side Aegis preflight continues to use `http://127.0.0.1:11434` because that endpoint is used for direct Ollama evidence. The OpenHands container uses `host.docker.internal` because its `127.0.0.1` points to the container itself.
+
+## Aegis preflight
+
+Run the local Ollama and OpenHands Agent Server checks before claiming the runtime boundary is verified:
+
+    python3 tools/preflight_runtime.py templates/ai-profiles.example.json development-local --agent-server-url http://127.0.0.1:8000
+
+The preflight is read-only. It verifies the exact configured model, Ollama runtime version, Agent Server liveness/readiness, local conversation runtime, and reported component versions.
+
 ## Local clone
 
 Clone this repository somewhere stable on the development VM, for example:
@@ -24,7 +89,7 @@ For product-discovery work:
 
     python3 tools/bootstrap_project.py /path/to/project --preset all
 
-Use --dry-run before changing an unfamiliar project.
+Aegis refuses to bootstrap the source repository itself or any target path inside the Aegis source tree. Use `--dry-run` before changing an unfamiliar project.
 
 ## Pinning and verification
 
@@ -36,15 +101,9 @@ After each deliberate Aegis update, the target project's .aegis/aegis-version.js
 - the exact installed skill set;
 - a SHA-256 checksum for every installed skill.
 
-Bootstrap refuses to run from a dirty Aegis source clone.
+Changing presets during a later bootstrap removes only skills previously recorded as managed by Aegis, refuses to overwrite unowned project skills, and refuses to overwrite or delete customized managed skill directories. Project-local skills not recorded in Aegis state are left untouched.
 
-Changing presets during a later bootstrap removes only skills previously recorded
-as managed by Aegis, refuses to overwrite unowned project skills, and refuses to
-overwrite or delete customized managed skill directories. Project-local skills
-not recorded in Aegis state are left untouched.
-
-Bootstrap stages changes before applying them and rolls back managed skills and
-state when a mutation fails.
+Bootstrap stages changes before applying them and rolls back managed skills and state when a mutation fails.
 
 Verify an installed project after recovery or when integrity is uncertain:
 

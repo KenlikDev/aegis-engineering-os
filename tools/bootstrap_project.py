@@ -114,6 +114,17 @@ def selected_sources(preset: str, integrations: list[str]) -> dict[str, Path]:
     return selected
 
 
+def ensure_project_outside_source(root: Path, project: Path) -> None:
+    try:
+        project.relative_to(root)
+    except ValueError:
+        return
+
+    raise SystemExit(
+        "Refusing to bootstrap a target project inside the Aegis source repository."
+    )
+
+
 def ensure_source_clean(root: Path) -> None:
     result = subprocess.run(
         ["git", "status", "--porcelain=v1", "--untracked-files=all"],
@@ -399,6 +410,8 @@ def main() -> int:
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
     project = args.project.resolve()
+
+    ensure_project_outside_source(root, project)
 
     if not project.is_dir():
         raise SystemExit(f"Project directory does not exist: {project}")

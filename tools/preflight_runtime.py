@@ -121,6 +121,13 @@ def preflight(
             f"{agent_server_base_url}/server_info",
             timeout,
         )
+        conversation_runtime = server_info.get("conversation_runtime")
+        if conversation_runtime != "local":
+            raise RuntimePreflightError(
+                "OpenHands Agent Server must report conversation_runtime=local "
+                "for the local runtime boundary."
+            )
+
         for field in (
             "version",
             "sdk_version",
@@ -141,10 +148,7 @@ def preflight(
             "workspace_version": server_info["workspace_version"],
             "build_git_sha": server_info.get("build_git_sha", "unknown"),
             "build_git_ref": server_info.get("build_git_ref", "unknown"),
-            "conversation_runtime": server_info.get(
-                "conversation_runtime",
-                "unknown",
-            ),
+            "conversation_runtime": conversation_runtime,
         }
 
     return result

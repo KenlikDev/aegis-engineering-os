@@ -220,6 +220,13 @@ class AegisPolicyTests(unittest.TestCase):
                     text=True,
                 )
 
+    def test_bootstrap_rejects_target_inside_aegis_source(self) -> None:
+        target = ROOT / ".aegis-audit-forbidden-target"
+        result = self.run_tool(BOOTSTRAP, target, "--preset", "core")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("inside the aegis source repository", result.stderr.lower())
+
     def test_project_verifier_detects_skill_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"
