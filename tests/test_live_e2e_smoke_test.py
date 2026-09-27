@@ -172,7 +172,8 @@ class LiveE2ESmokeTest(unittest.TestCase):
             def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
                 return (
                     {
-                        "kind": "Agent",
+                        "agent_kind": "openhands",
+                        "agent": "CodeActAgent",
                         "llm": {
                             "model": "openai/gemma4:31b",
                             "base_url": (
@@ -180,6 +181,8 @@ class LiveE2ESmokeTest(unittest.TestCase):
                             ),
                             "api_key": "local-llm",
                         },
+                        "tools": None,
+                        "enable_sub_agents": False,
                     },
                     {
                         "provider": "ollama",
@@ -256,8 +259,13 @@ class LiveE2ESmokeTest(unittest.TestCase):
             )
             self.assertEqual(
                 f"openai/{DEFAULT_MODEL}",
-                captured["request"].agent["llm"]["model"],
+                captured["request"].agent_settings["llm"]["model"],
             )
+            self.assertEqual(
+                "openhands",
+                captured["request"].agent_settings["agent_kind"],
+            )
+            self.assertIsNone(captured["request"].agent_settings["tools"])
             self.assertEqual(
                 "10",
                 str(captured["request"].max_iterations),
@@ -324,12 +332,15 @@ class LiveE2ESmokeTest(unittest.TestCase):
             def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
                 return (
                     {
-                        "kind": "Agent",
+                        "agent_kind": "openhands",
+                        "agent": "CodeActAgent",
                         "llm": {
                             "model": "openai/different-model:latest",
                             "base_url": "http://host.docker.internal:11434/v1",
                             "api_key": "local-llm",
                         },
+                        "tools": None,
+                        "enable_sub_agents": False,
                     },
                     {
                         "provider": "ollama",
@@ -382,12 +393,15 @@ class LiveE2ESmokeTest(unittest.TestCase):
             def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
                 return (
                     {
-                        "kind": "Agent",
+                        "agent_kind": "openhands",
+                        "agent": "CodeActAgent",
                         "llm": {
                             "model": "openai/gemma4:31b",
                             "base_url": "http://host.docker.internal:11434/v1",
                             "api_key": "local-llm",
                         },
+                        "tools": None,
+                        "enable_sub_agents": False,
                     },
                     {
                         "provider": "ollama",

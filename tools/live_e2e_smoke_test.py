@@ -111,7 +111,7 @@ def _inspect_container_image(
     return image
 
 
-def _render_local_ollama_agent(
+def _render_local_ollama_agent_settings(
     profile_config: Path,
     profile_name: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -140,15 +140,18 @@ def _render_local_ollama_agent(
             "Rendered local Ollama profile is missing required OpenHands LLM settings."
         )
 
-    agent = {
-        "kind": "Agent",
+    agent_settings = {
+        "agent_kind": "openhands",
+        "agent": "CodeActAgent",
         "llm": {
             "model": model,
             "base_url": base_url,
             "api_key": api_key,
         },
+        "tools": None,
+        "enable_sub_agents": False,
     }
-    return agent, rendered
+    return agent_settings, rendered
 
 
 def _configure_workspace_permissions(
@@ -346,7 +349,7 @@ def run_live_smoke_test(
     inspect_image_fn: Callable[[str], str] = _inspect_container_image,
     render_agent_fn: Callable[
         [Path, str], tuple[dict[str, Any], dict[str, Any]]
-    ] = _render_local_ollama_agent,
+    ] = _render_local_ollama_agent_settings,
 ) -> dict[str, Any]:
     """Execute and verify one isolated live task, then remove its workspace."""
 
@@ -410,12 +413,12 @@ def run_live_smoke_test(
             "OpenHands Agent Server did not report conversation_runtime=local."
         )
 
-    agent, rendered_profile = render_agent_fn(
+    agent_settings, rendered_profile = render_agent_fn(
         profile_config,
         config.profile_name,
     )
     expected_openai_model = f"openai/{config.expected_model}"
-    rendered_model = agent.get("llm", {}).get("model")
+    rendered_model = agent_settings.get("llm", {}).get("model")
     if rendered_model != expected_openai_model:
         raise LiveE2EError(
             f"OpenHands model mismatch: expected "
@@ -436,7 +439,7 @@ def run_live_smoke_test(
             server_url=agent_server_url,
             workspace=container_workspace,
             task=_task_text(),
-            agent=agent,
+            agent_settings=agent_settings,
             confirmation_policy={"kind": "NeverConfirm"},
             expected_agent_server_version=config.expected_openhands_version,
             max_iterations=config.max_iterations,
