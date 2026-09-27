@@ -94,9 +94,17 @@ class LiveE2ESmokeTest(unittest.TestCase):
             ["/usr/bin/setfacl", "-m", "u:10001:rwx", root],
             calls[0][0],
         )
-        self.assertEqual(["/usr/bin/setfacl", "-d", "-m", 
-                         "u::rwx,g::---,m::rwx,o::---,u:10001:rwx,u:1000:rwx", root],
-                         calls[1][0])
+        self.assertEqual(
+            [
+                "/usr/bin/setfacl",
+                "-d",
+                "-m",
+                "u::rwx,g::---,m::rwx,o::---,u:10001:rwx,u:1000:rwx",
+                root,
+            ],
+            calls[1][0],
+        )
+
     def test_cleanup_removes_only_workspace_child(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             host_root = Path(root)
@@ -336,6 +344,7 @@ class LiveE2ESmokeTest(unittest.TestCase):
                         agent_server_url="http://127.0.0.1:8000",
                         host_workspace_root=host_root,
                         openhands_container="openhands",
+                        configure_workspace_permissions=False,
                     ),
                     preflight_fn=fake_preflight,
                     inspect_image_fn=fake_inspect,
@@ -410,6 +419,7 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 agent_server_url="http://127.0.0.1:8000",
                 host_workspace_root=host_root,
                 openhands_container="openhands",
+                configure_workspace_permissions=False,
             )
             with self.assertRaises(LiveE2EError):
                 run_live_smoke_test(
