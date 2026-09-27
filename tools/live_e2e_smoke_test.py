@@ -255,13 +255,23 @@ def _verify_workspace_artifact(workspace: Path) -> dict[str, Any]:
         )
 
     entries = sorted(workspace.iterdir(), key=lambda item: item.name)
-    if len(entries) != 1 or entries[0].name != EXPECTED_FILE_NAME:
+    entry_names = {entry.name for entry in entries}
+    allowed_names = {EXPECTED_FILE_NAME, ".git"}
+    if not entry_names.issubset(allowed_names) or EXPECTED_FILE_NAME not in entry_names:
         names = [entry.name for entry in entries]
         raise LiveE2EError(
             f"Live smoke test produced an unexpected workspace shape: {names!r}."
         )
 
-    artifact = entries[0]
+    git_metadata = workspace / ".git"
+    if git_metadata in entries and (
+        not git_metadata.is_dir() or git_metadata.is_symlink()
+    ):
+        raise LiveE2EError(
+            "OpenHands Git metadata entry is not a normal directory."
+        )
+
+    artifact = workspace / EXPECTED_FILE_NAME
     if not artifact.is_file() or artifact.is_symlink():
         raise LiveE2EError(
             "Expected live smoke-test artifact is not a normal file."

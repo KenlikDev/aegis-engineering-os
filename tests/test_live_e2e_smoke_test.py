@@ -65,10 +65,20 @@ class LiveE2ESmokeTest(unittest.TestCase):
             evidence = _verify_workspace_artifact(workspace)
             self.assertTrue(evidence["content_verified"])
 
+            (workspace / ".git").mkdir()
+            evidence = _verify_workspace_artifact(workspace)
+            self.assertTrue(evidence["content_verified"])
+
             (workspace / "unexpected.txt").write_text(
                 "bad",
                 encoding="utf-8",
             )
+            with self.assertRaises(LiveE2EError):
+                _verify_workspace_artifact(workspace)
+
+            (workspace / "unexpected.txt").unlink()
+            (workspace / ".git").rmdir()
+            (workspace / ".git").symlink_to(workspace)
             with self.assertRaises(LiveE2EError):
                 _verify_workspace_artifact(workspace)
 
