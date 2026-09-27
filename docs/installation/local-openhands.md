@@ -93,7 +93,7 @@ The harness verifies the exact expected local runtime:
 - local conversation runtime;
 - selected model `gemma4:31b`.
 
-It creates one unique temporary directory directly under `$HOME/openhands_workspace`, grants the OpenHands container UID `10001` ACL access only to that directory, maps it to `/projects/<name>`, asks OpenHands to create exactly `Aegis-Live-E2E.txt` with `AEGIS_LIVE_E2E_OK`, verifies the file from the host, emits machine-readable evidence, and then removes only the temporary directory it created.
+It creates one unique temporary directory directly under `$HOME/openhands_workspace`, grants the OpenHands container UID `10001` ACL access only to that directory, maps it to `/projects/<name>`, allows OpenHands Agent Server to initialize its required `.git` metadata, asks the agent to create exactly `Aegis-Live-E2E.txt` with `AEGIS_LIVE_E2E_OK`, rejects any other top-level workspace entries, verifies the file from the host, emits machine-readable evidence, and then removes only the temporary directory it created.
 
 The smoke test uses an explicit `NeverConfirm` policy only for this isolated temporary workspace. It does not grant general approval authority to Aegis and must not be reused as a general project-execution mechanism.
 
