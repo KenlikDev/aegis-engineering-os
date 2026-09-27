@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -14,6 +15,7 @@ from live_e2e_smoke_test import (  # noqa: E402
     LiveE2EConfig,
     LiveE2EError,
     _cleanup_workspace,
+    _configure_workspace_permissions,
     _container_workspace,
     _event_summary,
     _task_text,
@@ -70,6 +72,31 @@ class LiveE2ESmokeTest(unittest.TestCase):
             with self.assertRaises(LiveE2EError):
                 _verify_workspace_artifact(workspace)
 
+    def test_workspace_acl_grants_container_and_host_access(self) -> None:
+        calls = []
+
+        def fake_run(command, **kwargs):  # noqa: ANN001
+            calls.append((command, kwargs))
+            return SimpleNamespace(returncode=0)
+
+        with tempfile.TemporaryDirectory() as root, patch(
+            "live_e2e_smoke_test.shutil.which",
+            return_value="/usr/bin/setfacl",
+        ), patch("live_e2e_smoke_test.os.getuid", return_value=1000):
+            _configure_workspace_permissions(
+                Path(root),
+                container_uid=10001,
+                run_command=fake_run,
+            )
+
+        self.assertEqual(2, len(calls))
+        self.assertEqual(
+            ["/usr/bin/setfacl", "-m", "u:10001:rwx", root],
+            calls[0][0],
+        )
+        self.assertEqual(["/usr/bin/setfacl", "-d", "-m", 
+                         "u::rwx,g::---,m::rwx,o::---,u:10001:rwx,u:1000:rwx", root],
+                         calls[1][0])
     def test_cleanup_removes_only_workspace_child(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             host_root = Path(root)
@@ -182,6 +209,7 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 agent_server_url="http://127.0.0.1:8000",
                 host_workspace_root=host_root,
                 openhands_container="openhands",
+                configure_workspace_permissions=False,
             )
             evidence = run_live_smoke_test(
                 config,
@@ -250,6 +278,7 @@ class LiveE2ESmokeTest(unittest.TestCase):
                         agent_server_url="http://127.0.0.1:8000",
                         host_workspace_root=host_root,
                         openhands_container="openhands",
+                        configure_workspace_permissions=False,
                     ),
                     preflight_fn=fake_preflight,
                     inspect_image_fn=fake_inspect,
