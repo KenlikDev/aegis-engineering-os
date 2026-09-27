@@ -69,7 +69,11 @@ Run the local Ollama and OpenHands Agent Server checks before claiming the runti
 
     python3 tools/preflight_runtime.py templates/ai-profiles.example.json development-local --agent-server-url http://127.0.0.1:8000
 
-The preflight is read-only. It verifies the exact configured model, Ollama runtime version, Agent Server liveness/readiness, local conversation runtime, and reported component versions.
+The preflight is read-only. It verifies the exact configured model, Ollama runtime version, Agent Server liveness/readiness, local conversation runtime, reported component versions, and exposure of the exact model through the Agent Server OpenAI-compatible `/v1/models` surface.
+
+When the Agent Server requires authentication, provide its session key through the `AEGIS_OPENHANDS_AGENT_SERVER_API_KEY` environment variable. The key is used only for the request and is not emitted in evidence.
+
+The preflight does not call `/v1/chat/completions`, create conversations, or modify OpenHands settings.
 
 ## Local clone
 

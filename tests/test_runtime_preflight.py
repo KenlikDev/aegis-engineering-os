@@ -27,7 +27,7 @@ class RuntimePreflightTests(unittest.TestCase):
         with patch.object(
             preflight_runtime,
             "_request_json",
-            side_effect=lambda url, timeout: responses[url],
+            side_effect=lambda url, timeout, headers=None: responses[url],
         ):
             result = preflight_runtime.preflight(
                 self.profile_path,
@@ -51,7 +51,7 @@ class RuntimePreflightTests(unittest.TestCase):
         with patch.object(
             preflight_runtime,
             "_request_json",
-            side_effect=lambda url, timeout: responses[url],
+            side_effect=lambda url, timeout, headers=None: responses[url],
         ):
             with self.assertRaises(preflight_runtime.RuntimePreflightError):
                 preflight_runtime.preflight(
@@ -83,12 +83,15 @@ class RuntimePreflightTests(unittest.TestCase):
                 "build_git_ref": "main",
                 "conversation_runtime": "local",
             },
+            "http://127.0.0.1:9000/v1/models": {
+                "data": [{"id": "openai/gemma4:31b"}]
+            },
         }
 
         with patch.object(
             preflight_runtime,
             "_request_json",
-            side_effect=lambda url, timeout: responses[url],
+            side_effect=lambda url, timeout, headers=None: responses[url],
         ):
             result = preflight_runtime.preflight(
                 self.profile_path,
@@ -113,6 +116,46 @@ class RuntimePreflightTests(unittest.TestCase):
             "abc123",
             result["openhands_agent_server"]["build_git_sha"],
         )
+        self.assertEqual(
+            "openai/gemma4:31b",
+            result["openhands_agent_server"]["openai_compatible_model"],
+        )
+        self.assertEqual(
+            "verified",
+            result["openhands_agent_server"]["openai_compatible_model_surface"],
+        )
+
+    def test_preflight_rejects_missing_openai_compatible_model(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+            "http://127.0.0.1:9000/alive": {"status": "ok"},
+            "http://127.0.0.1:9000/ready": {"status": "ready"},
+            "http://127.0.0.1:9000/server_info": {
+                "version": "0.12.1",
+                "sdk_version": "1.2.3",
+                "tools_version": "1.2.4",
+                "workspace_version": "1.2.5",
+                "conversation_runtime": "local",
+            },
+            "http://127.0.0.1:9000/v1/models": {
+                "data": [{"id": "openai/other-model"}]
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout, headers=None: responses[url],
+        ):
+            with self.assertRaises(preflight_runtime.RuntimePreflightError):
+                preflight_runtime.preflight(
+                    self.profile_path,
+                    "development-local",
+                    openhands_agent_server_url="http://127.0.0.1:9000",
+                )
 
     def test_preflight_rejects_non_local_openhands_agent_server(self) -> None:
         responses = {
@@ -134,7 +177,7 @@ class RuntimePreflightTests(unittest.TestCase):
         with patch.object(
             preflight_runtime,
             "_request_json",
-            side_effect=lambda url, timeout: responses[url],
+            side_effect=lambda url, timeout, headers=None: responses[url],
         ):
             with self.assertRaises(preflight_runtime.RuntimePreflightError):
                 preflight_runtime.preflight(
@@ -142,6 +185,49 @@ class RuntimePreflightTests(unittest.TestCase):
                     "development-local",
                     openhands_agent_server_url="http://127.0.0.1:9000",
                 )
+
+    def test_preflight_sends_optional_session_api_key(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+            "http://127.0.0.1:9000/alive": {"status": "ok"},
+            "http://127.0.0.1:9000/ready": {"status": "ready"},
+            "http://127.0.0.1:9000/server_info": {
+                "version": "0.12.1",
+                "sdk_version": "1.2.3",
+                "tools_version": "1.2.4",
+                "workspace_version": "1.2.5",
+                "conversation_runtime": "local",
+            },
+            "http://127.0.0.1:9000/v1/models": {
+                "data": [{"id": "gemma4:31b"}]
+            },
+        }
+        captured_headers = []
+
+        def request_json(url: str, timeout: int, headers=None) -> dict:
+            if url.endswith("/v1/models"):
+                captured_headers.append(headers)
+            return responses[url]
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=request_json,
+        ):
+            preflight_runtime.preflight(
+                self.profile_path,
+                "development-local",
+                openhands_agent_server_url="http://127.0.0.1:9000",
+                openhands_agent_server_api_key="test-session-key",
+            )
+
+        self.assertEqual(
+            [{"X-Session-API-Key": "test-session-key"}],
+            captured_headers,
+        )
 
     def test_preflight_rejects_unready_openhands_agent_server(self) -> None:
         responses = {
@@ -180,7 +266,7 @@ class RuntimePreflightTests(unittest.TestCase):
         with patch.object(
             preflight_runtime,
             "_request_json",
-            side_effect=lambda url, timeout: responses[url],
+            side_effect=lambda url, timeout, headers=None: responses[url],
         ):
             with self.assertRaises(preflight_runtime.RuntimePreflightError):
                 preflight_runtime.preflight(
