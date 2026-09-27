@@ -47,7 +47,29 @@ The runtime preflight deliberately does not hard-code an OpenHands CLI command.
 
 OpenHands integration details can change independently from Aegis orchestration. A provider/runtime adapter must be verified against the exact installed OpenHands version before an execution command is promoted into the canonical runtime contract.
 
-Until that verification exists, Aegis may validate the local model runtime and prepare an execution profile, but it must not claim that autonomous end-to-end execution has been proven.
+The current adapter is an explicit REST contract for the verified OpenHands Agent Server 1.49.5 runtime. It is implemented separately in \`tools/openhands_execution.py\` and documented in \`docs/architecture/openhands-execution.md\`.
+
+Until a live execution has been verified, Aegis must not claim that autonomous end-to-end execution has been proven.
+
+## OpenHands execution adapter
+
+After the read-only preflight succeeds, the execution adapter can drive one explicitly selected task through the Agent Server:
+
+1. verify \`/alive\`, \`/ready\`, and the exact Agent Server version;
+2. create a conversation with the selected agent and OpenHands server-visible workspace;
+3. send the user task with \`run=false\`;
+4. trigger the run through the dedicated \`/run\` endpoint;
+5. poll the authoritative conversation state;
+6. stop on a stable terminal state or escalate \`waiting_for_confirmation\` / \`paused\`;
+7. collect the complete paginated event history as execution evidence.
+
+The adapter is loopback-only for the local runtime, never performs provider fallback, never substitutes a model, and never automatically confirms or resumes a blocked conversation.
+
+The workspace is a path in the OpenHands container/server namespace. Aegis must establish the host-to-container mapping before execution; the adapter does not invent or mutate Docker mounts.
+
+An execution timeout preserves the conversation ID in \`OpenHandsExecutionError\` so the caller can inspect or recover the existing conversation instead of creating an untracked duplicate.
+
+The adapter requires an explicit confirmation policy rather than inheriting the OpenHands default implicitly. This keeps approval behavior visible at the Aegis authority boundary.
 
 ## Failure handling
 
@@ -62,6 +84,8 @@ The failure must identify:
 
 Automatic fallback is prohibited.
 
+For execution failures, preserve the OpenHands conversation identifier when one exists. Do not silently start another conversation with a different provider, model, or workspace.
+
 ## Evidence
 
 Runtime evidence is an observation, not a promise.
@@ -70,9 +94,10 @@ Aegis must distinguish:
 
 - configured profile;
 - verified local runtime state;
-- actual OpenHands execution state.
+- actual OpenHands execution state;
+- final project/workspace verification after execution.
 
-A successful preflight proves that the selected local runtime is reachable and that the exact model tag is installed. It does not prove that OpenHands can execute a task successfully with that model.
+A successful preflight proves that the selected local runtime is reachable and that the exact model tag is installed. The execution adapter tests prove its HTTP/state contract. Neither one by itself proves that a real engineering task completed successfully against the live workspace.
 
 ## OpenHands Agent Server preflight
 
@@ -89,10 +114,10 @@ The preflight reads:
 - /server_info to capture the reported Agent Server, SDK, tools, workspace versions, and local conversation runtime;
 - /v1/models to verify that the exact selected model is exposed through OpenHands' OpenAI-compatible LLM surface.
 
-The /v1/models check is read-only. The selected model is accepted when the server reports either the raw model tag or the OpenAI-compatible `openai/<model-tag>` identifier.
+The /v1/models check is read-only. The selected model is accepted when the server reports either the raw model tag or the OpenAI-compatible \`openai/<model-tag>\` identifier.
 
 A session API key may be supplied to authenticated Agent Server APIs through the environment; the key is never printed in evidence.
 
 A reachable but not-ready server or a server that does not expose the selected model is a hard failure. The runtime URL is never inferred from a default port.
 
-This still does not execute `/v1/chat/completions` and does not prove that a full agent task can complete successfully.
+This still does not execute \`/v1/chat/completions\`, create conversations, or modify OpenHands settings.

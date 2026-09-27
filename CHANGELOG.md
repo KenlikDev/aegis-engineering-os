@@ -18,7 +18,8 @@ All notable changes to Aegis Engineering OS will be documented here.
 - require clean Aegis source provenance and record it in state;
 - add offline project integrity verification with per-skill SHA-256 checksums;
 - validate source metadata before installation;
-- add regression coverage for bootstrap ownership and dirty-source rejection.
+- add regression coverage for bootstrap ownership and dirty-source rejection;
+- add the OpenHands Agent Server execution adapter contract with exact version gating, explicit task execution sequencing, and execution evidence collection.
 
 ## 0.1.0-alpha.1
 
