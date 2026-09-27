@@ -75,6 +75,32 @@ When the Agent Server requires authentication, provide its session key through t
 
 The preflight does not call `/v1/chat/completions`, create conversations, or modify OpenHands settings.
 
+## Live Aegis-to-OpenHands smoke test
+
+After the local runtime preflight is green, run the isolated live smoke test only from the Ubuntu VM that owns the OpenHands Docker workspace mount:
+
+    python3 tools/live_e2e_smoke_test.py \
+      templates/ai-profiles.example.json \
+      development-local \
+      --agent-server-url http://127.0.0.1:8000 \
+      --host-workspace-root "$HOME/openhands_workspace"
+
+The harness verifies the exact expected local runtime:
+
+- Ollama 0.34.3;
+- OpenHands Agent Server 1.49.5;
+- `ghcr.io/openhands/agent-canvas:1.23.0`;
+- local conversation runtime;
+- selected model `gemma4:31b`.
+
+It creates one unique temporary directory directly under `$HOME/openhands_workspace`, maps it to `/projects/<name>`, asks OpenHands to create exactly `Aegis-Live-E2E.txt` with `AEGIS_LIVE_E2E_OK`, verifies the file from the host, emits machine-readable evidence, and then removes only the temporary directory it created.
+
+The smoke test uses an explicit `NeverConfirm` policy only for this isolated temporary workspace. It does not grant general approval authority to Aegis and must not be reused as a general project-execution mechanism.
+
+When the Agent Server requires authentication, the harness reads `AEGIS_OPENHANDS_AGENT_SERVER_API_KEY` by default, or the environment variable named by `--agent-server-api-key-env`.
+
+A passing adapter unit test or CI run is not live evidence. End-to-end capability is considered verified only when this smoke test itself completes successfully on the target Ubuntu VM.
+
 ## Local clone
 
 Clone this repository somewhere stable on the development VM, for example:
