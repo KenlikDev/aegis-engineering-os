@@ -86,6 +86,13 @@ The preflight reads:
 
 - /alive to verify liveness;
 - /ready to verify completed initialization;
-- /server_info to capture the reported Agent Server, SDK, tools, and workspace versions.
+- /server_info to capture the reported Agent Server, SDK, tools, workspace versions, and local conversation runtime;
+- /v1/models to verify that the exact selected model is exposed through OpenHands' OpenAI-compatible LLM surface.
 
-A reachable but not-ready server is a hard failure. The runtime URL is never inferred from a default port.
+The /v1/models check is read-only. The selected model is accepted when the server reports either the raw model tag or the OpenAI-compatible `openai/<model-tag>` identifier.
+
+A session API key may be supplied to authenticated Agent Server APIs through the environment; the key is never printed in evidence.
+
+A reachable but not-ready server or a server that does not expose the selected model is a hard failure. The runtime URL is never inferred from a default port.
+
+This still does not execute `/v1/chat/completions` and does not prove that a full agent task can complete successfully.

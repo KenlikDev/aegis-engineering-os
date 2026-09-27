@@ -22,8 +22,16 @@ class RuntimePreflightError(RuntimeError):
     """Raised when the selected local runtime cannot be verified."""
 
 
-def _request_json(url: str, timeout: int) -> dict[str, Any]:
-    request = Request(url, headers={"Accept": "application/json"})
+def _request_json(
+    url: str,
+    timeout: int,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    request_headers = {"Accept": "application/json"}
+    if headers:
+        request_headers.update(headers)
+
+    request = Request(url, headers=request_headers)
     try:
         with urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -52,6 +60,7 @@ def preflight(
     profile_name: str,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     openhands_agent_server_url: str | None = None,
+    openhands_agent_server_api_key: str | None = None,
 ) -> dict[str, Any]:
     registry = load_registry()
     config = validate_profile_config(profile_config, registry)
@@ -139,8 +148,42 @@ def preflight(
                     f"OpenHands Agent Server /server_info is missing {field}."
                 )
 
+        server_headers = (
+            {"X-Session-API-Key": openhands_agent_server_api_key}
+            if openhands_agent_server_api_key
+            else None
+        )
+        openai_models = _request_json(
+            f"{agent_server_base_url}/v1/models",
+            timeout,
+            headers=server_headers,
+        )
+        model_entries = openai_models.get("data")
+        if not isinstance(model_entries, list):
+            raise RuntimePreflightError(
+                "OpenHands Agent Server /v1/models response does not contain a data list."
+            )
+
+        exposed_model_ids = sorted(
+            item.get("id")
+            for item in model_entries
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        )
+        accepted_model_ids = {model, f"openai/{model}"}
+        matching_model_ids = sorted(
+            model_id for model_id in exposed_model_ids if model_id in accepted_model_ids
+        )
+        if not matching_model_ids:
+            raise RuntimePreflightError(
+                f"Selected model {model!r} is not exposed by the OpenHands "
+                f"OpenAI-compatible /v1/models endpoint. "
+                f"Available models: {', '.join(exposed_model_ids) or '(none)'}."
+            )
+
         result["openhands_agent_server"] = {
             "status": "verified",
+            "openai_compatible_model": matching_model_ids[0],
+            "openai_compatible_model_surface": "verified",
             "base_url": agent_server_base_url,
             "version": server_info["version"],
             "sdk_version": server_info["sdk_version"],
@@ -166,6 +209,11 @@ def main() -> int:
         help="Explicit OpenHands Agent Server base URL; may also be set via AEGIS_OPENHANDS_AGENT_SERVER_URL.",
     )
     parser.add_argument(
+        "--agent-server-api-key-env",
+        default="AEGIS_OPENHANDS_AGENT_SERVER_API_KEY",
+        help="Environment variable containing the optional OpenHands Agent Server session API key.",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=DEFAULT_TIMEOUT_SECONDS,
@@ -176,12 +224,17 @@ def main() -> int:
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero.")
 
+    agent_server_api_key = None
+    if args.agent_server_url:
+        agent_server_api_key = os.environ.get(args.agent_server_api_key_env)
+
     try:
         result = preflight(
             args.profile_config,
             args.profile_name,
             args.timeout,
             args.agent_server_url,
+            agent_server_api_key,
         )
     except (ValueError, RuntimePreflightError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
