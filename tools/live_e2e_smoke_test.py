@@ -29,6 +29,7 @@ DEFAULT_OLLAMA_VERSION = "0.34.3"
 DEFAULT_MODEL = "gemma4:31b"
 DEFAULT_OPENHANDS_AGENT_SERVER_VERSION = "1.49.5"
 DEFAULT_OPENHANDS_IMAGE = "ghcr.io/openhands/agent-canvas:1.23.0"
+DEFAULT_OPENHANDS_CONTAINER_UID = 10001
 DEFAULT_WORKSPACE_ROOT = Path.home() / "openhands_workspace"
 DEFAULT_MAX_ITERATIONS = 10
 DEFAULT_TIMEOUT_SECONDS = 900.0
@@ -58,6 +59,7 @@ class LiveE2EConfig:
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS
     agent_server_api_key: str | None = None
+    configure_workspace_permissions: bool = True
 
 
 def _validate_loopback_url(value: str) -> str:
@@ -148,6 +150,58 @@ def _render_local_ollama_agent(
     }
     return agent, rendered
 
+
+def _configure_workspace_permissions(
+    workspace: Path,
+    container_uid: int = DEFAULT_OPENHANDS_CONTAINER_UID,
+    run_command: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> None:
+    """Grant only the temporary workspace to the OpenHands container UID.
+
+    The live Ubuntu runtime uses UID 10001 inside the Agent Canvas container.
+    A default ACL also grants the host user access to files created by the
+    container. No parent or sibling path is modified.
+    """
+    setfacl = shutil.which("setfacl")
+    if setfacl is None:
+        raise LiveE2EError(
+            "Live OpenHands verification requires the 'setfacl' command "
+            "(install the acl package)."
+        )
+
+    if container_uid <= 0:
+        raise LiveE2EError("OpenHands container UID must be greater than zero.")
+
+    host_uid = os.getuid()
+    access_entry = f"u:{container_uid}:rwx"
+    default_entries = [
+        "u::rwx",
+        "g::---",
+        "m::rwx",
+        "o::---",
+        access_entry,
+    ]
+    if host_uid != container_uid:
+        default_entries.append(f"u:{host_uid}:rwx")
+
+    try:
+        run_command(
+            [setfacl, "-m", access_entry, str(workspace)],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        run_command(
+            [setfacl, "-d", "-m", ",".join(default_entries), str(workspace)],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise LiveE2EError(
+            f"Unable to configure isolated workspace ACL for OpenHands UID "
+            f"{container_uid}."
+        ) from exc
 
 def _create_workspace(host_workspace_root: Path) -> Path:
     root = host_workspace_root.expanduser().resolve()
@@ -361,6 +415,8 @@ def run_live_smoke_test(
     evidence: dict[str, Any] | None = None
     try:
         workspace = _create_workspace(config.host_workspace_root)
+        if config.configure_workspace_permissions:
+            _configure_workspace_permissions(workspace)
         container_workspace = _container_workspace(
             workspace,
             config.host_workspace_root,
