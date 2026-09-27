@@ -16,6 +16,10 @@ Use task branches such as:
 Shared integration branch:
 - ai/integration
 
+Promotion branches are short-lived and target-controlled, for example:
+- ai/<issue>-develop-promotion
+- ai/<issue>-main-promotion
+
 Never work directly on develop or main.
 
 ## Commits

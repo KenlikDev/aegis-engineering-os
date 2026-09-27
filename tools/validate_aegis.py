@@ -124,6 +124,7 @@ def main() -> int:
         "docs/architecture/overview.md",
         "docs/architecture/work-management.md",
         "docs/architecture/ai-backends.md",
+        "docs/architecture/runtime.md",
         "docs/governance/state-verification.md",
         "docs/product/discovery-mode.md",
         "docs/product/user-decision-model.md",
@@ -136,6 +137,7 @@ def main() -> int:
         "tools/verify_project.py",
         "tools/validate_ai_config.py",
         "tools/render_openhands_profile.py",
+        "tools/preflight_runtime.py",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
