@@ -2,6 +2,8 @@ import sys
 import unittest
 import uuid
 from dataclasses import replace
+from urllib.error import HTTPError
+from unittest.mock import patch
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -161,6 +163,97 @@ class OpenHandsExecutionTests(unittest.TestCase):
             transport.calls[2][3]["X-Session-API-Key"],
         )
         self.assertNotIn("secret-value", repr(result))
+
+    def test_agent_api_key_is_redacted_from_returned_state(self) -> None:
+        request = replace(
+            request_data(),
+            agent={
+                **request_data().agent,
+                "llm": {
+                    **request_data().agent["llm"],
+                    "api_key": "llm-secret-value",
+                },
+            },
+        )
+        responses = responses_with_states(["finished", "finished"])
+        responses[("GET", f"{SERVER}/api/conversations/{CID}")] = [
+            (
+                200,
+                {
+                    "id": CID,
+                    "execution_status": "finished",
+                    "agent": {
+                        "kind": "Agent",
+                        "llm": {
+                            "model": "openai/gemma4:31b",
+                            "api_key": "llm-secret-value",
+                        },
+                    },
+                },
+            ),
+            (
+                200,
+                {
+                    "id": CID,
+                    "execution_status": "finished",
+                    "agent": {
+                        "kind": "Agent",
+                        "llm": {
+                            "model": "openai/gemma4:31b",
+                            "api_key": "llm-secret-value",
+                        },
+                    },
+                },
+            ),
+        ]
+        responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
+            (
+                200,
+                {
+                    "items": [
+                        {
+                            "id": "event-1",
+                            "type": "MessageEvent",
+                            "api_key": "event-secret",
+                        }
+                    ],
+                    "next_page_id": None,
+                },
+            )
+        ]
+        transport = FakeTransport(responses)
+        result = OpenHandsExecutionClient(transport).execute(request)
+
+        self.assertEqual("[REDACTED]", result.state["agent"]["llm"]["api_key"])
+        self.assertEqual("[REDACTED]", result.events[0]["api_key"])
+        self.assertNotIn("llm-secret-value", repr(result))
+        self.assertNotIn("event-secret", repr(result))
+
+    def test_real_http_409_is_returned_for_status_specific_handling(self) -> None:
+        response = HTTPError(
+            f"{SERVER}/api/conversations/{CID}/run",
+            409,
+            "Conflict",
+            {},
+            None,
+        )
+
+        class ErrorOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                raise response
+
+        with patch("openhands_execution._HTTP_OPENER", ErrorOpener()):
+            from openhands_execution import _request_json
+
+            status, payload = _request_json(
+                "POST",
+                f"{SERVER}/api/conversations/{CID}/run",
+                {},
+                None,
+            )
+
+        self.assertEqual(409, status)
+        self.assertEqual({}, payload)
 
     def test_waiting_for_confirmation_is_a_blocked_outcome(self) -> None:
         transport = FakeTransport(
