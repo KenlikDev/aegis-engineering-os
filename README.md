@@ -227,6 +227,21 @@ The contract records the evidence kind, source, subject, revision, observation t
 See docs/architecture/evidence-provenance.md and docs/governance/state-verification.md.
 
 
+## Evidence bundles
+
+Compose already validated canonical evidence artifacts into one deterministic reference set:
+
+    python3 tools/evidence_bundle.py create       /path/to/project       .aegis/evidence-bundle.json       "Inputs for implementation readiness"       .aegis/state-evidence.json       .aegis/promotion-evidence.json
+
+Validate the bundle and every referenced evidence artifact:
+
+    python3 tools/evidence_bundle.py validate       /path/to/project       .aegis/evidence-bundle.json
+
+Bundles do not infer completeness, upgrade evidence status, contact providers, or mutate observed systems.
+
+See docs/architecture/evidence-bundles.md.
+
+
 ## Version verification evidence
 
 After project discovery, record explicit version claims and pin their authoritative sources:
