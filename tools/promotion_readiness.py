@@ -250,6 +250,7 @@ class GitHubPromotionProvider:
         *,
         validated_sha: str,
         evidence_type: str,
+        expected_head_sha: str | None = None,
         pull_request_number: int | None = None,
     ) -> ValidationRun | None:
         run_id = item.get("id")
@@ -269,6 +270,10 @@ class GitHubPromotionProvider:
             and run_status == "completed"
             and conclusion == "success"
             and run_name == "Aegis Validation"
+            and (
+                expected_head_sha is None
+                or run_sha == expected_head_sha
+            )
         ):
             return None
         return ValidationRun(
@@ -418,6 +423,7 @@ class GitHubPromotionProvider:
                 item,
                 validated_sha=head_sha,
                 evidence_type="branch-push",
+                expected_head_sha=head_sha,
             )
             if parsed is not None:
                 candidates.append(parsed)
