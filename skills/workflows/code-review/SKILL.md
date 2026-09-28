@@ -47,6 +47,6 @@ For every material workflow boundary, trace input validation through mutation, r
 
 For GitHub delivery, record exact PR head SHA, exact validation run head SHA, exact merge SHA, exact integration target SHA, and post-merge workflow SHA separately. Never substitute PR validation for post-merge validation. Autonomous merges are valid only on explicitly authorized integration branches; protected promotion remains human-controlled.
 
-Review security as implementation behavior: redirect policy, URL schemes, subprocess invocation, shell use, credential handling, redaction, path confinement, output bounds, duplicate JSON keys, and sensitive-field scanners all require concrete checks and regression coverage.
+Review security as implementation behavior: redirect policy, URL schemes, subprocess invocation, shell use, credential handling, redaction, path confinement, output bounds, duplicate JSON keys, sensitive-field scanners, and high-priority instruction-file integrity all require concrete checks and regression coverage. For files such as AGENTS.md, determine explicit ownership before treating checksum drift as tampering; do not overwrite user-owned instruction files.
 
 Cross-check canonical documentation, skills, registry wiring, CLI flags, tests, and implementation so no layer advertises a capability that another layer does not enforce.
