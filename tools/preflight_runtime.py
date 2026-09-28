@@ -101,6 +101,7 @@ def preflight(
 
     result = {
         "status": "verified",
+        "profile_name": profile_name,
         "provider": profile["provider"],
         "surface": profile["surface"],
         "integration": integration,
@@ -231,6 +232,11 @@ def main() -> int:
         help="Environment variable containing the optional OpenHands Agent Server session API key.",
     )
     parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=DEFAULT_TIMEOUT_SECONDS,
@@ -256,6 +262,24 @@ def main() -> int:
     except (ValueError, RuntimePreflightError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+    if args.canonical_evidence_output is not None:
+        from evidence_adapters import runtime_preflight_evidence
+        from evidence_contract import write_evidence
+
+        canonical_path = args.canonical_evidence_output.expanduser().resolve()
+        profile_path = args.profile_config.expanduser().resolve()
+        if canonical_path == profile_path:
+            raise RuntimePreflightError(
+                "Canonical evidence output must not overwrite the AI profile configuration."
+            )
+        canonical = runtime_preflight_evidence(
+            result,
+            observed_at=__import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc
+            ),
+        )
+        write_evidence(canonical, canonical_path)
 
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
