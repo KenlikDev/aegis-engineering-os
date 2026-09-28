@@ -99,3 +99,5 @@ Knowledge-gap records now have an explicit adapter as well. It preserves candida
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
+
+A separate evidence-set requirements consumer can validate whether an explicitly declared selector set is satisfied by a bundle. This is deliberately downstream of bundle integrity validation and does not define which evidence a product or engineering gate should require; those requirements must be supplied explicitly by the owning gate or workflow.
