@@ -27,8 +27,6 @@ The repository currently provides:
 
 ## Planned workflow areas
 
-The architecture also identifies these workflow areas for future dedicated skills:
-
-- refactoring;
+No additional dedicated workflow areas are currently planned.
 
 A workflow must define entry conditions, required evidence, quality gates, and exit conditions.
