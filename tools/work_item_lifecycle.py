@@ -670,6 +670,10 @@ def _build_provider(args: argparse.Namespace) -> GitHubIssuesProvider:
 
 
 def _print_evidence(evidence: MutationEvidence) -> None:
+    require_verified_mutation(
+        evidence,
+        f"Lifecycle {evidence.operation} mutation",
+    )
     print(
         json.dumps(
             {
