@@ -101,6 +101,15 @@ def _validate_version_evidence(project: Path, reference: str) -> tuple[str, str]
         raise ImplementationReadinessError(
             f"Local version evidence file does not exist: {resolved}"
         )
+    try:
+        if not resolved.read_text(encoding="utf-8").strip():
+            raise ImplementationReadinessError(
+                f"Local version evidence file is empty: {resolved}"
+            )
+    except UnicodeDecodeError as exc:
+        raise ImplementationReadinessError(
+            f"Local version evidence must be readable UTF-8 text: {resolved}"
+        ) from exc
     return "local-file", resolved.relative_to(project).as_posix()
 
 
@@ -108,6 +117,7 @@ def evaluate_readiness(
     work_item_path: str | Path,
     work_item_kind: str,
     *,
+    project_root: str | Path | None = None,
     version_evidence_ref: str,
     architecture_required: bool,
     work_item_provider: WorkItemProvider | None = None,
@@ -124,7 +134,13 @@ def evaluate_readiness(
     if not kind:
         raise ImplementationReadinessError("work_item_kind must be explicit and non-empty.")
 
-    project = document.parent
+    project = (
+        Path(project_root).expanduser().resolve()
+        if project_root is not None
+        else document.parent
+    )
+    if not project.is_dir():
+        raise ImplementationReadinessError(f"Project root does not exist: {project}")
     observations: list[ReadinessObservation] = []
     blockers: list[str] = []
 
@@ -183,33 +199,45 @@ def evaluate_readiness(
     )
 
     if architecture_required:
-        try:
-            architecture: ArchitecturePlan = plan_architecture(
-                document,
-                work_item_reader=work_item_provider,
-                work_item_id=work_item_id,
-            )
-        except ArchitecturePlanningError as exc:
-            raise ImplementationReadinessError(str(exc)) from exc
-        if architecture.ready:
-            observations.append(
-                ReadinessObservation(
-                    "architecture",
-                    "passed",
-                    "Architecture planning returned no blockers.",
-                )
-            )
-        else:
-            blockers.append(
-                "Architecture planning returned blocker-level information gaps."
-            )
+        if not requirements.ready:
             observations.append(
                 ReadinessObservation(
                     "architecture",
                     "blocked",
-                    f"{len(architecture.blockers)} architecture blocker(s) remain.",
+                    "Architecture planning was not executed because requirements clarification is blocked.",
                 )
             )
+            blockers.append(
+                "Architecture planning cannot establish implementation readiness while requirements remain blocked."
+            )
+        else:
+            try:
+                architecture: ArchitecturePlan = plan_architecture(
+                    document,
+                    work_item_reader=work_item_provider,
+                    work_item_id=work_item_id,
+                )
+            except ArchitecturePlanningError as exc:
+                raise ImplementationReadinessError(str(exc)) from exc
+            if architecture.ready:
+                observations.append(
+                    ReadinessObservation(
+                        "architecture",
+                        "passed",
+                        "Architecture planning returned no blockers.",
+                    )
+                )
+            else:
+                blockers.append(
+                    "Architecture planning returned blocker-level information gaps."
+                )
+                observations.append(
+                    ReadinessObservation(
+                        "architecture",
+                        "blocked",
+                        f"{len(architecture.blockers)} architecture blocker(s) remain.",
+                    )
+                )
     else:
         observations.append(
             ReadinessObservation(
@@ -259,6 +287,11 @@ def main() -> int:
         description="Evaluate implementation readiness without mutating the project."
     )
     parser.add_argument("work_item", type=Path)
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        help="Explicit target project root used to validate local version evidence.",
+    )
     parser.add_argument(
         "--kind",
         required=True,
@@ -311,6 +344,7 @@ def main() -> int:
         readiness = evaluate_readiness(
             args.work_item,
             args.kind,
+            project_root=args.project_root,
             version_evidence_ref=args.version_evidence_ref,
             architecture_required=args.architecture_required,
             work_item_provider=provider,
