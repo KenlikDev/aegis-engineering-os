@@ -182,6 +182,43 @@ class ImplementationReadinessTests(unittest.TestCase):
                 work_item_id="106",
             )
 
+    def test_external_version_reference_is_not_verified(self):
+        root, work_item, _, provider = self._fixture()
+        result = evaluate_readiness(
+            work_item,
+            "feature",
+            project_root=root,
+            version_evidence_ref="https://example.invalid/toolchain.txt",
+            architecture_required=False,
+            work_item_provider=provider,
+            work_item_id="106",
+        )
+        self.assertFalse(result.ready)
+        version = next(
+            item for item in result.observations if item.check == "version-verification"
+        )
+        self.assertEqual("blocked", version.status)
+
+    def test_work_item_document_id_must_match_provider_id(self):
+        root, work_item, evidence, provider = self._fixture()
+        work_item.write_text(
+            work_item.read_text(encoding="utf-8").replace(
+                "Work item ID: 106",
+                "Work item ID: 999",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ImplementationReadinessError, "does not match"):
+            evaluate_readiness(
+                work_item,
+                "feature",
+                project_root=root,
+                version_evidence_ref=evidence,
+                architecture_required=False,
+                work_item_provider=provider,
+                work_item_id="106",
+            )
+
     def test_lifecycle_must_be_ready_when_provider_is_supplied(self):
         root, work_item, evidence, provider = self._fixture(ready=False)
         with self.assertRaisesRegex(ImplementationReadinessError, "ready work item"):
