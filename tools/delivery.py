@@ -246,7 +246,17 @@ class GitHubPullRequestProvider:
             or not HTTPS_URL_RE.fullmatch(url)
         ):
             raise DeliveryError("GitHub pull-request response is malformed.")
+        if state not in {"open", "closed"}:
+            raise DeliveryError(
+                f"Unsupported GitHub pull-request state: {state!r}."
+            )
         merged_at = data.get("merged_at")
+        if merged_at is not None and state != "closed":
+            raise DeliveryError(
+                "GitHub pull request reports merged_at while still open."
+            )
+        if merged_at is not None and not isinstance(merged_at, str):
+            raise DeliveryError("GitHub pull request merged_at field is malformed.")
         mergeable = data.get("mergeable")
         if mergeable is not None and not isinstance(mergeable, bool):
             mergeable = None
