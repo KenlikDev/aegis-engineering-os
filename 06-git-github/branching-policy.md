@@ -76,3 +76,11 @@ The verifier records the exact source and target SHAs, compare divergence, chang
 Promotion is blocked when the source is behind the target, contains no delta, the exact source SHA has no successful \`Aegis Validation\`, the protected-state assumptions are false, or the caller supplied expected SHAs that no longer match.
 
 The verifier is read-only. It does not create promotion branches, modify branch protection, merge pull requests, or change \`develop\`/\`main\`.
+
+## Integration validation trigger
+
+Task pull requests are validated on opened, synchronized, and reopened events. The validation workflow also handles merged pull requests explicitly with the closed activity and a merged == true condition.
+
+For a merge into ai/integration, the closed-PR path checks out the pull request's actual merge commit SHA. This is a second validation path for the resulting integration state, independent of whether the repository emits an observable push-triggered run.
+
+The workflow keeps contents: read and does not use pull_request_target. No credentials with write access are introduced for post-merge verification.
