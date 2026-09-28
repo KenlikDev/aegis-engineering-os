@@ -1,3 +1,4 @@
+import json
 import subprocess
 import tempfile
 import unittest
@@ -100,7 +101,7 @@ class TestingWorkflowTests(unittest.TestCase):
 
         self.assertEqual("verified", evidence["status"])
         self.assertTrue(evidence_path.is_file())
-        self.assertEqual("verified", __import__("json").loads(evidence_path.read_text(encoding="utf-8"))["status"])
+        self.assertEqual("verified", json.loads(evidence_path.read_text(encoding="utf-8"))["status"])
 
     def test_required_failure_is_not_bypassed(self):
         root = self._project()
