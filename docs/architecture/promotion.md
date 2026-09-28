@@ -96,7 +96,7 @@ The final protected-branch merge remains outside the autonomous delivery boundar
 
 A promotion pull request is owner-controlled. tools/promotion_sync.py is the post-merge synchronization boundary.
 
-The operation requires the work item to be in integration, verifies the deterministic promotion branch and protected target, requires an actual closed-and-merged PR with a merge commit SHA, and verifies that the target branch contains that merge commit. Only then does it attach non-secret PR/merge evidence and transition integration -> done.
+The operation requires the work item to be in integration, verifies the deterministic promotion branch and protected target, requires an actual closed-and-merged PR with a merge commit SHA, and compares the target branch against that merge commit with an exact `identical` result. It then re-reads the protected target and requires its SHA to equal the merge commit. Only after both traceability and integration -> done lifecycle mutations report read-after-write verification does it return `status=verified`.
 
 Open or unmerged promotion PRs are non-mutating. The synchronizer never approves, merges, force-pushes, or changes protected branches.
 
