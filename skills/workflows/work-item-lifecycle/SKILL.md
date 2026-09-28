@@ -51,6 +51,10 @@ Create subtasks only when they clarify ownership or dependencies.
 4. Add material decisions and blockers to the work item.
 5. Keep routine implementation details in Git rather than using issue comments as a code log.
 
+## Implementation readiness
+
+Before managed implementation starts, run the implementation-readiness gate after the work item has been classified and the workflow composition has been established. It must verify requirements, explicit toolchain evidence, architecture applicability, and authoritative ready state when a provider is supplied. The gate is fail-closed and read-only.
+
 ## Refactoring
 
 When a work item is explicitly classified as refactoring, use the refactoring workflow to establish a verified baseline before mutation and repeat the declared testing contract after changes. Preserve explicit behavior invariants and reclassify or escalate any material behavior change.
