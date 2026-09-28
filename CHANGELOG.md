@@ -45,3 +45,4 @@ Initial experimental foundation:
 - guarantee an explicit validation path after merged pull requests, including the actual merge commit for ai/integration, with event-isolated concurrency so the exact integration push validation is not cancelled;
 - add promotion merge synchronization so an owner-controlled develop/main merge can advance an integration work item to done after exact merge verification;
 - add the controlled ai/integration merge boundary using exact-head SHA preconditions, squash-only merges, and post-merge verification;
+- add a composed integration delivery controller that binds exact-head validation to the controlled ai/integration merge;
