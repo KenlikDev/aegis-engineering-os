@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 
 from evidence_contract import EvidenceContractError, EvidenceRecord, build_evidence
 from promotion_readiness import PromotionReadiness
