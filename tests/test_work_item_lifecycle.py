@@ -1,4 +1,6 @@
+import io
 import sys
+from contextlib import redirect_stdout
 import unittest
 from pathlib import Path
 
@@ -12,7 +14,10 @@ from work_item_lifecycle import (  # noqa: E402
     Traceability,
     WorkItem,
     WorkItemLifecycleError,
+    MutationEvidence,
+    _print_evidence,
     render_traceability_comment,
+    require_verified_mutation,
     validate_transition,
 )
 
@@ -78,6 +83,33 @@ class FakeGitHubTransport:
 
 
 class WorkItemLifecycleTests(unittest.TestCase):
+    def test_require_verified_mutation_rejects_unverified_evidence(self) -> None:
+        evidence = MutationEvidence(
+            provider="memory",
+            operation="transition",
+            work_item_id="53",
+            verified=False,
+        )
+        with self.assertRaisesRegex(
+            WorkItemLifecycleError,
+            "was not read-after-write verified",
+        ):
+            require_verified_mutation(evidence, "Test transition")
+
+    def test_lifecycle_cli_cannot_print_unverified_mutation_as_verified(self) -> None:
+        evidence = MutationEvidence(
+            provider="memory",
+            operation="comment",
+            work_item_id="53",
+            verified=False,
+        )
+        with redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(
+                WorkItemLifecycleError,
+                "Lifecycle comment mutation was not read-after-write verified",
+            ):
+                _print_evidence(evidence)
+
     def test_transition_matrix_rejects_skips_and_terminal_changes(self) -> None:
         validate_transition(LifecycleState.INTAKE, LifecycleState.PLANNED)
         with self.assertRaises(WorkItemLifecycleError):
