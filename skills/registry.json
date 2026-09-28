@@ -156,6 +156,12 @@
       "path": "skills/workflows/promotion-synchronization/SKILL.md",
       "domain": "workflow",
       "stability": "core"
+    },
+    {
+      "name": "integration-merge",
+      "path": "skills/workflows/integration-merge/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
     }
   ]
 }

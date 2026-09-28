@@ -136,3 +136,11 @@ After a promotion PR is merged by the owner, synchronize the work item:
     python3 tools/promotion_sync.py OWNER/REPO 66 123 main
 
 The command verifies the actual merged PR, protected target, merge commit ancestry, and then advances the work item from integration to done. An open or unmerged PR changes nothing. The tool never approves or merges.
+
+## Autonomous integration merge
+
+After a task PR reaches review and its checks are clean, Aegis may merge it into ai/integration:
+
+    python3 tools/integration_merge.py OWNER/REPO 75 74
+
+The tool verifies the work item, target branch, exact task branch, clean merge state, exact head SHA, and final merge commit before moving the work item from review to integration. It is never permitted to merge develop or main.

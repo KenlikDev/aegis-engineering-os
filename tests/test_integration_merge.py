@@ -1,0 +1,307 @@
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+from integration_merge import (  # noqa: E402
+    GitHubIntegrationMergeProvider,
+    IntegrationMergeError,
+    IntegrationPullRequest,
+    MergeResult,
+    sync_integration_merge,
+)
+from promotion_readiness import BranchSnapshot  # noqa: E402
+from work_item_lifecycle import (  # noqa: E402
+    InMemoryWorkItemProvider,
+    LifecycleState,
+    WorkItem,
+)
+
+REPOSITORY = "KenlikDev/aegis-engineering-os"
+PR_NUMBER = 75
+HEAD_SHA = "1111111111111111111111111111111111111111"
+INTEGRATION_SHA = "2222222222222222222222222222222222222222"
+MERGE_SHA = "3333333333333333333333333333333333333333"
+
+
+def work_items(state=LifecycleState.REVIEW):
+    return InMemoryWorkItemProvider(
+        {
+            "75": WorkItem(
+                id="75",
+                title="integration merge",
+                state=state,
+                provider="memory",
+            )
+        }
+    )
+
+
+class FakeIntegrationProvider:
+    def __init__(
+        self,
+        *,
+        pr_state="open",
+        merged=False,
+        draft=False,
+        mergeable_state="clean",
+        protected=True,
+        contains_merge=True,
+        base="ai/integration",
+        head="ai/feature/75-integration-merge",
+        merge_commit_sha=None,
+        head_sha=HEAD_SHA,
+    ):
+        self.repository = REPOSITORY
+        self.pr = IntegrationPullRequest(
+            number=PR_NUMBER,
+            url="https://github.com/KenlikDev/aegis-engineering-os/pull/75",
+            head=head,
+            head_sha=head_sha,
+            base=base,
+            state=pr_state,
+            merged=merged,
+            draft=draft,
+            mergeable_state=mergeable_state,
+            merge_commit_sha=merge_commit_sha,
+        )
+        self.integration = BranchSnapshot(
+            branch="ai/integration",
+            sha=INTEGRATION_SHA,
+            protected=protected,
+        )
+        self.contains_merge = contains_merge
+        self.merge_calls = []
+
+    def get_pull_request(self, number):
+        if number != PR_NUMBER:
+            raise AssertionError(f"Unexpected pull request number: {number}")
+        return self.pr
+
+    def get_branch(self, branch):
+        if branch != "ai/integration":
+            raise AssertionError(f"Unexpected branch: {branch}")
+        return self.integration
+
+    def target_contains_commit(self, target_branch, commit_sha):
+        self.merge_calls.append(("contains", target_branch, commit_sha))
+        return self.contains_merge
+
+    def merge_pull_request(self, number, expected_head_sha):
+        self.merge_calls.append(("merge", number, expected_head_sha))
+        if number != PR_NUMBER or expected_head_sha != HEAD_SHA:
+            raise AssertionError("Unexpected merge precondition.")
+        self.pr = IntegrationPullRequest(
+            number=self.pr.number,
+            url=self.pr.url,
+            head=self.pr.head,
+            head_sha=self.pr.head_sha,
+            base=self.pr.base,
+            state="closed",
+            merged=True,
+            draft=False,
+            mergeable_state="unknown",
+            merge_commit_sha=MERGE_SHA,
+        )
+        return MergeResult(merged=True, merge_commit_sha=MERGE_SHA)
+
+
+class FakeGitHubTransport:
+    def __init__(self):
+        self.calls = []
+        self.pr_reads = 0
+        self.merge_payload = None
+
+    def __call__(self, method, url, headers, payload):
+        path = url.removeprefix("https://api.github.com")
+        self.calls.append((method, path, payload))
+
+        if path == f"/repos/{REPOSITORY}/branches/ai%2Fintegration":
+            return 200, {
+                "name": "ai/integration",
+                "protected": True,
+                "commit": {"sha": INTEGRATION_SHA},
+            }
+
+        if path == f"/repos/{REPOSITORY}/pulls/{PR_NUMBER}" and method == "GET":
+            self.pr_reads += 1
+            merged = self.pr_reads >= 2
+            return 200, {
+                "number": PR_NUMBER,
+                "title": "integration merge",
+                "body": "",
+                "head": {"ref": "ai/feature/75-integration-merge", "sha": HEAD_SHA},
+                "base": {"ref": "ai/integration", "sha": INTEGRATION_SHA},
+                "state": "closed" if merged else "open",
+                "merged_at": "2026-09-28T15:00:00Z" if merged else None,
+                "merge_commit_sha": MERGE_SHA if merged else None,
+                "draft": False,
+                "mergeable_state": "clean" if not merged else "unknown",
+                "html_url": f"https://github.com/KenlikDev/aegis-engineering-os/pull/{PR_NUMBER}",
+            }
+
+        if path == f"/repos/{REPOSITORY}/pulls/{PR_NUMBER}/merge" and method == "PUT":
+            self.merge_payload = payload
+            return 200, {"merged": True, "sha": MERGE_SHA}
+
+        if path == f"/repos/{REPOSITORY}/compare/{MERGE_SHA}...ai%2Fintegration":
+            return 200, {
+                "status": "identical",
+                "ahead_by": 0,
+                "behind_by": 0,
+            }
+
+        raise AssertionError(f"Unexpected GitHub request: {method} {path}")
+
+
+class IntegrationMergeTests(unittest.TestCase):
+    def test_successful_merge_advances_review_to_integration(self):
+        provider = FakeIntegrationProvider()
+        items = work_items()
+
+        result = sync_integration_merge(
+            provider,
+            items,
+            "75",
+            PR_NUMBER,
+        )
+
+        self.assertEqual("verified", result["status"])
+        self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
+        self.assertEqual(
+            [("merge", PR_NUMBER, HEAD_SHA), ("contains", "ai/integration", MERGE_SHA)],
+            provider.merge_calls,
+        )
+        self.assertIn(MERGE_SHA, items.comments["75"][0])
+
+    def test_already_merged_pr_is_idempotent_for_merge_call(self):
+        provider = FakeIntegrationProvider(
+            pr_state="closed",
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+        )
+        items = work_items()
+
+        result = sync_integration_merge(
+            provider,
+            items,
+            "75",
+            PR_NUMBER,
+        )
+
+        self.assertEqual("verified", result["status"])
+        self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
+        self.assertEqual(
+            [("contains", "ai/integration", MERGE_SHA)],
+            provider.merge_calls,
+        )
+
+    def test_open_pr_with_non_clean_mergeability_is_blocked(self):
+        provider = FakeIntegrationProvider(mergeable_state="blocked")
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "mergeable_state must be clean"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+        self.assertEqual([], provider.merge_calls)
+
+    def test_draft_pr_is_blocked(self):
+        provider = FakeIntegrationProvider(draft=True)
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "Draft pull requests"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual([], provider.merge_calls)
+
+    def test_closed_unmerged_pr_is_non_mutating(self):
+        provider = FakeIntegrationProvider(pr_state="closed", merged=False)
+        items = work_items()
+
+        result = sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual("not-merged", result["status"])
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+        self.assertEqual([], provider.merge_calls)
+
+    def test_rejects_unprotected_integration(self):
+        provider = FakeIntegrationProvider(protected=False)
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "must remain protected"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual([], provider.merge_calls)
+
+    def test_rejects_wrong_task_head(self):
+        provider = FakeIntegrationProvider(
+            head="ai/feature/999-other-task",
+        )
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "task branch for this work item"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+    def test_rejects_wrong_base(self):
+        provider = FakeIntegrationProvider(base="develop")
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "base does not match"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+    def test_rejects_missing_merge_commit(self):
+        provider = FakeIntegrationProvider(pr_state="closed", merged=True)
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "no merge commit SHA"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+    def test_rejects_merge_commit_not_in_target(self):
+        provider = FakeIntegrationProvider(contains_merge=False)
+        items = work_items()
+
+        with self.assertRaisesRegex(IntegrationMergeError, "not contained in ai/integration"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+
+    def test_rejects_work_item_outside_review(self):
+        provider = FakeIntegrationProvider()
+        items = work_items(LifecycleState.VERIFICATION)
+
+        with self.assertRaisesRegex(IntegrationMergeError, "requires a work item in review"):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual([], provider.merge_calls)
+
+    def test_github_provider_uses_exact_sha_and_squash_merge(self):
+        transport = FakeGitHubTransport()
+        provider = GitHubIntegrationMergeProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        pull_request = provider.get_pull_request(PR_NUMBER)
+        result = provider.merge_pull_request(
+            PR_NUMBER,
+            pull_request.head_sha,
+        )
+
+        self.assertTrue(result.merged)
+        self.assertEqual(MERGE_SHA, result.merge_commit_sha)
+        self.assertEqual(
+            {"sha": HEAD_SHA, "merge_method": "squash"},
+            transport.merge_payload,
+        )
+
+        self.assertTrue(
+            provider.target_contains_commit("ai/integration", MERGE_SHA)
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
