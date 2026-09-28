@@ -9,6 +9,7 @@ The repository currently provides:
 - project discovery;
 - product discovery;
 - work-item lifecycle;
+- workflow composition;
 - feature implementation;
 - bug fixing;
 - code review;
