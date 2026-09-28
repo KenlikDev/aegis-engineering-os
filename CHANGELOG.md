@@ -38,3 +38,5 @@ Initial experimental foundation:
 - knowledge lifecycle;
 - project bootstrap templates;
 - repository validation scaffold.
+
+- add the read-only promotion readiness verifier for ai/integration -> develop/main, including exact-SHA CI evidence and protection checks;

@@ -89,3 +89,18 @@ After an actual merge, synchronize the delivery state:
     python3 tools/delivery.py sync-merge OWNER/REPO 60 123 ai/feature/60-execution ai/integration
 
 Only a verified merged PR advances the work item from \`review\` to \`integration\`.
+
+
+## Promotion readiness
+
+Before promoting \`ai/integration\`, run the read-only verifier against the explicit protected target:
+
+    python3 tools/promotion_readiness.py OWNER/REPO develop --workflow .github/workflows/validate.yml
+
+For a release target:
+
+    python3 tools/promotion_readiness.py OWNER/REPO main --workflow .github/workflows/validate.yml
+
+The verifier checks fresh source/target SHAs, compare divergence, protection state, and a successful \`Aegis Validation\` run for the exact \`ai/integration\` SHA. Exit code \`0\` means no readiness blockers were observed; exit code \`2\` means the observed state is not ready.
+
+The verifier is read-only and does not create, merge, or promote anything.
