@@ -128,3 +128,11 @@ Exit code 0 means all release evidence is present. Exit code 2 means the release
 The verifier checks the exact main SHA, branch protection, exact-SHA Aegis Validation, version consistency across release metadata, and CHANGELOG state. It never creates tags, GitHub Releases, commits, branches, or pull requests.
 
 See docs/architecture/release.md and skills/workflows/release-preparation/SKILL.md.
+
+## Promotion merge synchronization
+
+After a promotion PR is merged by the owner, synchronize the work item:
+
+    python3 tools/promotion_sync.py OWNER/REPO 66 123 main
+
+The command verifies the actual merged PR, protected target, merge commit ancestry, and then advances the work item from integration to done. An open or unmerged PR changes nothing. The tool never approves or merges.
