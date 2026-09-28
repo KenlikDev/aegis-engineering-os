@@ -324,6 +324,15 @@ def main() -> int:
     validate = subparsers.add_parser("validate")
     validate.add_argument("project", type=Path)
     validate.add_argument("evidence", type=Path)
+    validate.add_argument(
+        "--evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
+    validate.add_argument(
+        "--revision",
+        help="Optional exact project revision associated with this observation.",
+    )
 
     args = parser.parse_args()
 
@@ -331,8 +340,33 @@ def main() -> int:
         if args.command == "record":
             evidence = record_version_evidence(args.project, args.claims, args.output)
         else:
+            from datetime import datetime, timezone
+
+            from evidence_adapters import version_verification_evidence
+            from evidence_contract import write_evidence
+
+            observed_at = datetime.now(timezone.utc)
             evidence = validate_version_evidence(args.project, args.evidence)
-    except VersionVerificationError as exc:
+            if args.evidence_output is not None:
+                evidence_path = args.evidence.expanduser().resolve()
+                output_path = args.evidence_output.expanduser()
+                project_root = args.project.expanduser().resolve()
+                if not output_path.is_absolute():
+                    output_path = project_root / output_path
+                output_path = output_path.resolve()
+                if output_path == evidence_path:
+                    raise VersionVerificationError(
+                        "Canonical evidence output must differ from the version evidence input."
+                    )
+                write_evidence(
+                    version_verification_evidence(
+                        evidence,
+                        observed_at=observed_at,
+                        revision=args.revision,
+                    ),
+                    output_path,
+                )
+    except (VersionVerificationError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
