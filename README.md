@@ -222,3 +222,18 @@ When lifecycle verification is required, pass the authoritative GitHub work item
 The planner separates explicit evidence, deterministic technical deductions, user-owned decisions, and blockers. It never changes source files, scope, Git state, or protected branches.
 
 See docs/architecture/architecture-planning.md.
+
+
+## Testing
+
+Validate the project-declared testing and quality contract without inferring commands:
+
+    python3 tools/testing.py /path/to/project --dry-run
+
+Execute the explicit contract:
+
+    python3 tools/testing.py /path/to/project
+
+With lifecycle synchronization, the work item must already be in `verification`; required gates passing advances it through the existing quality-gate contract to `review`, while required failures block it.
+
+See docs/architecture/testing.md.

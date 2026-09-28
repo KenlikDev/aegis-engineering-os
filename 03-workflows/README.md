@@ -16,6 +16,7 @@ The repository currently provides:
 - ci remediation;
 - requirements clarification;
 - architecture planning;
+- testing;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
