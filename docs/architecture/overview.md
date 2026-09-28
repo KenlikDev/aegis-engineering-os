@@ -89,6 +89,8 @@ Testing can now emit a canonical provenance record from its existing redacted ex
 
 Security review can now emit a canonical provenance record from its deterministic findings without changing the security gate itself.
 
+CI diagnosis can now emit canonical provenance from its read-only run/job/step evidence without changing diagnosis rules or CI state.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
