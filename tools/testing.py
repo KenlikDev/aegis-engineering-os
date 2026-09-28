@@ -155,6 +155,13 @@ def run_testing(
                 ],
                 "work_item": None,
             }
+            if evidence_path is not None:
+                destination = Path(evidence_path).expanduser().resolve()
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    json.dumps(output, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
         else:
             output = run_with_optional_work_item(
                 Path(plan.project),
