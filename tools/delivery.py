@@ -139,9 +139,7 @@ JsonTransport = Callable[
     tuple[int, Any],
 ]
 
-_HTTP_OPENER = __import__("urllib.request", fromlist=["build_opener"]).build_opener(
-    _NoRedirectHandler()
-)
+_HTTP_OPENER = build_opener(_NoRedirectHandler())
 
 
 def _default_transport(
@@ -230,7 +228,7 @@ class GitHubPullRequestProvider:
     def _parse(data: Mapping[str, Any]) -> PullRequest:
         number = data.get("number")
         title = data.get("title")
-        body = data.get("body")
+        body = data.get("body") or ""
         head = data.get("head")
         base = data.get("base")
         state = data.get("state")
