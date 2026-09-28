@@ -161,6 +161,44 @@ class VersionVerificationTests(unittest.TestCase):
                 root / ".aegis" / "version-evidence.json",
             )
 
+    def test_pending_flag_must_be_boolean(self):
+        root, claims = self._project()
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "pyproject.toml",
+                        }
+                    ],
+                    "external_verification_pending": "yes",
+                }
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(VersionVerificationError, "must be boolean"):
+            record_version_evidence(
+                root,
+                claims,
+                root / ".aegis" / "version-evidence.json",
+            )
+
+    def test_record_refuses_to_overwrite_input_or_source(self):
+        root, claims = self._project()
+        with self.assertRaisesRegex(VersionVerificationError, "differ"):
+            record_version_evidence(root, claims, claims)
+
+        with self.assertRaisesRegex(VersionVerificationError, "overwrite"):
+            record_version_evidence(
+                root,
+                claims,
+                root / "pyproject.toml",
+            )
+
     def test_external_verification_pending_is_preserved(self):
         root, claims = self._project()
         claims.write_text(
