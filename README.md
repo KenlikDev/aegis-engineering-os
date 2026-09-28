@@ -187,6 +187,8 @@ After a focused scenario passes, validate the candidate with explicit evidence:
 
 The candidate registry never edits the active skill registry. A validated candidate remains a candidate until a separate controlled promotion step accepts it as known-good or active.
 
+A candidate record can also be adapted into canonical evidence. Candidate state is `pending`, validated state is `verified`, and rejected state is `failed`; canonical `verified` does not activate knowledge.
+
 See docs/architecture/knowledge.md for the knowledge safety contract.
 
 ## Security review
