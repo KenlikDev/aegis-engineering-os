@@ -204,3 +204,21 @@ Check a work item before planning without inventing missing decisions:
 Exit code 0 means the required inputs are present. Exit code 2 means blocker-level clarification questions remain. The workflow is read-only and does not alter the work item.
 
 See docs/architecture/requirements.md for the decision-ownership contract.
+
+
+## Architecture planning
+
+Produce a deterministic, read-only architecture plan after requirements clarification:
+
+    python3 tools/architecture_planning.py path/to/work-item.md
+
+When lifecycle verification is required, pass the authoritative GitHub work item:
+
+    GITHUB_TOKEN="$TOKEN" python3 tools/architecture_planning.py \
+      path/to/work-item.md \
+      --work-item-repository OWNER/REPO \
+      --work-item-id 123
+
+The planner separates explicit evidence, deterministic technical deductions, user-owned decisions, and blockers. It never changes source files, scope, Git state, or protected branches.
+
+See docs/architecture/architecture-planning.md.
