@@ -42,4 +42,4 @@ Initial experimental foundation:
 - add the read-only promotion readiness verifier for ai/integration -> develop/main, including exact-SHA CI evidence and protection checks;
 - add the owner-controlled promotion snapshot bridge, which prepares an exact integration-tree snapshot on a short-lived target-based branch and opens or reuses a draft promotion pull request without merging protected branches;
 - add the read-only release readiness verifier and release-preparation workflow for protected main;
-- guarantee an explicit validation path after merged pull requests, including the actual merge commit for ai/integration;
+- guarantee an explicit validation path after merged pull requests, including the actual merge commit for ai/integration, with event-isolated concurrency so the exact integration push validation is not cancelled;
