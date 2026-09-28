@@ -9,8 +9,11 @@ import os
 import re
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Protocol
+
+from evidence_contract import EvidenceContractError, write_evidence
 
 from requirements_clarification import RequirementsClarificationError, clarify_requirements
 from work_item_lifecycle import LifecycleState, WorkItemLifecycleError, WorkItemProvider
@@ -378,6 +381,11 @@ def main() -> int:
         help="GitHub issue number for the ready-state precondition.",
     )
     parser.add_argument("--github-token-env", default="GITHUB_TOKEN")
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     if bool(args.work_item_repository) != bool(args.work_item_id):
@@ -408,7 +416,26 @@ def main() -> int:
             work_item_reader=reader,
             work_item_id=args.work_item_id,
         )
-    except ArchitecturePlanningError as exc:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import architecture_planning_evidence
+
+            output_path = args.canonical_evidence_output.expanduser()
+            if not output_path.is_absolute():
+                output_path = Path(args.work_item).expanduser().resolve().parent / output_path
+            output_path = output_path.resolve()
+            work_item_path = Path(args.work_item).expanduser().resolve()
+            if output_path == work_item_path:
+                raise ArchitecturePlanningError(
+                    "Canonical evidence output must not overwrite the work-item document."
+                )
+            write_evidence(
+                architecture_planning_evidence(
+                    plan,
+                    observed_at=datetime.now(timezone.utc),
+                ),
+                output_path,
+            )
+    except (ArchitecturePlanningError, EvidenceContractError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
