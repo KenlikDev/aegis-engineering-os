@@ -297,6 +297,33 @@ class GitHubPromotionProvider:
             return None
         return data
 
+    def _list_closed_pull_requests(
+        self,
+        *,
+        head_branch: str,
+        base_branch: str,
+    ) -> list[Mapping[str, Any]]:
+        if not head_branch or not base_branch:
+            return []
+        owner = self.repository.split("/", 1)[0]
+        query = urlencode(
+            {
+                "state": "closed",
+                "head": f"{owner}:{head_branch}",
+                "base": base_branch,
+                "per_page": "20",
+            }
+        )
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/pulls?{query}",
+        )
+        if status != 200 or not isinstance(data, list):
+            raise PromotionReadinessError(
+                f"Unable to read closed pull requests; HTTP {status}."
+            )
+        return [item for item in data if isinstance(item, Mapping)]
+
     def _latest_successful_merged_pr_validation(
         self,
         workflow: str,
@@ -307,9 +334,7 @@ class GitHubPromotionProvider:
                 continue
             if item.get("path") not in {None, workflow}:
                 continue
-            raw_pull_requests = item.get("pull_requests")
-            if not isinstance(raw_pull_requests, list):
-                continue
+
             successful = self._parse_successful_run(
                 workflow,
                 item,
@@ -319,40 +344,63 @@ class GitHubPromotionProvider:
             if successful is None:
                 continue
 
-            for raw_pull_request in raw_pull_requests:
-                if not isinstance(raw_pull_request, Mapping):
-                    continue
-                number = raw_pull_request.get("number")
-                base = raw_pull_request.get("base")
-                base_ref = base.get("ref") if isinstance(base, Mapping) else None
-                if not isinstance(number, int) or base_ref != DEFAULT_SOURCE_BRANCH:
-                    continue
+            head_branch = item.get("head_branch")
+            if not isinstance(head_branch, str) or not head_branch:
+                continue
 
+            run_head_sha = item.get("head_sha")
+            if not isinstance(run_head_sha, str) or not SHA_RE.fullmatch(run_head_sha):
+                continue
+
+            candidates = self._list_closed_pull_requests(
+                head_branch=head_branch,
+                base_branch=DEFAULT_SOURCE_BRANCH,
+            )
+            matching_prs: list[tuple[int, Mapping[str, Any]]] = []
+            for candidate in candidates:
+                number = candidate.get("number")
+                if not isinstance(number, int) or number <= 0:
+                    continue
                 pull_request = self._get_pull_request(number)
                 if pull_request is None:
                     continue
+
+                head_data = pull_request.get("head")
+                base_data = pull_request.get("base")
+                head_ref = head_data.get("ref") if isinstance(head_data, Mapping) else None
+                head_sha = head_data.get("sha") if isinstance(head_data, Mapping) else None
+                base_ref = base_data.get("ref") if isinstance(base_data, Mapping) else None
                 state = pull_request.get("state")
                 merged_at = pull_request.get("merged_at")
-                merge_sha = pull_request.get("merge_commit_sha")
-                base_data = pull_request.get("base")
-                base_ref = base_data.get("ref") if isinstance(base_data, Mapping) else None
+                pr_merge_sha = pull_request.get("merge_commit_sha")
+
                 if (
                     state == "closed"
                     and isinstance(merged_at, str)
-                    and merge_sha == merge_commit_sha
+                    and head_ref == head_branch
+                    and head_sha == run_head_sha
                     and base_ref == DEFAULT_SOURCE_BRANCH
+                    and pr_merge_sha == merge_commit_sha
                 ):
-                    return ValidationRun(
-                        id=successful.id,
-                        workflow=successful.workflow,
-                        status=successful.status,
-                        conclusion=successful.conclusion,
-                        head_sha=successful.head_sha,
-                        url=successful.url,
-                        evidence_type="merged-pull-request",
-                        validated_sha=merge_commit_sha,
-                        pull_request_number=number,
-                    )
+                    matching_prs.append((number, pull_request))
+
+            if len(matching_prs) == 1:
+                number, _ = matching_prs[0]
+                return ValidationRun(
+                    id=successful.id,
+                    workflow=successful.workflow,
+                    status=successful.status,
+                    conclusion=successful.conclusion,
+                    head_sha=successful.head_sha,
+                    url=successful.url,
+                    evidence_type="merged-pull-request",
+                    validated_sha=merge_commit_sha,
+                    pull_request_number=number,
+                )
+            if len(matching_prs) > 1:
+                raise PromotionReadinessError(
+                    "Multiple merged pull requests match one successful validation run."
+                )
         return None
 
     def latest_successful_validation(
