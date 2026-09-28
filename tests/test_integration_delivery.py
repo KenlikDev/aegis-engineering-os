@@ -250,7 +250,7 @@ class IntegrationDeliveryTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             IntegrationDeliveryError,
-            "head SHA changed after validation",
+            "Integration merge failed after validation.",
         ):
             deliver_to_integration(pr, merge, validation, items, self.request())
 
