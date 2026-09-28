@@ -84,6 +84,78 @@ class AegisOrchestratorTests(unittest.TestCase):
         (self.project / "README.md").write_text("test\n", encoding="utf-8")
         self._git("add", "README.md")
         self._git("commit", "-m", "test: initialize repository")
+        self._write_readiness_document("51")
+
+    def _write_readiness_document(self, work_item_id: str) -> None:
+        (self.project / "work-item.md").write_text(
+            f"""# Work Item
+
+## Identity
+
+Provider: memory
+Work item ID: {work_item_id}
+Title: Managed execution readiness test
+
+## Intent
+
+The managed execution test must verify readiness before execution.
+
+## Scope
+
+### In scope
+
+- managed readiness verification
+
+### Out of scope
+
+- unrelated product behavior
+
+## Acceptance criteria
+
+- [ ] Readiness is checked before execution.
+
+## Dependencies
+
+- Python runtime
+
+## Roles
+
+Primary role: software engineer
+
+## Technical notes
+
+Affected component: test fixture
+
+## Risks
+
+- Missing readiness evidence must block execution.
+
+## Verification plan
+
+- Run the Aegis policy tests.
+
+## Delivery links
+
+Branch:
+Pull request:
+Documentation:
+ADR:
+
+## Status log
+
+Test fixture.
+
+## Definition of done
+
+- [ ] Acceptance criteria satisfied
+""",
+            encoding="utf-8",
+        )
+        (self.project / "version-evidence.txt").write_text(
+            "Python 3.13 toolchain evidence.
+",
+            encoding="utf-8",
+        )
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -103,9 +175,14 @@ class AegisOrchestratorTests(unittest.TestCase):
         work_item_id: str = "51",
         work_item_provider: InMemoryWorkItemProvider | None = None,
     ) -> aegis_orchestrator.OrchestratorConfig:
+        self._write_readiness_document(work_item_id)
         return aegis_orchestrator.OrchestratorConfig(
             project_path=self.project,
             work_item_id=work_item_id,
+            work_item_kind="feature",
+            work_item_document=self.project / "work-item.md",
+            version_evidence_ref=self.project / "version-evidence.txt",
+            architecture_required=False,
             work_item_provider=work_item_provider,
             task=task,
             agent_server_url="http://127.0.0.1:8000",
@@ -277,6 +354,22 @@ class AegisOrchestratorTests(unittest.TestCase):
         self.assertIn("Do not commit changes, create commits, amend commits, push", prompt)
         self.assertIn("--- BEGIN USER TASK ---", prompt)
         self.assertIn("Edit the API.", prompt)
+
+    def test_readiness_failure_prevents_task_branch_creation(self):
+        readiness_evidence = self.project / "version-evidence.txt"
+        readiness_evidence.unlink()
+
+        with self.assertRaisesRegex(
+            aegis_orchestrator.AegisOrchestratorError,
+            "Implementation readiness",
+        ):
+            aegis_orchestrator.orchestrate(
+                self._config(),
+                preflight_fn=self._preflight,
+            )
+
+        branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
+        self.assertNotIn("ai/feature/51-execution", branches)
 
     def test_preflight_failure_does_not_create_task_branch(self) -> None:
         def failed_preflight(*args, **kwargs):  # noqa: ANN002, ANN003
