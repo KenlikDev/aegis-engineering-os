@@ -67,7 +67,7 @@ class IntegrationMergeProvider(Protocol):
 
     def get_branch(self, branch: str) -> BranchSnapshot: ...
 
-    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool: ...
+    def target_matches_commit(self, target_branch: str, commit_sha: str) -> bool: ...
 
     def merge_pull_request(self, number: int, expected_head_sha: str) -> MergeResult: ...
 
@@ -244,21 +244,26 @@ class GitHubIntegrationMergeProvider:
             protected=protected,
         )
 
-    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool:
+    def target_matches_commit(self, target_branch: str, commit_sha: str) -> bool:
         self._sha(commit_sha, "Merge commit SHA")
         status, data = self._request(
             "GET",
-            f"/repos/{self.repository}/compare/{commit_sha}...{quote(target_branch, safe='')}",
+            f"/repos/{self.repository}/compare/{quote(target_branch, safe='')}...{commit_sha}",
         )
         if status != 200 or not isinstance(data, Mapping):
             raise IntegrationMergeError(
                 f"Unable to verify merge commit in {target_branch!r}; HTTP {status}."
             )
         compare_status = data.get("status")
+        ahead_by = data.get("ahead_by")
         behind_by = data.get("behind_by")
-        if not isinstance(compare_status, str) or not isinstance(behind_by, int):
+        if (
+            not isinstance(compare_status, str)
+            or not isinstance(ahead_by, int)
+            or not isinstance(behind_by, int)
+        ):
             raise IntegrationMergeError("GitHub comparison response is malformed.")
-        return compare_status in {"ahead", "identical"} and behind_by == 0
+        return compare_status == "identical" and ahead_by == 0 and behind_by == 0
 
     def merge_pull_request(
         self,
@@ -345,14 +350,6 @@ def sync_integration_merge(
             "Pull request base does not match ai/integration."
         )
 
-    if expected_head_sha is not None:
-        if not SHA_RE.fullmatch(expected_head_sha):
-            raise IntegrationMergeError("Expected pull-request head SHA is malformed.")
-        if pull_request.head_sha != expected_head_sha:
-            raise IntegrationMergeError(
-                "Pull request head SHA changed after validation."
-            )
-
     if pull_request.state == "closed" and not pull_request.merged:
         return {
             "status": "not-merged",
@@ -375,6 +372,16 @@ def sync_integration_merge(
             raise IntegrationMergeError(
                 "Pull request mergeable_state must be clean before autonomous integration."
             )
+        if expected_head_sha is None:
+            raise IntegrationMergeError(
+                "An exact validation head SHA is required before merging an open pull request."
+            )
+        if not SHA_RE.fullmatch(expected_head_sha):
+            raise IntegrationMergeError("Expected pull-request head SHA is malformed.")
+        if pull_request.head_sha != expected_head_sha:
+            raise IntegrationMergeError(
+                "Pull request head SHA changed after validation."
+            )
 
         result = provider.merge_pull_request(
             pull_request.number,
@@ -396,12 +403,19 @@ def sync_integration_merge(
     if merge_commit_sha is None:
         raise IntegrationMergeError("Merged integration pull request has no merge commit SHA.")
 
-    if not provider.target_contains_commit(
+    if not provider.target_matches_commit(
         INTEGRATION_BRANCH,
         merge_commit_sha,
     ):
         raise IntegrationMergeError(
-            f"Integration merge commit {merge_commit_sha} is not contained in ai/integration."
+            f"ai/integration is not exactly equal to integration merge commit {merge_commit_sha}."
+        )
+
+    integration = provider.get_branch(INTEGRATION_BRANCH)
+    if integration.sha != merge_commit_sha:
+        raise IntegrationMergeError(
+            f"ai/integration advanced after exact merge verification: "
+            f"observed {integration.sha}, expected {merge_commit_sha}."
         )
 
     trace = work_item_provider.attach_traceability(
