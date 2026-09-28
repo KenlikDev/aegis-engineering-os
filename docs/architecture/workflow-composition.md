@@ -45,6 +45,7 @@ An unregistered capability is a hard configuration error. The planner never sile
 work-item lifecycle
 -> requirements clarification
 -> project discovery
+-> version verification
 -> architecture planning (when applicable)
 -> feature implementation
 -> testing
@@ -86,6 +87,8 @@ work-item lifecycle
 -> security review (when applicable)
 -> code review
 -> integration delivery (when implementation changes are ready)
+
+Version verification is a registered engineering skill step rather than a separate workflow. It establishes the actual toolchain before architecture-sensitive decisions are made.
 
 The composition is a reusable plan, not permission to bypass any downstream workflow contract.
 
