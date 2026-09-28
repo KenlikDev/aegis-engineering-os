@@ -111,12 +111,11 @@ class EvidenceAdapterTests(unittest.TestCase):
         )
 
         with __import__("tempfile").TemporaryDirectory() as temp:
-            path = ROOT / "tmp-evidence-adapter.json"
-            try:
-                __import__("evidence_contract").write_evidence(evidence, path)
-                self.assertEqual(evidence, read_and_validate_evidence(path))
-            finally:
-                path.unlink(missing_ok=True)
+            path = __import__("pathlib").Path(temp) / "evidence.json"
+            from evidence_contract import write_evidence
+
+            write_evidence(evidence, path)
+            self.assertEqual(evidence, read_and_validate_evidence(path))
 
     def test_release_ready_result_is_verified(self):
         result = ReleaseReadiness(
