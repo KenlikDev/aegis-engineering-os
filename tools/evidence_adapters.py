@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from evidence_contract import EvidenceContractError, EvidenceRecord, build_evidence
 from promotion_readiness import PromotionReadiness
 from release_readiness import ReleaseReadiness
-from version_verification import VersionEvidence
+if TYPE_CHECKING:
+    from version_verification import VersionEvidence
 
 
 def _timestamp(value: datetime | str) -> str:
