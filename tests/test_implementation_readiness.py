@@ -223,7 +223,11 @@ class ImplementationReadinessTests(unittest.TestCase):
         )
         self.assertEqual("verified", payload["result"]["evidence_set"]["status"])
         self.assertEqual(1, payload["result"]["evidence_set"]["requirements_satisfied"])
-        self.assertEqual(bundle_id if False else payload["result"]["evidence_set"]["bundle_id"], payload["result"]["evidence_set"]["bundle_id"])
+        bundle_payload = json.loads(bundle.read_text(encoding="utf-8"))
+        self.assertEqual(
+            bundle_payload["bundle_id"],
+            payload["result"]["evidence_set"]["bundle_id"],
+        )
 
     def test_explicit_evidence_set_is_a_readiness_prerequisite(self):
         root, work_item, evidence, provider = self._fixture()
