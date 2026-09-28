@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -14,10 +13,8 @@ from typing import Any
 from architecture_planning import ArchitecturePlanningError, ArchitecturePlan, plan_architecture
 from workflow_composition import WorkflowComposition, WorkflowCompositionError, compose_workflow
 from requirements_clarification import RequirementsClarificationError, RequirementsReport, clarify_requirements
+from version_verification import VersionVerificationError, validate_version_evidence
 from work_item_lifecycle import LifecycleState, WorkItemLifecycleError, WorkItemProvider
-
-HTTPS_URL_RE = re.compile(r"^https://[^\s]+$")
-FORBIDDEN_CONTROL_RE = re.compile(r"[\x00\r\n]")
 
 
 class ImplementationReadinessError(RuntimeError):
@@ -77,44 +74,34 @@ def _validate_lifecycle(
     return item.state.value
 
 
-def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[str, str]:
+def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[str, int]:
     value = str(reference).strip()
-    if not value or FORBIDDEN_CONTROL_RE.search(value):
+    if not value:
         raise ImplementationReadinessError(
-            "version_evidence_ref must be a non-empty single-line reference."
+            "version_evidence_ref must be a non-empty project-local evidence file."
         )
-    if HTTPS_URL_RE.fullmatch(value):
-        return "external-reference", value
 
-    candidate = Path(value)
-    if candidate.is_absolute():
-        resolved = candidate.expanduser().resolve()
+    path = Path(value)
+    if path.is_absolute():
+        resolved = path.expanduser().resolve()
     else:
-        resolved = (project / candidate).resolve()
+        resolved = (project / path).resolve()
+
     try:
         resolved.relative_to(project)
     except ValueError as exc:
         raise ImplementationReadinessError(
-            "Local version evidence must remain inside the project root."
+            "Version evidence must remain inside the project root."
         ) from exc
-    if not resolved.is_file():
-        raise ImplementationReadinessError(
-            f"Local version evidence file does not exist: {resolved}"
-        )
+
     try:
-        if not resolved.read_text(encoding="utf-8").strip():
-            raise ImplementationReadinessError(
-                f"Local version evidence file is empty: {resolved}"
-            )
-    except UnicodeDecodeError as exc:
+        evidence = validate_version_evidence(project, resolved)
+    except VersionVerificationError as exc:
         raise ImplementationReadinessError(
-            f"Local version evidence must be readable UTF-8 text: {resolved}"
+            f"Version evidence validation failed: {exc}"
         ) from exc
-    except OSError as exc:
-        raise ImplementationReadinessError(
-            f"Unable to read local version evidence file: {resolved}"
-        ) from exc
-    return "local-file", resolved.relative_to(project).as_posix()
+
+    return resolved.relative_to(project).as_posix(), len(evidence.claims)
 
 
 def evaluate_readiness(
@@ -203,29 +190,17 @@ def evaluate_readiness(
         )
     )
 
-    version_kind, normalized_version_ref = _validate_version_evidence(
+    normalized_version_ref, version_claim_count = _validate_version_evidence(
         project,
         version_evidence_ref,
     )
-    if version_kind == "local-file":
-        observations.append(
-            ReadinessObservation(
-                "version-verification",
-                "passed",
-                f"Local toolchain evidence exists at {normalized_version_ref}.",
-            )
+    observations.append(
+        ReadinessObservation(
+            "version-verification",
+            "passed",
+            f"Validated version evidence contains {version_claim_count} source-pinned claim(s) at {normalized_version_ref}.",
         )
-    else:
-        observations.append(
-            ReadinessObservation(
-                "version-verification",
-                "blocked",
-                f"External toolchain evidence reference is explicit but not independently verified: {normalized_version_ref}.",
-            )
-        )
-        blockers.append(
-            "Toolchain evidence must be independently verified locally before managed implementation."
-        )
+    )
 
     if architecture_required:
         if not requirements.ready:
@@ -332,7 +307,7 @@ def main() -> int:
     parser.add_argument(
         "--version-evidence-ref",
         required=True,
-        help="Explicit toolchain/version evidence: a non-empty project-local UTF-8 file. External URLs remain blocked until independently verified.",
+        help="Project-local version-evidence JSON produced and validated by tools/version_verification.py.",
     )
     architecture = parser.add_mutually_exclusive_group(required=True)
     architecture.add_argument(
