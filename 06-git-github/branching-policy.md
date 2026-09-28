@@ -78,6 +78,8 @@ Promotion is blocked when the source is behind the target, contains no delta, th
 The verifier is read-only. It does not create promotion branches, modify branch protection, merge pull requests, or change \`develop\`/\`main\`.
 
 ## Integration validation trigger
+The concurrency group includes the triggering event and pull-request number where available. This prevents a merged pull-request validation from cancelling the branch push validation that records the exact integration SHA.
+
 
 Task pull requests are validated on opened, synchronized, and reopened events. The validation workflow also handles merged pull requests explicitly with the closed activity and a merged == true condition.
 
