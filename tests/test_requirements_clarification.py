@@ -163,6 +163,34 @@ class RequirementsClarificationTests(unittest.TestCase):
                 all(question.severity == "warning" for question in report.questions)
             )
 
+    def test_questions_are_deterministically_ordered(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "work-item.md"
+            path.write_text(INVALID, encoding="utf-8")
+
+            first = clarify_requirements(path)
+            second = clarify_requirements(path)
+
+            first_ids = [
+                (question.severity, question.question_id)
+                for question in first.questions
+            ]
+            second_ids = [
+                (question.severity, question.question_id)
+                for question in second.questions
+            ]
+            self.assertEqual(first_ids, second_ids)
+
+    def test_clarification_never_changes_the_source_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "work-item.md"
+            path.write_text(INVALID, encoding="utf-8")
+            before = path.read_bytes()
+
+            clarify_requirements(path)
+
+            self.assertEqual(before, path.read_bytes())
+
     def test_nonexistent_work_item_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "missing.md"

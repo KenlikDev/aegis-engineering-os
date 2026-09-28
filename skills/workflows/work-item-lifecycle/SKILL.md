@@ -17,6 +17,10 @@ Use for every non-trivial engineering task, feature, bug, refactor, infrastructu
 4. Otherwise create a work item before substantial implementation.
 5. Record the work item ID in the task context.
 
+## Requirements clarification
+
+Before advancing an intake item into planning or ready state, run the read-only requirements clarification workflow when the canonical work-item document is available. Blocker-level questions must be answered by the user or an authoritative project source; Aegis must not invent the missing decision.
+
 ## Planning
 
 Record:
