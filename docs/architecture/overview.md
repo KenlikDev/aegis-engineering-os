@@ -72,3 +72,15 @@ The executable boundaries are documented in:
 - docs/architecture/promotion.md;
 - docs/architecture/release.md.
 
+
+### Architecture planning
+
+The current executable planning path is:
+
+requirements clarification
+-> planned
+-> ready
+-> architecture planning
+-> implementation
+
+The architecture planning boundary is documented in docs/architecture/architecture-planning.md. It is read-only and does not advance lifecycle state.
