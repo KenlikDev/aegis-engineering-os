@@ -186,17 +186,25 @@ def evaluate_readiness(
         project,
         version_evidence_ref,
     )
-    observations.append(
-        ReadinessObservation(
-            "version-verification",
-            "passed" if version_kind == "local-file" else "referenced",
-            (
-                f"Local toolchain evidence exists at {normalized_version_ref}."
-                if version_kind == "local-file"
-                else f"External toolchain evidence reference is explicit: {normalized_version_ref}."
-            ),
+    if version_kind == "local-file":
+        observations.append(
+            ReadinessObservation(
+                "version-verification",
+                "passed",
+                f"Local toolchain evidence exists at {normalized_version_ref}.",
+            )
         )
-    )
+    else:
+        observations.append(
+            ReadinessObservation(
+                "version-verification",
+                "blocked",
+                f"External toolchain evidence reference is explicit but not independently verified: {normalized_version_ref}.",
+            )
+        )
+        blockers.append(
+            "Toolchain evidence must be independently verified locally before managed implementation."
+        )
 
     if architecture_required:
         if not requirements.ready:
