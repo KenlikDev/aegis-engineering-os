@@ -135,12 +135,17 @@ def deliver_to_integration(
         )
     if pull_request.merged:
         validation = None
-        merge_result = sync_integration_merge(
-            merge_provider,
-            work_item_provider,
-            request.work_item_id,
-            pull_request_number,
-        )
+        try:
+            merge_result = sync_integration_merge(
+                merge_provider,
+                work_item_provider,
+                request.work_item_id,
+                pull_request_number,
+            )
+        except IntegrationMergeError as exc:
+            raise IntegrationDeliveryError(
+                "Already-merged integration synchronization failed."
+            ) from exc
     else:
         validation = validation_provider.latest_successful_validation(
             request.workflow,
@@ -156,13 +161,18 @@ def deliver_to_integration(
                 "Task pull request mergeable_state must be clean before integration."
             )
 
-        merge_result = sync_integration_merge(
-            merge_provider,
-            work_item_provider,
-            request.work_item_id,
-            pull_request_number,
-            expected_head_sha=validation.head_sha,
-        )
+        try:
+            merge_result = sync_integration_merge(
+                merge_provider,
+                work_item_provider,
+                request.work_item_id,
+                pull_request_number,
+                expected_head_sha=validation.head_sha,
+            )
+        except IntegrationMergeError as exc:
+            raise IntegrationDeliveryError(
+                "Integration merge failed after validation."
+            ) from exc
 
     return {
         "status": merge_result["status"],
