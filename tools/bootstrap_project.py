@@ -569,6 +569,18 @@ def main() -> int:
             shutil.copy2(staged, destination)
             print(f"Installed {destination}")
 
+        if not agents_path.exists() and not agents_path.is_symlink():
+            shutil.copy2(agents_template_path, agents_path)
+            agents_created = True
+            agents_managed = True
+            agents_sha256 = sha256_file(agents_path)
+            print(f"Installed {agents_path}")
+        else:
+            print(
+                f"Preserved existing {agents_path}; "
+                "reconcile Aegis rules manually."
+            )
+
         commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=root,
@@ -599,18 +611,6 @@ def main() -> int:
             "status": "active",
         }
         write_state_atomically(state_path, state)
-
-        if not agents_path.exists() and not agents_path.is_symlink():
-            shutil.copy2(agents_template_path, agents_path)
-            agents_created = True
-            agents_managed = True
-            agents_sha256 = sha256_file(agents_path)
-            print(f"Installed {agents_path}")
-        else:
-            print(
-                f"Preserved existing {agents_path}; "
-                "reconcile Aegis rules manually."
-            )
 
     except Exception:
         if not mutation_started:
