@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 import sys
 
@@ -11,6 +12,29 @@ from workflow_composition import WorkflowCompositionError, compose_workflow
 
 
 class WorkflowCompositionTests(unittest.TestCase):
+    def test_cli_can_emit_canonical_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "workflow-evidence.json"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "tools" / "workflow_composition.py"),
+                    "--kind",
+                    "refactoring",
+                    "--canonical-evidence-output",
+                    str(output),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn('"work_item_kind": "refactoring"', completed.stdout)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("workflow-composition", payload["kind"])
+            self.assertEqual("verified", payload["status"])
+            self.assertEqual("refactoring", payload["result"]["work_item_kind"])
+
     def test_kind_is_explicit_and_supported(self):
         with self.assertRaisesRegex(WorkflowCompositionError, "does not infer a kind"):
             compose_workflow("Fix an authentication bug")
