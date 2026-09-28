@@ -96,6 +96,8 @@ Lifecycle mutations now have an explicit adapter as well. It preserves provider,
 
 Knowledge-gap records now have an explicit adapter as well. It preserves candidate provenance and controlled lifecycle state; candidate/validated/rejected map to `pending`/`verified`/`failed`, without treating verified candidate knowledge as active guidance.
 
+Requirements clarification, workflow composition, and architecture planning now have explicit adapters as well. They preserve their specialized planning information and map only their existing gate state into canonical status.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
