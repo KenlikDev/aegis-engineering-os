@@ -80,6 +80,10 @@ def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[st
         raise ImplementationReadinessError(
             "version_evidence_ref must be a non-empty project-local evidence file."
         )
+    if value.startswith("http://") or value.startswith("https://"):
+        raise ImplementationReadinessError(
+            "version_evidence_ref must reference local schema-validated version evidence."
+        )
 
     path = Path(value)
     if path.is_absolute():
