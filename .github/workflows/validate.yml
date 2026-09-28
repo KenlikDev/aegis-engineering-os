@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - develop
+      - ai/integration
   pull_request:
     branches:
       - main
