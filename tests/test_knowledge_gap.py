@@ -143,6 +143,31 @@ class KnowledgeGapTests(unittest.TestCase):
                     store_root=directory,
                 )
 
+    def test_rejects_tampered_validation_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            create_candidate(
+                scope="global",
+                capability="tamper detection",
+                problem="Validation records must not be silently altered.",
+                proposed_change="Hash the serialized validation evidence.",
+                references=["https://docs.example.test/knowledge"],
+                store_root=directory,
+                candidate_id="88888888-8888-4888-8888-888888888888",
+            )
+            path = Path(directory) / "88888888-8888-4888-8888-888888888888.json"
+            validate_candidate(
+                path,
+                scenario="run tamper detection scenario",
+                evidence_refs=["https://ci.example.test/runs/47"],
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["validation"]["scenario"] = "tampered"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(KnowledgeGapError, "evidence hash"):
+                reject_candidate(path, reason="should fail closed")
+
+
     def test_redacts_secret_like_validation_data(self):
         with tempfile.TemporaryDirectory() as directory:
             create_candidate(
