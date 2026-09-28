@@ -78,20 +78,23 @@ finally:
 
 
 class UnverifiedMutationWorkItemProvider(InMemoryWorkItemProvider):
-    def __init__(self, items, unverified_operation, unverified_call=1):
+    def __init__(
+        self,
+        items,
+        unverified_operation,
+        unverified_state=None,
+    ):
         super().__init__(items)
         self.unverified_operation = unverified_operation
-        self.unverified_call = unverified_call
-        self.call_counts = {"transition": 0, "traceability": 0, "comment": 0}
+        self.unverified_state = unverified_state
 
-    def transition(self, *args, **kwargs):
-        self.call_counts["transition"] += 1
-        evidence = super().transition(*args, **kwargs)
-        if (
-            self.unverified_operation != "transition"
-            or self.call_counts["transition"] != self.unverified_call
-        ):
-            return evidence
+    def _should_fail(self, work_item_id):
+        if self.unverified_state is None:
+            return True
+        return self.get(work_item_id).state == self.unverified_state
+
+    @staticmethod
+    def _unverified(evidence):
         return MutationEvidence(
             provider=evidence.provider,
             operation=evidence.operation,
@@ -103,43 +106,29 @@ class UnverifiedMutationWorkItemProvider(InMemoryWorkItemProvider):
             identifier=evidence.identifier,
         )
 
-    def attach_traceability(self, *args, **kwargs):
-        self.call_counts["traceability"] += 1
-        evidence = super().attach_traceability(*args, **kwargs)
-        if (
-            self.unverified_operation != "traceability"
-            or self.call_counts["traceability"] != self.unverified_call
-        ):
-            return evidence
-        return MutationEvidence(
-            provider=evidence.provider,
-            operation=evidence.operation,
-            work_item_id=evidence.work_item_id,
-            state_before=evidence.state_before,
-            state_after=evidence.state_after,
-            verified=False,
-            reference=evidence.reference,
-            identifier=evidence.identifier,
+    def transition(self, work_item_id, *args, **kwargs):
+        should_fail = (
+            self.unverified_operation == "transition"
+            and self._should_fail(work_item_id)
         )
+        evidence = super().transition(work_item_id, *args, **kwargs)
+        return self._unverified(evidence) if should_fail else evidence
 
-    def comment(self, *args, **kwargs):
-        self.call_counts["comment"] += 1
-        evidence = super().comment(*args, **kwargs)
-        if (
-            self.unverified_operation != "comment"
-            or self.call_counts["comment"] != self.unverified_call
-        ):
-            return evidence
-        return MutationEvidence(
-            provider=evidence.provider,
-            operation=evidence.operation,
-            work_item_id=evidence.work_item_id,
-            state_before=evidence.state_before,
-            state_after=evidence.state_after,
-            verified=False,
-            reference=evidence.reference,
-            identifier=evidence.identifier,
+    def attach_traceability(self, work_item_id, *args, **kwargs):
+        should_fail = (
+            self.unverified_operation == "traceability"
+            and self._should_fail(work_item_id)
         )
+        evidence = super().attach_traceability(work_item_id, *args, **kwargs)
+        return self._unverified(evidence) if should_fail else evidence
+
+    def comment(self, work_item_id, *args, **kwargs):
+        should_fail = (
+            self.unverified_operation == "comment"
+            and self._should_fail(work_item_id)
+        )
+        evidence = super().comment(work_item_id, *args, **kwargs)
+        return self._unverified(evidence) if should_fail else evidence
 
 
 class AegisOrchestratorTests(unittest.TestCase):
@@ -364,7 +353,7 @@ Test fixture.
             )
 
         self.assertFalse(executed["value"])
-        self.assertEqual(LifecycleState.READY, provider.get("51").state)
+        self.assertEqual(LifecycleState.IN_PROGRESS, provider.get("51").state)
 
     def test_success_to_verification_fails_closed_on_unverified_traceability(self) -> None:
         provider = UnverifiedMutationWorkItemProvider(
@@ -377,7 +366,7 @@ Test fixture.
                 )
             },
             "traceability",
-            unverified_call=2,
+            unverified_state=LifecycleState.IN_PROGRESS,
         )
         project = self.project
 
@@ -415,7 +404,7 @@ Test fixture.
                 )
             },
             "transition",
-            unverified_call=2,
+            unverified_state=LifecycleState.IN_PROGRESS,
         )
         project = self.project
 
