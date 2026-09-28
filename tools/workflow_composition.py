@@ -57,6 +57,7 @@ COMMON_PREFIX = (
     _step("work-item-lifecycle"),
     _step("requirements-clarification"),
     _step("project-discovery"),
+    _step("version-verification", "skill"),
     _step(
         "architecture-planning",
         required=False,
