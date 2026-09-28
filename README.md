@@ -144,3 +144,12 @@ After a task PR reaches review and its checks are clean, Aegis may merge it into
     python3 tools/integration_merge.py OWNER/REPO 75 74
 
 The tool verifies the work item, target branch, exact task branch, clean merge state, exact head SHA, and final merge commit before moving the work item from review to integration. It is never permitted to merge develop or main.
+
+## Composed integration delivery
+
+For a reviewed work item, use the composed delivery boundary:
+
+    python3 tools/integration_delivery.py OWNER/REPO 77 ai/feature/77-integration "feat: deliver work item"
+
+The controller creates or reuses the ai/integration task PR, requires successful validation for its exact head SHA, and then delegates the protected ai/integration merge. It never targets develop or main.
+

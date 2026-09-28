@@ -321,6 +321,8 @@ def sync_integration_merge(
     work_item_provider: WorkItemProvider,
     work_item_id: str,
     pull_request_number: int,
+    *,
+    expected_head_sha: str | None = None,
 ) -> dict[str, Any]:
     """Merge a verified task PR into ai/integration and synchronize lifecycle state."""
     _validate_request(provider.repository, work_item_id, pull_request_number)
@@ -342,6 +344,14 @@ def sync_integration_merge(
         raise IntegrationMergeError(
             "Pull request base does not match ai/integration."
         )
+
+    if expected_head_sha is not None:
+        if not SHA_RE.fullmatch(expected_head_sha):
+            raise IntegrationMergeError("Expected pull-request head SHA is malformed.")
+        if pull_request.head_sha != expected_head_sha:
+            raise IntegrationMergeError(
+                "Pull request head SHA changed after validation."
+            )
 
     if pull_request.state == "closed" and not pull_request.merged:
         return {
@@ -451,6 +461,7 @@ def main() -> int:
     parser.add_argument("repository")
     parser.add_argument("work_item_id")
     parser.add_argument("pull_request_number", type=int)
+    parser.add_argument("--expected-head-sha", default=None)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     args = parser.parse_args()
 
@@ -463,6 +474,7 @@ def main() -> int:
             work_item_provider,
             args.work_item_id,
             args.pull_request_number,
+            expected_head_sha=args.expected_head_sha,
         )
     except (IntegrationMergeError, WorkItemLifecycleError, ValueError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
