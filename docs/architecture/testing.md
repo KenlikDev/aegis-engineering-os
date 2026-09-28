@@ -57,3 +57,4 @@ The workflow itself adds no hidden pass/fail rules beyond the existing quality-g
 Testing is execution, so it may run project-declared commands. It does not mutate project source or Git state itself. Any lifecycle mutation is explicit provider synchronization delegated to the existing quality-gate contract.
 
 Protected branches remain outside the workflow boundary.
+\n## Lifecycle synchronization invariant\n\nWhen the testing boundary synchronizes a work item, each material traceability, comment, and lifecycle mutation must return `MutationEvidence.verified=true`. Local gate success and provider transport success are separate facts; an unverified provider mutation must fail the synchronization boundary closed.\n
