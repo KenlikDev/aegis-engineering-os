@@ -19,8 +19,60 @@ from quality_gates import (  # noqa: E402
 from work_item_lifecycle import (  # noqa: E402
     InMemoryWorkItemProvider,
     LifecycleState,
+    MutationEvidence,
     WorkItem,
-)
+ )
+
+
+class UnverifiedMutationProvider(InMemoryWorkItemProvider):
+    def __init__(self, items, unverified_operation):
+        super().__init__(items)
+        self.unverified_operation = unverified_operation
+
+    def transition(self, *args, **kwargs):
+        evidence = super().transition(*args, **kwargs)
+        if self.unverified_operation == "transition":
+            return MutationEvidence(
+                provider=evidence.provider,
+                operation=evidence.operation,
+                work_item_id=evidence.work_item_id,
+                state_before=evidence.state_before,
+                state_after=evidence.state_after,
+                verified=False,
+                reference=evidence.reference,
+                identifier=evidence.identifier,
+            )
+        return evidence
+
+    def comment(self, *args, **kwargs):
+        evidence = super().comment(*args, **kwargs)
+        if self.unverified_operation == "comment":
+            return MutationEvidence(
+                provider=evidence.provider,
+                operation=evidence.operation,
+                work_item_id=evidence.work_item_id,
+                state_before=evidence.state_before,
+                state_after=evidence.state_after,
+                verified=False,
+                reference=evidence.reference,
+                identifier=evidence.identifier,
+            )
+        return evidence
+
+    def attach_traceability(self, *args, **kwargs):
+        evidence = super().attach_traceability(*args, **kwargs)
+        if self.unverified_operation == "traceability":
+            return MutationEvidence(
+                provider=evidence.provider,
+                operation=evidence.operation,
+                work_item_id=evidence.work_item_id,
+                state_before=evidence.state_before,
+                state_after=evidence.state_after,
+                verified=False,
+                reference=evidence.reference,
+                identifier=evidence.identifier,
+            )
+        return evidence
 
 
 class QualityGateTests(unittest.TestCase):
@@ -294,6 +346,147 @@ class QualityGateTests(unittest.TestCase):
             self.assertEqual(LifecycleState.BLOCKED, provider.get("58").state)
             self.assertEqual("blocked", evidence["work_item"]["state_after_execution"])
             self.assertIn("tests", provider.comments["58"][-1])
+
+    def test_success_fails_closed_on_unverified_traceability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._write_manifest(
+                root,
+                [{"id": "tests", "command": ["tests"], "required": True}],
+            )
+            provider = UnverifiedMutationProvider(
+                {
+                    "58": WorkItem(
+                        id="58",
+                        title="quality",
+                        state=LifecycleState.VERIFICATION,
+                        provider="memory",
+                    )
+                },
+                "traceability",
+            )
+
+            with self.assertRaisesRegex(
+                QualityGateError,
+                "work-item synchronization failed",
+            ):
+                run_with_optional_work_item(
+                    root,
+                    manifest,
+                    work_item_provider=provider,
+                    work_item_id="58",
+                    evidence_path=root / "quality-evidence.json",
+                    run_command=lambda command, **kwargs: subprocess.CompletedProcess(
+                        command, 0, "ok\n", ""
+                    ),
+                )
+
+            self.assertEqual(LifecycleState.VERIFICATION, provider.get("58").state)
+
+    def test_success_fails_closed_on_unverified_comment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._write_manifest(
+                root,
+                [{"id": "tests", "command": ["tests"], "required": True}],
+            )
+            provider = UnverifiedMutationProvider(
+                {
+                    "58": WorkItem(
+                        id="58",
+                        title="quality",
+                        state=LifecycleState.VERIFICATION,
+                        provider="memory",
+                    )
+                },
+                "comment",
+            )
+
+            with self.assertRaisesRegex(
+                QualityGateError,
+                "work-item synchronization failed",
+            ):
+                run_with_optional_work_item(
+                    root,
+                    manifest,
+                    work_item_provider=provider,
+                    work_item_id="58",
+                    run_command=lambda command, **kwargs: subprocess.CompletedProcess(
+                        command, 0, "ok\n", ""
+                    ),
+                )
+
+            self.assertEqual(LifecycleState.VERIFICATION, provider.get("58").state)
+
+    def test_success_fails_closed_on_unverified_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._write_manifest(
+                root,
+                [{"id": "tests", "command": ["tests"], "required": True}],
+            )
+            provider = UnverifiedMutationProvider(
+                {
+                    "58": WorkItem(
+                        id="58",
+                        title="quality",
+                        state=LifecycleState.VERIFICATION,
+                        provider="memory",
+                    )
+                },
+                "transition",
+            )
+
+            with self.assertRaisesRegex(
+                QualityGateError,
+                "work-item synchronization failed",
+            ):
+                run_with_optional_work_item(
+                    root,
+                    manifest,
+                    work_item_provider=provider,
+                    work_item_id="58",
+                    run_command=lambda command, **kwargs: subprocess.CompletedProcess(
+                        command, 0, "ok\n", ""
+                    ),
+                )
+
+            self.assertEqual(LifecycleState.REVIEW, provider.get("58").state)
+
+    def test_failure_fails_closed_on_unverified_block_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._write_manifest(
+                root,
+                [{"id": "tests", "command": ["tests"], "required": True}],
+            )
+            provider = UnverifiedMutationProvider(
+                {
+                    "58": WorkItem(
+                        id="58",
+                        title="quality",
+                        state=LifecycleState.VERIFICATION,
+                        provider="memory",
+                    )
+                },
+                "transition",
+            )
+
+            with self.assertRaisesRegex(
+                QualityGateError,
+                "work-item synchronization failed",
+            ):
+                run_with_optional_work_item(
+                    root,
+                    manifest,
+                    work_item_provider=provider,
+                    work_item_id="58",
+                    run_command=lambda command, **kwargs: subprocess.CompletedProcess(
+                        command, 1, "", "failed"
+                    ),
+                )
+
+            self.assertEqual(LifecycleState.BLOCKED, provider.get("58").state)
 
     def test_provider_requires_verification_state_before_running_gates(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
