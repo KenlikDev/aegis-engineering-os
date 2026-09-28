@@ -72,3 +72,17 @@ Close the work item through its provider when supported. Preserve traceability t
 ## Provider rule
 
 Never assume a specific work-management provider is available. Use the provider skill selected by capability discovery.
+
+## Runtime composition
+
+When used with managed OpenHands execution:
+
+1. require the authoritative work item to be `ready`;
+2. record the generated task branch;
+3. transition `ready -> in_progress`;
+4. execute through the verified runtime boundary;
+5. on successful execution and Git verification, record conversation/evidence traceability;
+6. transition `in_progress -> verification`;
+7. on execution or post-execution boundary failure, transition `in_progress -> blocked` and record safe failure metadata.
+
+The runtime never advances automatically to `review`, `integration`, or `done`. Those states require the applicable quality gates and delivery workflow.
