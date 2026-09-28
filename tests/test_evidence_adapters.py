@@ -9,6 +9,7 @@ from evidence_adapters import (  # noqa: E402
     architecture_planning_evidence,
     ci_diagnosis_evidence,
     implementation_readiness_evidence,
+    integration_merge_evidence,
     knowledge_gap_evidence,
     mutation_evidence,
     promotion_readiness_evidence,
@@ -819,6 +820,85 @@ class EvidenceAdapterTests(unittest.TestCase):
             path = __import__("pathlib").Path(temp) / "ci-diagnosis.json"
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
+
+    def test_integration_merge_verified_result_preserves_exact_identity(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "143",
+            "validation_head_sha": SOURCE_SHA,
+            "pull_request": {
+                "number": 143,
+                "url": "https://github.com/example/pull/143",
+                "head": "ai/feature/143-integration-merge-provenance",
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "state": "closed",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "traceability_verified": True,
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        canonical = integration_merge_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("integration-merge", canonical.kind)
+        self.assertEqual("work-item:143", canonical.subject)
+        self.assertEqual(TARGET_SHA, canonical.revision)
+        self.assertEqual(SOURCE_SHA, canonical.result["validation_head_sha"])
+        self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
+        self.assertEqual("verified", canonical.result["work_item"]["transition_verified"])
+        self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "integration-merge-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
+
+    def test_integration_merge_not_merged_remains_unknown(self):
+        result = {
+            "status": "not-merged",
+            "work_item_id": "143",
+            "pull_request": {
+                "number": 143,
+                "url": "https://github.com/example/pull/143",
+                "state": "closed",
+                "merged": False,
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": SOURCE_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "review",
+                "transition_verified": False,
+            },
+        }
+
+        canonical = integration_merge_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("unknown", canonical.status)
+        self.assertIsNone(canonical.revision)
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("not merged", canonical.uncertainty[0])
 
     def test_implementation_readiness_verified_result_is_verified(self):
         result = ImplementationReadiness(
