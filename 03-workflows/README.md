@@ -12,13 +12,14 @@ The repository currently provides:
 - feature implementation;
 - bug fixing;
 - code review;
+- security review;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
 - integration merge;
-- integration delivery.
+- integration delivery;
+- knowledge-gap creation;
 
-- knowledge-gap creation.
 ## Planned workflow areas
 
 The architecture also identifies these workflow areas for future dedicated skills:
@@ -27,7 +28,6 @@ The architecture also identifies these workflow areas for future dedicated skill
 - architecture planning;
 - refactoring;
 - testing;
-- security review;
 - CI remediation.
 
 A workflow must define entry conditions, required evidence, quality gates, and exit conditions.

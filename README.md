@@ -168,3 +168,13 @@ After a focused scenario passes, validate the candidate with explicit evidence:
 The candidate registry never edits the active skill registry. A validated candidate remains a candidate until a separate controlled promotion step accepts it as known-good or active.
 
 See docs/architecture/knowledge.md for the knowledge safety contract.
+
+## Security review
+
+Run the read-only repository security review before high-impact integration or promotion:
+
+    python3 tools/security_review.py /path/to/repository
+
+Exit code 0 means no high-severity findings were observed. Exit code 2 means blocking findings are present. The review never modifies the repository.
+
+See docs/architecture/security.md for the security-review architecture and safety boundary.
