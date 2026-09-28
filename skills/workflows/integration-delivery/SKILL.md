@@ -18,6 +18,7 @@ Move one reviewed work item into ai/integration through one explicit, verified s
 5. Delegate the merge to the controlled integration merge boundary.
 6. Bind the merge to the same validated head SHA.
 7. Verify the resulting merge and lifecycle state.
+8. Optionally emit canonical `integration-delivery` evidence with `--canonical-evidence-output`.
 
 ## Rules
 
@@ -28,6 +29,7 @@ Move one reviewed work item into ai/integration through one explicit, verified s
 - Do not accept a PR head change after validation.
 - Keep the work-item transition optimistic and read-after-write verified.
 - Keep merge approval and protected release promotion outside this workflow.
+- Canonical integration-delivery evidence is an observation of an already completed composition; it is not validation authorization.
 
 ## Implementation
 
