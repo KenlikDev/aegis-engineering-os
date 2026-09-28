@@ -70,6 +70,12 @@ requirements clarification
 
 The architecture planner does not mutate lifecycle state. It verifies ready when a lifecycle provider is supplied and returns a plan that can be consumed by the implementation workflow.
 
+## Canonical provenance
+
+An architecture plan can be adapted into the canonical evidence envelope with `--canonical-evidence-output`. The adapter preserves explicit architecture evidence, deterministic deductions, constraints, boundaries, affected components, ADR needs, non-goals, user-owned questions, and blockers as separate fields.
+
+A ready plan is canonical `verified`. A blocked plan is canonical `failed`. The adapter does not collapse deductions into facts or user-owned questions into decisions.
+
 ## Safety boundary
 
 The planner never:
