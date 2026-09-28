@@ -19,7 +19,8 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add offline project integrity verification with per-skill SHA-256 checksums;
 - validate source metadata before installation;
 - add regression coverage for bootstrap ownership and dirty-source rejection;
-- add the OpenHands Agent Server execution adapter contract with exact version gating, explicit task execution sequencing, and execution evidence collection.
+- add the OpenHands Agent Server execution adapter contract with exact version gating, explicit task execution sequencing, and execution evidence collection;
+- add the managed project execution coordinator with work-item branch safety, runtime preflight reuse, OpenHands boundary prompts, and post-execution Git integrity checks.
 
 ## 0.1.0-alpha.1
 

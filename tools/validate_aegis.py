@@ -138,6 +138,7 @@ def main() -> int:
         "tools/validate_ai_config.py",
         "tools/render_openhands_profile.py",
         "tools/preflight_runtime.py",
+        "tools/aegis_orchestrator.py",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
