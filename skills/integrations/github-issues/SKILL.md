@@ -44,3 +44,13 @@ Do not create a second GitHub Issue when an existing issue already represents th
 Do not close issues merely because a PR exists.
 
 Do not weaken repository or branch protection to simplify issue-driven automation.
+
+## Executable lifecycle bridge
+
+The executable provider boundary is `tools/work_item_lifecycle.py`.
+
+GitHub-specific behavior is intentionally isolated in `GitHubIssuesProvider`. Lifecycle state is stored in `aegis:status:<state>` labels; `done` additionally closes the issue. Blocked work uses `aegis:resume:<state>` to preserve the exact active state from which execution must resume.
+
+The adapter requires an explicit expected state when callers can observe concurrent work. It reads the issue before mutation and reads it again after mutation. Comment creation also uses read-after-write verification.
+
+Provider credentials are supplied through the environment and never appear in mutation evidence. Traceability input validates branch names, HTTPS pull-request URLs, evidence references, and OpenHands UUIDs before an external comment is created.
