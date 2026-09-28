@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "state": "candidate",
+  "candidate": {
+    "candidate_id": "00000000-0000-4000-8000-000000000000",
+    "scope": "global",
+    "capability": "Describe the missing capability.",
+    "problem": "Explain what Aegis cannot currently do safely or correctly.",
+    "proposed_change": "Describe the candidate guidance or reference to validate.",
+    "references": [
+      "https://example.com/authoritative-source"
+    ],
+    "created_at": "2026-01-01T00:00:00Z",
+    "candidate_sha256": "replace-after-creation"
+  },
+  "validation": null,
+  "transitions": [
+    {
+      "from": null,
+      "to": "candidate",
+      "at": "2026-01-01T00:00:00Z",
+      "reason": "knowledge gap identified"
+    }
+  ]
+}
