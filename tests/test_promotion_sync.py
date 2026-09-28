@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from promotion_readiness import BranchSnapshot
 from promotion_sync import (
+    GitHubPromotionSyncProvider,
     PromotionPullRequest,
     PromotionSyncError,
     sync_promotion_merge,
@@ -140,6 +141,38 @@ class FakeWorkItemProvider:
             state_after=target.value,
             verified=self.transition_verified,
         )
+
+
+class FakeGitHubTransport:
+    def __init__(self):
+        self.url = None
+        self.status = "ahead"
+
+    def __call__(self, method, url, headers, payload):
+        self.url = url
+        return 200, {
+            "status": self.status,
+            "ahead_by": 1 if self.status == "ahead" else 0,
+            "behind_by": 0,
+        }
+
+
+    def test_github_provider_requires_identical_compare(self):
+        transport = FakeGitHubTransport()
+        provider = GitHubPromotionSyncProvider(
+            REPOSITORY,
+            "test-token",
+            transport=transport,
+        )
+
+        self.assertFalse(provider.target_matches_commit("main", MERGE_SHA))
+        self.assertEqual(
+            f"/repos/{REPOSITORY}/compare/main...{MERGE_SHA}",
+            transport.url.removeprefix("https://api.github.test"),
+        )
+
+        transport.status = "identical"
+        self.assertTrue(provider.target_matches_commit("main", MERGE_SHA))
 
 
 class PromotionSyncTests(unittest.TestCase):
