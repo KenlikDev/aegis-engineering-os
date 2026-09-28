@@ -168,6 +168,12 @@
       "path": "skills/workflows/integration-delivery/SKILL.md",
       "domain": "workflow",
       "stability": "core"
+    },
+    {
+      "name": "knowledge-gap-creation",
+      "path": "skills/workflows/knowledge-gap-creation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
     }
   ]
 }
