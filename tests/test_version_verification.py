@@ -1,5 +1,8 @@
 import hashlib
+import contextlib
+import io
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -186,6 +189,51 @@ class VersionVerificationTests(unittest.TestCase):
                 claims,
                 root / ".aegis" / "version-evidence.json",
             )
+
+    def test_cli_validate_can_emit_canonical_evidence(self):
+        root, claims = self._project()
+        output = root / ".aegis" / "version-evidence.json"
+        canonical = root / ".aegis" / "canonical-version-evidence.json"
+        record_version_evidence(root, claims, output)
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tools" / "version_verification.py"),
+                "validate",
+                str(root),
+                str(output),
+                "--revision",
+                "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+                "--evidence-output",
+                str(canonical),
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn('"external_verification_pending": false', completed.stdout)
+        payload = json.loads(canonical.read_text(encoding="utf-8"))
+        self.assertEqual(1, payload["schema_version"])
+        self.assertEqual("version-verification", payload["kind"])
+        self.assertEqual(
+            "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+            payload["revision"],
+        )
+        self.assertEqual("verified", payload["status"])
+        self.assertEqual(
+            output.relative_to(root).as_posix(),
+            " .aegis/version-evidence.json".strip(),
+        )
+        self.assertEqual(
+            "2.2.20",
+            next(
+                claim["version"]
+                for claim in payload["result"]["claims"]
+                if claim["component"] == "kotlin"
+            ),
+        )
 
     def test_record_refuses_to_overwrite_input_or_source(self):
         root, claims = self._project()
