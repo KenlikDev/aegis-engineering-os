@@ -14,6 +14,7 @@ The repository currently provides:
 - code review;
 - security review;
 - ci remediation;
+- requirements clarification;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
@@ -25,7 +26,6 @@ The repository currently provides:
 
 The architecture also identifies these workflow areas for future dedicated skills:
 
-- requirements clarification;
 - architecture planning;
 - refactoring;
 - testing.

@@ -19,6 +19,7 @@ CORE_WORKFLOW_DISPLAY_NAMES = {
     "integration-delivery": "integration delivery",
     "security-review": "security review",
     "ci-remediation": "ci remediation",
+    "requirements-clarification": "requirements clarification",
 }
 
 
@@ -55,7 +56,7 @@ class WorkflowCatalogTests(unittest.TestCase):
         self.assertIn("- integration delivery;", implemented)
         self.assertNotIn("- integration delivery.", planned)
         self.assertNotIn("- ci remediation;", planned)
-        self.assertIn("- requirements clarification;", planned)
+        self.assertNotIn("- requirements clarification;", planned)
 
 
 if __name__ == "__main__":
