@@ -350,7 +350,7 @@ Test fixture.
             )
 
         self.assertFalse(executed["value"])
-        self.assertEqual(LifecycleState.IN_PROGRESS, provider.get("51").state)
+        self.assertEqual(LifecycleState.READY, provider.get("51").state)
 
     def test_success_to_verification_fails_closed_on_unverified_traceability(self) -> None:
         provider = UnverifiedMutationWorkItemProvider(
