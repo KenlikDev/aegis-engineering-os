@@ -1,0 +1,222 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+import sys
+
+sys.path.insert(0, str(ROOT / "tools"))
+
+from security_review import assess_repository  # noqa: E402
+
+
+class SecurityReviewTests(unittest.TestCase):
+    def test_current_repository_has_no_high_severity_findings(self):
+        result = assess_repository(ROOT)
+        self.assertEqual("ready", result.status)
+        self.assertEqual(
+            0,
+            sum(finding.severity == "high" for finding in result.findings),
+        )
+
+    def test_blocks_pull_request_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "unsafe.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: unsafe\n"
+                "on:\n"
+                "  pull_request_target:\n"
+                "permissions:\n"
+                "  contents: read\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "workflow.untrusted-trigger" for f in result.findings)
+            )
+
+    def test_blocks_missing_explicit_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "missing-permissions.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: missing-permissions\n"
+                "on: push\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "workflow.permissions-explicit" for f in result.findings)
+            )
+
+    def test_blocks_unpinned_action(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "unpinned.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: unpinned\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "steps:\n"
+                "  - uses: actions/checkout@v7\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "workflow.unpinned-action" for f in result.findings)
+            )
+
+    def test_flags_write_permission_without_blocking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "write.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: write\n"
+                "permissions:\n"
+                "  contents: write\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertTrue(
+                any(f.rule_id == "workflow.permissions-write" for f in result.findings)
+            )
+
+    def test_blocks_subprocess_shell_true(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "import subprocess\n"
+                "subprocess.run('echo unsafe', shell=True)\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "python.subprocess-shell" for f in result.findings)
+            )
+
+    def test_blocks_force_push_subprocess(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "import subprocess\n"
+                "subprocess.run(['git', 'push', '--force', 'origin', 'main'])\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "git.force-push" for f in result.findings)
+            )
+
+    def test_blocks_force_true_git_ref_update(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "def update():\n"
+                "    payload = {'force': True}\n"
+                "    return payload\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "git.force-update" for f in result.findings)
+            )
+
+    def test_blocks_direct_protected_ref_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "def _request(method, path):\n"
+                "    return method, path\n"
+                "def update():\n"
+                "    return _request('POST', 'refs/heads/main')\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "git.protected-direct-write" for f in result.findings)
+            )
+
+    def test_blocks_github_api_without_explicit_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "API = 'https://api.github.com'\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
+    def test_reports_findings_deterministically(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "unsafe.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: unsafe\n"
+                "on:\n"
+                "  pull_request_target:\n"
+                "permissions:\n"
+                "  contents: write\n"
+                "steps:\n"
+                "  - uses: actions/checkout@v7\n",
+                encoding="utf-8",
+            )
+
+            first = assess_repository(root)
+            second = assess_repository(root)
+            self.assertEqual(
+                [finding.__dict__ if hasattr(finding, "__dict__") else (
+                    finding.rule_id,
+                    finding.severity,
+                    finding.path,
+                    finding.message,
+                    finding.line,
+                ) for finding in first.findings],
+                [finding.__dict__ if hasattr(finding, "__dict__") else (
+                    finding.rule_id,
+                    finding.severity,
+                    finding.path,
+                    finding.message,
+                    finding.line,
+                ) for finding in second.findings],
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
