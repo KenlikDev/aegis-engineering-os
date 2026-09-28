@@ -67,9 +67,9 @@ def _relative_member_path(root: Path, raw_path: str | Path) -> tuple[Path, str]:
         raise EvidenceBundleError("Evidence member path contains invalid characters.")
     candidate = Path(value).expanduser()
     if candidate.is_absolute():
-        raise EvidenceBundleError("Evidence member paths must be project-relative.")
-
-    resolved = (root / candidate).resolve()
+        resolved = candidate.resolve()
+    else:
+        resolved = (root / candidate).resolve()
     try:
         relative = resolved.relative_to(root)
     except ValueError as exc:
