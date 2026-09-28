@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from validate_ai_config import load_registry, validate_profile_config
 
@@ -21,6 +21,18 @@ DEFAULT_TIMEOUT_SECONDS = 5
 
 class RuntimePreflightError(RuntimeError):
     """Raised when the selected local runtime cannot be verified."""
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject runtime redirects so local authentication cannot cross origins."""
+
+    def redirect_request(self, request, *args: Any, **kwargs: Any) -> Request:
+        raise RuntimePreflightError(
+            "Runtime preflight endpoint returned an unexpected redirect."
+        )
+
+
+_NO_REDIRECT_OPENER = build_opener(_NoRedirectHandler)
 
 
 def _request_json(
@@ -34,7 +46,7 @@ def _request_json(
 
     request = Request(url, headers=request_headers)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RuntimePreflightError(f"Unable to verify local runtime at {url}: {exc}") from exc

@@ -143,6 +143,26 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertEqual(dry_run.returncode, 0, dry_run.stderr)
             self.assertIn("Would install", dry_run.stdout)
 
+    def test_symlinked_managed_skill_is_never_overwritten(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            bootstrap = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            external = Path(tmp) / "external-skill.md"
+            external.write_text("external content\n", encoding="utf-8")
+
+            managed = project / ".agents" / "skills" / "aegis-orchestrator" / "SKILL.md"
+            managed.unlink()
+            managed.symlink_to(external)
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlinked aegis skill file", result.stderr.lower())
+            self.assertEqual("external content\n", external.read_text(encoding="utf-8"))
+
     def test_unowned_skill_is_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"

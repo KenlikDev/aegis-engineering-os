@@ -453,7 +453,12 @@ def _validate_record(payload: Mapping[str, Any]) -> EvidenceRecord:
 
 def write_evidence(record: EvidenceRecord, output_path: str | Path) -> None:
     """Write a validated evidence record as canonical JSON."""
-    path = Path(output_path).expanduser().resolve()
+    path = Path(output_path).expanduser()
+    if path.is_symlink():
+        raise EvidenceContractError(
+            "Evidence output must not be a symbolic link."
+        )
+    path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(

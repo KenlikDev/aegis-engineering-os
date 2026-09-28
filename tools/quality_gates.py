@@ -497,7 +497,12 @@ def run_with_optional_work_item(
     output = _evidence_dict(evidence)
 
     if evidence_path is not None:
-        destination = evidence_path.expanduser().resolve()
+        destination = evidence_path.expanduser()
+        if destination.is_symlink():
+            raise QualityGateError(
+                "Quality-gate evidence output must not be a symbolic link."
+            )
+        destination = destination.resolve()
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
             json.dumps(output, indent=2, sort_keys=True) + "\n",

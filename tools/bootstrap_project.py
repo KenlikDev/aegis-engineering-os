@@ -254,6 +254,10 @@ def validate_existing_managed_path(
 ) -> None:
     if not destination.exists():
         return
+    if destination.is_symlink():
+        raise SystemExit(
+            f"Refusing to manage symlinked Aegis skill path: {destination}"
+        )
     if not destination.is_dir():
         raise SystemExit(
             f"Refusing to manage non-directory skill path: {destination}"
@@ -272,6 +276,10 @@ def validate_existing_managed_path(
         )
 
     skill_file = destination / "SKILL.md"
+    if skill_file.is_symlink():
+        raise SystemExit(
+            f"Refusing to manage symlinked Aegis skill file: {skill_file}"
+        )
     if expected_checksum and skill_file.is_file():
         actual = sha256_file(skill_file)
         if actual != expected_checksum:

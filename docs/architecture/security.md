@@ -45,3 +45,10 @@ implementation
 -> integration
 
 Security review can also be invoked before promotion when a high-impact change crosses a trust boundary.
+
+
+## Network and filesystem boundaries
+
+Local runtime preflight rejects HTTP redirects because it may send an Agent Server session authentication header to the selected local endpoint. Redirects therefore cannot silently move that header to another origin.
+
+Managed bootstrap skill directories and SKILL.md files reject symbolic links before mutation. Canonical evidence and quality-gate output writers reject symbolic-link destinations before writing. These checks preserve the declared filesystem boundary rather than relying on the final resolved path alone.
