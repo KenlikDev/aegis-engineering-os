@@ -85,6 +85,23 @@ class TestingWorkflowTests(unittest.TestCase):
         self.assertEqual([], evidence["required_failures"])
         self.assertEqual(["unit-tests"], evidence["testing_contract"]["required_gate_ids"])
 
+    def test_standalone_execution_persists_evidence(self):
+        root = self._project()
+        evidence_path = root / "artifacts" / "testing.json"
+
+        def fake_runner(command, **kwargs):
+            return subprocess.CompletedProcess(command, 0, "passed\\n", "")
+
+        evidence = run_testing(
+            root,
+            evidence_path=evidence_path,
+            run_command=fake_runner,
+        )
+
+        self.assertEqual("verified", evidence["status"])
+        self.assertTrue(evidence_path.is_file())
+        self.assertEqual("verified", __import__("json").loads(evidence_path.read_text(encoding="utf-8"))["status"])
+
     def test_required_failure_is_not_bypassed(self):
         root = self._project()
 
