@@ -271,3 +271,32 @@ def implementation_readiness_evidence(
         }
     )
 
+def testing_evidence(
+    result: Mapping[str, Any],
+    *,
+    observed_at: datetime | str,
+    revision: str | None = None,
+) -> EvidenceRecord:
+    """Convert the already-redacted testing result into canonical evidence."""
+    status = result.get("status")
+    if status not in {"verified", "failed"}:
+        raise EvidenceContractError(
+            "Testing result status must be 'verified' or 'failed'."
+        )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "testing",
+            "source": "aegis:testing",
+            "subject": "project-testing",
+            "revision": revision,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": dict(result),
+            "uncertainty": [],
+            "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
