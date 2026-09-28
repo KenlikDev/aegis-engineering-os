@@ -63,6 +63,7 @@ class JobSnapshot:
     status: str
     conclusion: str | None
     url: str
+    failed_steps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +116,26 @@ class _NoRedirectHandler(HTTPRedirectHandler):
 
 
 _HTTP_OPENER = build_opener(_NoRedirectHandler())
+
+class _LogRedirectHandler(HTTPRedirectHandler):
+    """Follow job-log redirects without forwarding GitHub credentials."""
+
+    def redirect_request(
+        self,
+        request: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Request:
+        parsed = urlparse(newurl)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise CIDiagnosisError("CI log redirect must target an HTTPS URL.")
+        return Request(newurl, headers={"Accept": "text/plain"}, method="GET")
+
+
+_LOG_HTTP_OPENER = build_opener(_LogRedirectHandler())
 
 
 def _redact(value: str) -> str:
@@ -254,17 +275,15 @@ def diagnose(
         if job.conclusion != "failure":
             continue
         log = _bounded_excerpt(provider.get_job_log(job.job_id), limit=log_limit)
-        # The full bounded excerpt is used for classification; evidence is redacted again.
-        step_name = None
-        if job.name:
-            step_name = job.name
-        findings.append(
-            _classify_failure(
-                job=job,
-                step_name=step_name,
-                log=log,
+        failed_steps = job.failed_steps or (job.name or None,)
+        for step_name in failed_steps:
+            findings.append(
+                _classify_failure(
+                    job=job,
+                    step_name=step_name,
+                    log=log,
+                )
             )
-        )
 
     findings.sort(
         key=lambda finding: (
@@ -469,6 +488,16 @@ class GitHubCIDiagnosisProvider:
             job_status = item.get("status")
             conclusion = item.get("conclusion")
             url = item.get("html_url")
+            raw_steps = item.get("steps", [])
+            if not isinstance(raw_steps, list):
+                raw_steps = []
+            failed_steps = tuple(
+                step.get("name")
+                for step in raw_steps
+                if isinstance(step, Mapping)
+                and step.get("conclusion") == "failure"
+                and isinstance(step.get("name"), str)
+            )
             if (
                 isinstance(job_id, int)
                 and job_id > 0
@@ -484,23 +513,42 @@ class GitHubCIDiagnosisProvider:
                         status=job_status,
                         conclusion=conclusion,
                         url=url,
+                        failed_steps=failed_steps,
                     )
                 )
         result.sort(key=lambda job: job.job_id)
         return result
 
-    def get_job_log(self, job_id: int) -> str:
+    def _download_job_log(self, job_id: int) -> str:
         if job_id <= 0:
             raise CIDiagnosisError("Workflow job id must be positive.")
-        status, data = self._request(
-            "GET",
-            f"/repos/{self.repository}/actions/jobs/{job_id}/logs",
+        url = (
+            f"{self._api_base_url}/repos/{self.repository}"
+            f"/actions/jobs/{job_id}/logs"
         )
-        if status != 200:
-            raise CIDiagnosisError(f"Unable to read workflow job log; HTTP {status}.")
-        if not isinstance(data, str):
-            raise CIDiagnosisError("GitHub workflow job log response is not text.")
-        return data
+        request = Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": GITHUB_API_VERSION,
+                "Authorization": f"Bearer {self._token}",
+            },
+            method="GET",
+        )
+        try:
+            with _LOG_HTTP_OPENER.open(request, timeout=30.0) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            raise CIDiagnosisError(
+                f"Unable to read workflow job log; HTTP {exc.code}."
+            ) from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise CIDiagnosisError("Unable to download workflow job log.") from exc
+
+    def get_job_log(self, job_id: int) -> str:
+        """Return job logs through the credential-safe redirect downloader."""
+        return self._download_job_log(job_id)
+
 
 
 def _to_dict(report: DiagnosticReport) -> dict[str, Any]:
