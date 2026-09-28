@@ -93,7 +93,12 @@ def _sha256_and_text(path: Path) -> tuple[str, str]:
     return digest, content
 
 
-def _validate_claim_input(project: Path, raw: object) -> tuple[str, str, str, str, str]:
+def _validate_claim_input(
+    project: Path,
+    raw: object,
+    *,
+    expected_sha256: str | None = None,
+) -> tuple[str, str, str, str, str]:
     if not isinstance(raw, dict):
         raise VersionVerificationError("Every version claim must be an object.")
     component = _clean_text(raw.get("component"), "component")
@@ -106,6 +111,10 @@ def _validate_claim_input(project: Path, raw: object) -> tuple[str, str, str, st
     source = _clean_text(raw.get("source"), "source", max_length=1024)
     path, relative_source = _relative_source(project, source)
     digest, content = _sha256_and_text(path)
+    if expected_sha256 is not None and expected_sha256 != digest:
+        raise VersionVerificationError(
+            f"Source SHA-256 changed for {component!r}: expected {expected_sha256}, got {digest}."
+        )
     if version not in content:
         raise VersionVerificationError(
             f"Claimed version {version!r} for {component!r} was not found in {relative_source}."
@@ -247,12 +256,18 @@ def validate_version_evidence(
     parsed: list[VersionClaim] = []
     seen: set[str] = set()
     for raw in claims:
-        component, version, scope, source, digest = _validate_claim_input(root, raw)
-        recorded_digest = raw.get("source_sha256") if isinstance(raw, dict) else None
-        if recorded_digest != digest:
+        if not isinstance(raw, dict):
+            raise VersionVerificationError("Every version claim must be an object.")
+        recorded_digest = raw.get("source_sha256")
+        if not isinstance(recorded_digest, str) or not recorded_digest:
             raise VersionVerificationError(
-                f"Source SHA-256 changed for {component!r}: expected {recorded_digest}, got {digest}."
+                "Every recorded version claim must contain a source_sha256 string."
             )
+        component, version, scope, source, digest = _validate_claim_input(
+            root,
+            raw,
+            expected_sha256=recorded_digest,
+        )
         key = component.casefold()
         if key in seen:
             raise VersionVerificationError(
