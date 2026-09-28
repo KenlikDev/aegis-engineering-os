@@ -121,3 +121,22 @@ A session API key may be supplied to authenticated Agent Server APIs through the
 A reachable but not-ready server or a server that does not expose the selected model is a hard failure. The runtime URL is never inferred from a default port.
 
 This still does not execute \`/v1/chat/completions\`, create conversations, or modify OpenHands settings.
+
+## Managed project execution coordinator
+
+The executable coordinator is `tools/aegis_orchestrator.py`. It is the first orchestration layer above the verified OpenHands adapter.
+
+Before execution it verifies the target is a Git repository root, refuses a dirty worktree and protected branches, validates the explicit OpenHands container workspace, runs the existing read-only runtime preflight, and renders the explicitly selected local Ollama profile.
+
+It then creates a task branch under the `ai/<kind>/` namespace and sends OpenHands a boundary-wrapped task. The task explicitly leaves commits, pushes, branch changes, resets, rebases, credential access, GitHub access, and sibling-repository access under Aegis control.
+
+After OpenHands reports `finished`, the coordinator verifies:
+
+- the task branch is still checked out;
+- Git HEAD is unchanged from the branch creation checkpoint;
+- the working tree contains inspectable changes unless `--allow-no-change` was explicitly supplied;
+- `git diff --check` passes.
+
+The coordinator does not automatically commit, push, create a pull request, merge, or discard a failed execution workspace. A failed execution therefore remains inspectable for recovery and diagnosis.
+
+The container workspace path is explicit because the OpenHands adapter operates in the Agent Server/container namespace. Aegis does not infer Docker mounts. The local installation must establish the corresponding host-to-container mapping before the coordinator is used.
