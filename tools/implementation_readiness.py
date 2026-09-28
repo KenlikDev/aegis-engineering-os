@@ -134,6 +134,18 @@ def evaluate_readiness(
     if not kind:
         raise ImplementationReadinessError("work_item_kind must be explicit and non-empty.")
 
+    if work_item_id is not None:
+        markdown = document.read_text(encoding="utf-8")
+        identity_match = re.search(
+            r"^Work item ID:\s*(\S+)\s*$",
+            markdown,
+            re.MULTILINE,
+        )
+        if identity_match is None or identity_match.group(1).lstrip("#") != work_item_id.lstrip("#"):
+            raise ImplementationReadinessError(
+                "Canonical work-item document does not match the supplied work-item ID."
+            )
+
     project = (
         Path(project_root).expanduser().resolve()
         if project_root is not None
