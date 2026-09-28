@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
 import os
+from datetime import datetime, timezone
 import sys
 from pathlib import Path
 from typing import Any
@@ -264,7 +264,8 @@ def main() -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    if args.canonical_evidence_output is not None:
+    try:
+        if args.canonical_evidence_output is not None:
         from evidence_adapters import runtime_preflight_evidence
         from evidence_contract import write_evidence
 
@@ -278,7 +279,10 @@ def main() -> int:
             result,
             observed_at=datetime.now(timezone.utc),
         )
-        write_evidence(canonical, canonical_path)
+            write_evidence(canonical, canonical_path)
+    except (ValueError, RuntimePreflightError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
