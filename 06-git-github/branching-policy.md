@@ -63,3 +63,16 @@ The delivery layer may create or reuse a PR from an \`ai/*\` task branch into an
 After a PR is actually merged, \`sync-merge\` verifies the PR source branch and target branch before advancing the authoritative work item from \`review\` to \`integration\`.
 
 The bridge never treats \`mergeable=true\` or a clean mergeability state as equivalent to an actual merge.
+
+
+## Promotion readiness
+
+The read-only promotion verifier is \`tools/promotion_readiness.py\`.
+
+It evaluates \`ai/integration -> develop\` or \`ai/integration -> main\` using fresh GitHub state. The target must be explicitly selected and protected; \`ai/integration\` must also remain protected.
+
+The verifier records the exact source and target SHAs, compare divergence, changed-file count, and the result of the required \`Aegis Validation\` workflow for the exact source SHA.
+
+Promotion is blocked when the source is behind the target, contains no delta, the exact source SHA has no successful \`Aegis Validation\`, the protected-state assumptions are false, or the caller supplied expected SHAs that no longer match.
+
+The verifier is read-only. It does not create promotion branches, modify branch protection, merge pull requests, or change \`develop\`/\`main\`.
