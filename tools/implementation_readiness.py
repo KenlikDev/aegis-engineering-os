@@ -77,8 +77,8 @@ def _validate_lifecycle(
     return item.state.value
 
 
-def _validate_version_evidence(project: Path, reference: str) -> tuple[str, str]:
-    value = reference.strip()
+def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[str, str]:
+    value = str(reference).strip()
     if not value or FORBIDDEN_CONTROL_RE.search(value):
         raise ImplementationReadinessError(
             "version_evidence_ref must be a non-empty single-line reference."
@@ -122,7 +122,7 @@ def evaluate_readiness(
     work_item_kind: str,
     *,
     project_root: str | Path | None = None,
-    version_evidence_ref: str,
+    version_evidence_ref: str | Path,
     architecture_required: bool,
     work_item_provider: WorkItemProvider | None = None,
     work_item_id: str | None = None,
