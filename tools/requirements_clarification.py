@@ -15,8 +15,6 @@ PLACEHOLDER_RE = re.compile(
     r"^(?:\.\.\.|tbd|todo|to be decided|fill in|n/?a)\.?$",
     re.IGNORECASE,
 )
-HEADING_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*$", re.MULTILINE)
-
 
 class RequirementsClarificationError(RuntimeError):
     """Raised when requirements clarification cannot be completed safely."""
@@ -56,13 +54,11 @@ def _is_placeholder(value: str) -> bool:
 
 
 def _sections(markdown: str) -> dict[str, str]:
-    matches = list(HEADING_RE.finditer(markdown))
+    heading_re = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+    matches = list(heading_re.finditer(markdown))
     result: dict[str, str] = {}
     for index, match in enumerate(matches):
-        level = len(match.group(1))
-        if level != 2:
-            continue
-        heading = _normalize(match.group(2)).lower()
+        heading = _normalize(match.group(1)).lower()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
         result[heading] = markdown[match.end():end].strip()
     return result
