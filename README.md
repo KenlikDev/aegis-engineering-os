@@ -166,3 +166,5 @@ After a focused scenario passes, validate the candidate with explicit evidence:
     python3 tools/knowledge_gap.py validate .aegis/knowledge/candidates/<candidate-id>.json --scenario "Run the documented rollback scenario" --evidence-ref https://ci.example.com/runs/123
 
 The candidate registry never edits the active skill registry. A validated candidate remains a candidate until a separate controlled promotion step accepts it as known-good or active.
+
+See docs/architecture/knowledge.md for the knowledge safety contract.
