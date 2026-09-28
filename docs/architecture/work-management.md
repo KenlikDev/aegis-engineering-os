@@ -97,3 +97,9 @@ Promotion from \`ai/integration\` into \`develop\` or \`main\` is a separate hum
 \`tools/promotion_readiness.py\` provides a read-only evidence gate. It verifies exact current branch SHAs, source/target divergence, protected status, and a successful \`Aegis Validation\` workflow run on the exact \`ai/integration\` SHA.
 
 A readiness result is evidence, not a merge authorization. Protected-branch policy and human approval remain authoritative.
+
+## Requirements clarification
+
+`tools/requirements_clarification.py` is the executable read-only boundary between intake and planning. It checks the canonical work-item format for a concrete title, intent, in-scope/out-of-scope boundaries, observable acceptance criteria, and verification plan. Missing dependencies or risks are reported as warnings because some tasks legitimately have none.
+
+A blocker result means the work item must not silently advance to `ready`. The tool emits deterministic questions rather than selecting the missing business or technical decision. This preserves user ownership of scope, acceptance, priorities, and commitments.
