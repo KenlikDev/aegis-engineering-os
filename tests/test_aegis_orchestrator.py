@@ -78,13 +78,19 @@ finally:
 
 
 class UnverifiedMutationWorkItemProvider(InMemoryWorkItemProvider):
-    def __init__(self, items, unverified_operation):
+    def __init__(self, items, unverified_operation, unverified_call=1):
         super().__init__(items)
         self.unverified_operation = unverified_operation
+        self.unverified_call = unverified_call
+        self.call_counts = {"transition": 0, "traceability": 0, "comment": 0}
 
     def transition(self, *args, **kwargs):
+        self.call_counts["transition"] += 1
         evidence = super().transition(*args, **kwargs)
-        if self.unverified_operation != "transition":
+        if (
+            self.unverified_operation != "transition"
+            or self.call_counts["transition"] != self.unverified_call
+        ):
             return evidence
         return MutationEvidence(
             provider=evidence.provider,
@@ -98,8 +104,12 @@ class UnverifiedMutationWorkItemProvider(InMemoryWorkItemProvider):
         )
 
     def attach_traceability(self, *args, **kwargs):
+        self.call_counts["traceability"] += 1
         evidence = super().attach_traceability(*args, **kwargs)
-        if self.unverified_operation != "traceability":
+        if (
+            self.unverified_operation != "traceability"
+            or self.call_counts["traceability"] != self.unverified_call
+        ):
             return evidence
         return MutationEvidence(
             provider=evidence.provider,
@@ -113,8 +123,12 @@ class UnverifiedMutationWorkItemProvider(InMemoryWorkItemProvider):
         )
 
     def comment(self, *args, **kwargs):
+        self.call_counts["comment"] += 1
         evidence = super().comment(*args, **kwargs)
-        if self.unverified_operation != "comment":
+        if (
+            self.unverified_operation != "comment"
+            or self.call_counts["comment"] != self.unverified_call
+        ):
             return evidence
         return MutationEvidence(
             provider=evidence.provider,
@@ -363,6 +377,7 @@ Test fixture.
                 )
             },
             "traceability",
+            unverified_call=2,
         )
         project = self.project
 
@@ -400,6 +415,7 @@ Test fixture.
                 )
             },
             "transition",
+            unverified_call=2,
         )
         project = self.project
 
