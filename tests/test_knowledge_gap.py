@@ -131,6 +131,18 @@ class KnowledgeGapTests(unittest.TestCase):
                     evidence_refs=["https://ci.example.test/runs/45"],
                 )
 
+    def test_rejects_secret_like_candidate_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(KnowledgeGapError, "secret-like value"):
+                create_candidate(
+                    scope="global",
+                    capability="unsafe secret handling",
+                    problem="contains ghp_SUPERSECRET123",
+                    proposed_change="Do not persist credentials.",
+                    references=["https://docs.example.test/security"],
+                    store_root=directory,
+                )
+
     def test_rejects_non_https_reference(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(KnowledgeGapError, "HTTPS URLs"):
