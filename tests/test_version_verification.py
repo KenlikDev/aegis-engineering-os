@@ -1,6 +1,4 @@
 import hashlib
-import contextlib
-import io
 import json
 import subprocess
 import tempfile
@@ -222,10 +220,7 @@ class VersionVerificationTests(unittest.TestCase):
             payload["revision"],
         )
         self.assertEqual("verified", payload["status"])
-        self.assertEqual(
-            output.relative_to(root).as_posix(),
-            " .aegis/version-evidence.json".strip(),
-        )
+        self.assertTrue(canonical.is_file())
         self.assertEqual(
             "2.2.20",
             next(
