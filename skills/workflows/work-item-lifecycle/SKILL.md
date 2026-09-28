@@ -21,6 +21,10 @@ Use for every non-trivial engineering task, feature, bug, refactor, infrastructu
 
 Before advancing an intake item into planning or ready state, run the read-only requirements clarification workflow when the canonical work-item document is available. Blocker-level questions must be answered by the user or an authoritative project source; Aegis must not invent the missing decision.
 
+## Workflow composition
+
+After the work item is classified explicitly, build the deterministic workflow composition before execution. Do not infer the work-item kind from free-form text.
+
 ## Architecture planning
 
 After a work item reaches ready, run the read-only architecture planning workflow before implementation when the task has architecture-relevant constraints or affected components. The planner must verify ready state when a lifecycle provider is supplied. It never changes lifecycle state and must not invent architecture decisions.
