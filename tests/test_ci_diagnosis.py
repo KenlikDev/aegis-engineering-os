@@ -77,6 +77,28 @@ class CIDiagnosisTests(unittest.TestCase):
         self.assertEqual("test-failure", report.findings[0].category)
         self.assertTrue(report.findings[0].actionable)
 
+    def test_exact_failed_step_takes_precedence_over_log_mentions(self):
+        job = JobSnapshot(
+            job_id=13,
+            name="Validate Aegis",
+            status="completed",
+            conclusion="failure",
+            url="https://github.com/example/runs/13",
+            failed_steps=("Run policy tests",),
+        )
+        provider = FakeProvider(
+            jobs=[job],
+            logs={
+                13: "security review is not relevant here; "
+                "FAILED (failures=1)"
+            },
+        )
+
+        report = diagnose(provider, 101)
+
+        self.assertEqual("test-failure", report.findings[0].category)
+        self.assertEqual("Run policy tests", report.findings[0].step)
+
     def test_unknown_failure_is_inconclusive(self):
         job = JobSnapshot(
             job_id=11,
