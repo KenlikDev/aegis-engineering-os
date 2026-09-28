@@ -10,6 +10,10 @@ Load:
 - user communication policy;
 - active project instructions.
 
+## Workflow composition
+
+Before loading task-specific workflow skills for an implementation-oriented work item, establish its explicit kind and use the workflow-composition boundary to determine the ordered capabilities and conditional steps.
+
 ## Dynamic context
 
 Load only the roles, technology skills, workflows, and quality/security guidance relevant to the current task.
