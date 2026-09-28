@@ -235,7 +235,7 @@ class ImplementationReadinessTests(unittest.TestCase):
 
     def test_external_version_reference_is_not_verified(self):
         root, work_item, _, provider = self._fixture()
-        with self.assertRaisesRegex(ImplementationReadinessError, "inside the project root"):
+        with self.assertRaisesRegex(ImplementationReadinessError, "local schema-validated"):
             evaluate_readiness(
                 work_item,
                 "feature",
