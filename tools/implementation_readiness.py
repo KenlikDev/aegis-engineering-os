@@ -7,9 +7,12 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+from evidence_contract import EvidenceContractError, write_evidence
 
 from architecture_planning import ArchitecturePlanningError, ArchitecturePlan, plan_architecture
 from workflow_composition import WorkflowComposition, WorkflowCompositionError, compose_workflow
@@ -329,6 +332,11 @@ def main() -> int:
         required=True,
         help="Project-local version-evidence JSON produced and validated by tools/version_verification.py.",
     )
+    parser.add_argument(
+        "--evidence-output",
+        type=Path,
+        help="Optional canonical implementation-readiness evidence output path.",
+    )
     architecture = parser.add_mutually_exclusive_group(required=True)
     architecture.add_argument(
         "--architecture-required",
@@ -368,6 +376,7 @@ def main() -> int:
         provider = GitHubIssuesProvider(args.work_item_repository, token)
 
     try:
+        observed_at = datetime.now(timezone.utc)
         readiness = evaluate_readiness(
             args.work_item,
             args.kind,
@@ -377,7 +386,39 @@ def main() -> int:
             work_item_provider=provider,
             work_item_id=args.work_item_id,
         )
-    except (ImplementationReadinessError, WorkItemLifecycleError) as exc:
+
+        if args.evidence_output is not None:
+            from evidence_adapters import implementation_readiness_evidence
+
+            output_path = args.evidence_output.expanduser()
+            project_root = (
+                args.project_root.expanduser().resolve()
+                if args.project_root is not None
+                else args.work_item.expanduser().resolve().parent
+            )
+            if not output_path.is_absolute():
+                output_path = project_root / output_path
+            output_path = output_path.resolve()
+
+            work_item_path = args.work_item.expanduser().resolve()
+            version_evidence_path = Path(args.version_evidence_ref).expanduser()
+            if not version_evidence_path.is_absolute():
+                version_evidence_path = project_root / version_evidence_path
+            version_evidence_path = version_evidence_path.resolve()
+
+            if output_path in {work_item_path, version_evidence_path}:
+                raise ImplementationReadinessError(
+                    "Canonical evidence output must not overwrite the work-item or version-evidence input."
+                )
+
+            write_evidence(
+                implementation_readiness_evidence(
+                    readiness,
+                    observed_at=observed_at,
+                ),
+                output_path,
+            )
+    except (ImplementationReadinessError, WorkItemLifecycleError, EvidenceContractError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

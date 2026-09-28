@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
+    implementation_readiness_evidence,
     release_readiness_evidence,
     version_verification_evidence,
 )
@@ -15,6 +16,10 @@ from evidence_contract import (  # noqa: E402
     write_evidence,
 )
 from promotion_readiness import BranchSnapshot, CompareSnapshot, PromotionReadiness, ValidationRun  # noqa: E402
+from implementation_readiness import (  # noqa: E402
+    ImplementationReadiness,
+    ReadinessObservation,
+)
 from release_readiness import ChangelogSnapshot, ReleaseReadiness  # noqa: E402
 from version_verification import VersionClaim, VersionEvidence  # noqa: E402
 
@@ -201,6 +206,109 @@ class EvidenceAdapterTests(unittest.TestCase):
             path = __import__("pathlib").Path(temp) / "version-evidence.json"
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
+
+    def test_implementation_readiness_verified_result_is_verified(self):
+        result = ImplementationReadiness(
+            work_item_path="/tmp/work-item.md",
+            work_item_id="118",
+            work_item_kind="feature",
+            lifecycle_state="ready",
+            requirements_status="ready",
+            architecture_required=False,
+            version_evidence_ref=".aegis/version-evidence.json",
+            version_external_verification_pending=False,
+            observations=(
+                ReadinessObservation(
+                    "requirements",
+                    "passed",
+                    "Requirements clarification has no blocker-level questions.",
+                ),
+                ReadinessObservation(
+                    "architecture",
+                    "not-required",
+                    "Architecture impact was explicitly classified as not required for this work item.",
+                ),
+            ),
+            blockers=(),
+            composition_steps=("feature-implementation", "testing"),
+        )
+
+        canonical = implementation_readiness_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("work-item:118", canonical.subject)
+        self.assertEqual("feature", canonical.result["work_item_kind"])
+        self.assertEqual(
+            ["feature-implementation", "testing"],
+            canonical.result["composition_steps"],
+        )
+        self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
+
+    def test_implementation_readiness_pending_version_remains_pending(self):
+        result = ImplementationReadiness(
+            work_item_path="/tmp/work-item.md",
+            work_item_id="118",
+            work_item_kind="feature",
+            lifecycle_state=None,
+            requirements_status="ready",
+            architecture_required=False,
+            version_evidence_ref=".aegis/version-evidence.json",
+            version_external_verification_pending=True,
+            observations=(
+                ReadinessObservation(
+                    "version-verification",
+                    "pending",
+                    "External compatibility verification remains pending.",
+                ),
+            ),
+            blockers=(),
+            composition_steps=("feature-implementation",),
+        )
+
+        canonical = implementation_readiness_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("pending", canonical.status)
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("pending", canonical.uncertainty[0].lower())
+
+    def test_implementation_readiness_blocked_result_is_failed(self):
+        result = ImplementationReadiness(
+            work_item_path="/tmp/work-item.md",
+            work_item_id="118",
+            work_item_kind="feature",
+            lifecycle_state=None,
+            requirements_status="blocked",
+            architecture_required=True,
+            version_evidence_ref=".aegis/version-evidence.json",
+            version_external_verification_pending=False,
+            observations=(
+                ReadinessObservation(
+                    "requirements",
+                    "blocked",
+                    "2 clarification question(s) remain.",
+                ),
+            ),
+            blockers=("Requirements clarification still contains blocker-level questions.",),
+            composition_steps=("feature-implementation", "testing"),
+        )
+
+        canonical = implementation_readiness_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual(
+            ["Requirements clarification still contains blocker-level questions."],
+            canonical.result["blockers"],
+        )
+
 
     def test_release_ready_result_is_verified(self):
         result = ReleaseReadiness(

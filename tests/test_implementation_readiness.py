@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -121,6 +122,65 @@ class ImplementationReadinessTests(unittest.TestCase):
         )
         self.addCleanup(project.cleanup)
         return root, work_item, evidence, provider
+
+    def test_cli_can_emit_canonical_readiness_evidence(self):
+        root, work_item, evidence, _ = self._fixture()
+        canonical = root / ".aegis" / "implementation-readiness-evidence.json"
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tools" / "implementation_readiness.py"),
+                str(work_item),
+                "--project-root",
+                str(root),
+                "--kind",
+                "feature",
+                "--version-evidence-ref",
+                str(evidence),
+                "--architecture-not-required",
+                "--evidence-output",
+                str(canonical),
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn('"ready": true', completed.stdout)
+        payload = json.loads(canonical.read_text(encoding="utf-8"))
+        self.assertEqual("implementation-readiness", payload["kind"])
+        self.assertEqual("work-item:unspecified", payload["subject"])
+        self.assertEqual("verified", payload["status"])
+        self.assertEqual([], payload["uncertainty"])
+        self.assertEqual(
+            "feature",
+            payload["result"]["work_item_kind"],
+        )
+
+    def test_cli_refuses_to_overwrite_version_evidence(self):
+        root, work_item, evidence, _ = self._fixture()
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tools" / "implementation_readiness.py"),
+                str(work_item),
+                "--project-root",
+                str(root),
+                "--kind",
+                "feature",
+                "--version-evidence-ref",
+                str(evidence),
+                "--architecture-not-required",
+                "--evidence-output",
+                str(evidence),
+            ],
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertEqual(1, completed.returncode)
+        self.assertIn("must not overwrite", completed.stderr)
 
     def test_ready_with_explicit_architecture_plan(self):
         root, work_item, evidence, provider = self._fixture()

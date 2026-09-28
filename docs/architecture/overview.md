@@ -83,6 +83,8 @@ The evidence-provenance boundary provides a canonical provider-neutral envelope 
 
 The evidence-bundle boundary composes already validated canonical evidence artifacts into a deterministic, self-verifying reference set. It preserves individual evidence identities and does not infer that a bundle is complete for any higher-level decision.
 
+Implementation readiness can now emit its own canonical provenance record, allowing the readiness gate result to participate in later evidence composition without replacing its specialized contract.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
