@@ -256,12 +256,15 @@ class PromotionSnapshotTests(unittest.TestCase):
         calls = {"target_reads": 0}
 
         def changing_call(method, url, headers, payload):  # noqa: ANN001
-            result = transport(method, url, headers, payload)
             if method == "GET" and url.endswith("/commits/develop"):
                 calls["target_reads"] += 1
                 if calls["target_reads"] >= 2:
-                    transport.target_sha = OTHER_SHA
-            return result
+                    return 200, {
+                        "sha": OTHER_SHA,
+                        "commit": {"tree": {"sha": OTHER_SHA}},
+                        "parents": [],
+                    }
+            return transport(method, url, headers, payload)
 
         provider = GitHubPromotionSnapshotProvider(
             REPOSITORY,
