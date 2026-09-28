@@ -134,6 +134,7 @@ def main() -> int:
         "docs/architecture/release.md",
         "docs/architecture/work-management.md",
         "docs/architecture/ai-backends.md",
+        "docs/architecture/knowledge.md",
         "docs/architecture/runtime.md",
         "docs/governance/state-verification.md",
         "docs/product/discovery-mode.md",
