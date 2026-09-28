@@ -319,8 +319,17 @@ class IntegrationMergeTests(unittest.TestCase):
         provider = FakeIntegrationProvider(exact_merge=False)
         items = work_items()
 
-        with self.assertRaisesRegex(IntegrationMergeError, "not contained in ai/integration"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "not exactly equal to integration merge commit",
+        ):
+            sync_integration_merge(
+                provider,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
 
         self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
 
