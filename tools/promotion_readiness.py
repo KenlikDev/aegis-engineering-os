@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 from urllib.error import HTTPError, URLError
@@ -548,10 +549,12 @@ def main() -> int:
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
     parser.add_argument("--expected-source-sha")
     parser.add_argument("--expected-target-sha")
+    parser.add_argument("--evidence-output", type=os.path.abspath)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     args = parser.parse_args()
 
     try:
+        observed_at = datetime.now(timezone.utc)
         token = os.environ.get(args.token_env, "")
         provider = GitHubPromotionProvider(args.repository, token)
         result = provider.assess(
@@ -564,6 +567,15 @@ def main() -> int:
     except (PromotionReadinessError, ValueError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
+
+    if args.evidence_output:
+        from evidence_adapters import promotion_readiness_evidence
+        from evidence_contract import write_evidence
+
+        write_evidence(
+            promotion_readiness_evidence(result, observed_at=observed_at),
+            args.evidence_output,
+        )
 
     print(json.dumps(_to_dict(result), indent=2, sort_keys=True))
     return 0 if result.ready else 2

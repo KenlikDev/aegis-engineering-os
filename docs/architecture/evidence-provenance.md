@@ -76,6 +76,8 @@ The executable evidence boundary only standardizes the representation and integr
 
 ## Relationship to existing evidence formats
 
-Quality-gate runs, CI diagnosis, security review, promotion readiness, release readiness, knowledge-gap records, and version verification currently expose specialized evidence structures.
+Quality-gate runs, CI diagnosis, security review, knowledge-gap records, and version verification currently expose specialized evidence structures.
 
-This change does not silently migrate or reinterpret those schemas. Future work may add explicit adapters that wrap or reference specialized evidence while preserving their existing semantics.
+Promotion readiness and release readiness now have explicit adapters in `tools/evidence_adapters.py`. They preserve their specialized result schemas while optionally emitting the canonical provenance envelope.
+
+The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.

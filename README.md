@@ -101,6 +101,10 @@ Before promoting \`ai/integration\`, run the read-only verifier against the expl
 
     python3 tools/promotion_readiness.py OWNER/REPO develop --workflow .github/workflows/validate.yml
 
+To additionally persist the assessment in the canonical provenance envelope:
+
+    python3 tools/promotion_readiness.py OWNER/REPO develop --evidence-output /tmp/promotion-evidence.json
+
 For a release target:
 
     python3 tools/promotion_readiness.py OWNER/REPO main --workflow .github/workflows/validate.yml
@@ -119,6 +123,8 @@ The command creates or reuses ai/66-main-promotion, prepares a verified two-pare
 
 The snapshot tool refuses develop while the selected target is behind or diverged. It never resolves conflicts and never approves or merges protected branches.
 
+The optional evidence artifact preserves the exact observed source SHA and validation provenance in the canonical evidence envelope.
+
 See docs/architecture/promotion.md for the complete contract.
 
 ## Release readiness
@@ -127,9 +133,13 @@ After changes reach main, evaluate release readiness without changing the reposi
 
     python3 tools/release_readiness.py OWNER/REPO
 
+    python3 tools/release_readiness.py OWNER/REPO --evidence-output /tmp/release-evidence.json
+
 Exit code 0 means all release evidence is present. Exit code 2 means the release is blocked and the JSON result lists the observed blockers.
 
 The verifier checks the exact main SHA, branch protection, exact-SHA Aegis Validation, version consistency across release metadata, and CHANGELOG state. It never creates tags, GitHub Releases, commits, branches, or pull requests.
+
+The optional evidence artifact preserves the exact observed main SHA and validation provenance in the canonical evidence envelope.
 
 See docs/architecture/release.md and skills/workflows/release-preparation/SKILL.md.
 
