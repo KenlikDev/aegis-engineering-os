@@ -94,6 +94,11 @@ def runtime_preflight_evidence(
                 f"Runtime preflight {field} must be a non-empty string."
             )
 
+    if result.get("model_available") is not True:
+        raise EvidenceContractError(
+            "Runtime preflight canonical evidence requires an exact installed model."
+        )
+
     agent_server = result.get("openhands_agent_server")
     if agent_server is not None and not isinstance(agent_server, Mapping):
         raise EvidenceContractError(
