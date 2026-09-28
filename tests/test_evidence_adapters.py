@@ -6,6 +6,7 @@ ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from evidence_adapters import (  # noqa: E402
+    architecture_planning_evidence,
     ci_diagnosis_evidence,
     implementation_readiness_evidence,
     knowledge_gap_evidence,
@@ -13,9 +14,11 @@ from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
     openhands_execution_evidence,
     release_readiness_evidence,
+    requirements_clarification_evidence,
     security_review_evidence,
     testing_evidence,
     version_verification_evidence,
+    workflow_composition_evidence,
 )
 from evidence_contract import (  # noqa: E402
     read_and_validate_evidence,
@@ -35,6 +38,14 @@ from implementation_readiness import (  # noqa: E402
 )
 from security_review import SecurityFinding, SecurityReviewResult  # noqa: E402
 from work_item_lifecycle import MutationEvidence  # noqa: E402
+from architecture_planning import (  # noqa: E402
+    ArchitectureDeduction,
+    ArchitectureEvidence,
+    ArchitecturePlan,
+    ArchitectureQuestion,
+)
+from requirements_clarification import ClarificationQuestion, RequirementsReport  # noqa: E402
+from workflow_composition import WorkflowComposition, WorkflowStep  # noqa: E402
 from knowledge_gap import (  # noqa: E402
     create_candidate,
     reject_candidate,
@@ -229,6 +240,166 @@ class EvidenceAdapterTests(unittest.TestCase):
 
 
 
+
+    def test_requirements_clarification_ready_is_verified(self):
+        report = RequirementsReport(
+            path="/tmp/work-item.md",
+            status="ready",
+            questions=(
+                ClarificationQuestion(
+                    "dependencies.unknown",
+                    "warning",
+                    "Dependencies",
+                    "Are there dependencies?",
+                    "No dependencies are explicitly recorded.",
+                ),
+            ),
+        )
+        canonical = requirements_clarification_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        self.assertEqual("verified", canonical.status)
+        self.assertTrue(canonical.result["ready"])
+        self.assertEqual("dependencies.unknown", canonical.result["questions"][0]["question_id"])
+
+    def test_requirements_clarification_blocked_is_failed(self):
+        report = RequirementsReport(
+            path="/tmp/work-item.md",
+            status="needs-clarification",
+            questions=(
+                ClarificationQuestion(
+                    "intent.outcome",
+                    "blocker",
+                    "Intent",
+                    "What outcome is required?",
+                    "Intent is missing.",
+                ),
+            ),
+        )
+        canonical = requirements_clarification_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual(1, canonical.result["summary"]["blockers"])
+
+    def test_workflow_composition_is_verified_and_preserves_conditions(self):
+        composition = WorkflowComposition(
+            work_item_kind="refactoring",
+            steps=(
+                WorkflowStep("requirements-clarification", "workflow", True),
+                WorkflowStep(
+                    "architecture-planning",
+                    "workflow",
+                    False,
+                    "Run when architecture-relevant constraints are present.",
+                ),
+            ),
+        )
+        canonical = workflow_composition_evidence(
+            composition,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("refactoring", canonical.subject.split(":", 1)[1])
+        self.assertFalse(canonical.result["steps"][1]["required"])
+        self.assertIn("architecture-relevant", canonical.result["steps"][1]["condition"])
+
+    def test_architecture_planning_ready_preserves_information_classes(self):
+        plan = ArchitecturePlan(
+            path="/tmp/work-item.md",
+            work_item_id="135",
+            lifecycle_state="ready",
+            status="ready",
+            requirements_status="ready",
+            evidence=(
+                ArchitectureEvidence(
+                    "technical-notes.1",
+                    "Technical notes",
+                    "Affected component: evidence planning.",
+                ),
+            ),
+            deductions=(
+                ArchitectureDeduction(
+                    "boundaries.explicit-components",
+                    "Explicit component reference exists.",
+                    "Preserve the named boundary.",
+                ),
+            ),
+            constraints=("Preserve the named boundary.",),
+            boundaries=("Add provenance adapter.",),
+            affected_components=("evidence planning",),
+            adr_needs=(),
+            non_goals=("Change execution behavior.",),
+            user_owned_decisions=(
+                ArchitectureQuestion(
+                    "decision.1",
+                    "user",
+                    "Choose the long-term promotion policy.",
+                    "Business decision remains user-owned.",
+                ),
+            ),
+            blockers=(),
+        )
+        canonical = architecture_planning_evidence(
+            plan,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("work-item:135", canonical.subject)
+        self.assertEqual(1, len(canonical.result["evidence"]))
+        self.assertEqual(1, len(canonical.result["deductions"]))
+        self.assertEqual(1, len(canonical.result["user_owned_decisions"]))
+
+    def test_architecture_planning_blocked_is_failed(self):
+        plan = ArchitecturePlan(
+            path="/tmp/work-item.md",
+            work_item_id="135",
+            lifecycle_state="ready",
+            status="blocked",
+            requirements_status="ready",
+            evidence=(),
+            deductions=(),
+            constraints=(),
+            boundaries=(),
+            affected_components=(),
+            adr_needs=(),
+            non_goals=(),
+            user_owned_decisions=(),
+            blockers=(
+                ArchitectureQuestion(
+                    "architecture.affected-components",
+                    "engineering-evidence",
+                    "Which component is affected?",
+                    "No explicit component reference was found.",
+                ),
+            ),
+        )
+        canonical = architecture_planning_evidence(
+            plan,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual(
+            "architecture.affected-components",
+            canonical.result["blockers"][0]["question_id"],
+        )
+
+    def test_planning_evidence_round_trips(self):
+        report = RequirementsReport(
+            path="/tmp/work-item.md",
+            status="ready",
+            questions=(),
+        )
+        canonical = requirements_clarification_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "requirements-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
 
     def test_verified_lifecycle_mutation_is_verified(self):
         result = MutationEvidence(

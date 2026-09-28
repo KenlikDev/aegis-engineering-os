@@ -109,6 +109,12 @@ The top-level orchestrator:
 
 A missing or ambiguous work-item kind is an input problem, not permission to guess.
 
+## Canonical provenance
+
+A successful explicit composition can be adapted into the canonical evidence envelope with `--canonical-evidence-output`. The adapter preserves the work-item kind, every ordered step, step kind, required/conditional state, condition text, and required-step projection.
+
+Because `compose_workflow` rejects unsupported kinds and unregistered capabilities, successful composition output is canonical `verified`. The adapter does not reinterpret conditional applicability.
+
 ## Safety
 
 The composition builder is read-only. It never:

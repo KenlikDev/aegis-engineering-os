@@ -99,6 +99,8 @@ Knowledge-gap records can now emit canonical provenance while preserving the can
 
 ### Evidence set requirements
 
+Planning results for requirements clarification, workflow composition, and architecture planning can now emit canonical provenance records. This allows an explicitly declared evidence-set contract to consume the complete pre-implementation planning chain without replacing those specialized planning contracts.
+
 The evidence-set consumer validates an explicitly supplied requirement document against a canonical evidence bundle. It is fail-closed, does not infer requirements, and does not itself define readiness or promotion policy.
 
 ### Version verification

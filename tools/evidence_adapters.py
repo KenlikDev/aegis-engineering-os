@@ -32,7 +32,10 @@ def _canonical_safe(value: Any) -> Any:
 
 
 if TYPE_CHECKING:
+    from architecture_planning import ArchitecturePlan
     from ci_diagnosis import DiagnosticReport
+    from requirements_clarification import RequirementsReport
+    from workflow_composition import WorkflowComposition
     from knowledge_gap import KnowledgeGapRecord
     from work_item_lifecycle import MutationEvidence
     from openhands_execution import OpenHandsExecutionResult
@@ -612,6 +615,163 @@ def knowledge_gap_evidence(
             },
             "uncertainty": uncertainty,
             "references": references,
+            "artifact_sha256": None,
+        }
+    )
+
+def requirements_clarification_evidence(
+    report: "RequirementsReport",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert deterministic requirements clarification into canonical evidence."""
+    status = "verified" if report.ready else "failed"
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "requirements-clarification",
+            "source": "aegis:requirements-clarification",
+            "subject": f"work-item-document:{report.path}",
+            "revision": None,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "path": report.path,
+                "status": report.status,
+                "ready": report.ready,
+                "questions": [
+                    {
+                        "question_id": question.question_id,
+                        "severity": question.severity,
+                        "section": question.section,
+                        "question": question.question,
+                        "evidence": question.evidence,
+                    }
+                    for question in report.questions
+                ],
+                "summary": {
+                    "blockers": sum(
+                        question.severity == "blocker"
+                        for question in report.questions
+                    ),
+                    "warnings": sum(
+                        question.severity == "warning"
+                        for question in report.questions
+                    ),
+                },
+            },
+            "uncertainty": [],
+            "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
+
+def workflow_composition_evidence(
+    composition: "WorkflowComposition",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert an explicit workflow composition into canonical evidence."""
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "workflow-composition",
+            "source": "aegis:workflow-composition",
+            "subject": f"work-item-kind:{composition.work_item_kind}",
+            "revision": None,
+            "observed_at": _timestamp(observed_at),
+            "status": "verified",
+            "result": {
+                "work_item_kind": composition.work_item_kind,
+                "steps": [
+                    {
+                        "name": step.name,
+                        "kind": step.kind,
+                        "required": step.required,
+                        "condition": step.condition,
+                    }
+                    for step in composition.steps
+                ],
+                "required_steps": [
+                    step.name for step in composition.required_steps
+                ],
+            },
+            "uncertainty": [],
+            "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
+
+def architecture_planning_evidence(
+    plan: "ArchitecturePlan",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert architecture planning into canonical evidence without collapsing its information classes."""
+    status = "verified" if plan.ready else "failed"
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "architecture-planning",
+            "source": "aegis:architecture-planning",
+            "subject": (
+                f"work-item:{plan.work_item_id}"
+                if plan.work_item_id is not None
+                else f"work-item-document:{plan.path}"
+            ),
+            "revision": None,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "path": plan.path,
+                "work_item_id": plan.work_item_id,
+                "lifecycle_state": plan.lifecycle_state,
+                "status": plan.status,
+                "requirements_status": plan.requirements_status,
+                "evidence": [
+                    {
+                        "evidence_id": item.evidence_id,
+                        "source": item.source,
+                        "value": item.value,
+                    }
+                    for item in plan.evidence
+                ],
+                "deductions": [
+                    {
+                        "deduction_id": item.deduction_id,
+                        "basis": item.basis,
+                        "conclusion": item.conclusion,
+                    }
+                    for item in plan.deductions
+                ],
+                "constraints": list(plan.constraints),
+                "boundaries": list(plan.boundaries),
+                "affected_components": list(plan.affected_components),
+                "adr_needs": list(plan.adr_needs),
+                "non_goals": list(plan.non_goals),
+                "user_owned_decisions": [
+                    {
+                        "question_id": item.question_id,
+                        "ownership": item.ownership,
+                        "question": item.question,
+                        "basis": item.basis,
+                    }
+                    for item in plan.user_owned_decisions
+                ],
+                "blockers": [
+                    {
+                        "question_id": item.question_id,
+                        "ownership": item.ownership,
+                        "question": item.question,
+                        "basis": item.basis,
+                    }
+                    for item in plan.blockers
+                ],
+            },
+            "uncertainty": [],
+            "references": [],
             "artifact_sha256": None,
         }
     )

@@ -25,6 +25,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add the lifecycle mutation provenance adapter while preserving read-after-write verification semantics;
 - add the knowledge-gap provenance adapter while preserving candidate-only activation semantics;
 - add an explicit evidence-set requirements consumer for semantic bundle completeness checks;
+- add canonical provenance adapters for requirements clarification, workflow composition, and architecture planning;
 - harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;

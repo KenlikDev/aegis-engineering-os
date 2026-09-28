@@ -8,7 +8,10 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+
+from evidence_contract import EvidenceContractError, write_evidence
 
 
 PLACEHOLDER_RE = re.compile(
@@ -263,11 +266,35 @@ def main() -> int:
         description="Check work-item completeness without inventing requirements."
     )
     parser.add_argument("work_item")
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     try:
         report = clarify_requirements(args.work_item)
-    except RequirementsClarificationError as exc:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import requirements_clarification_evidence
+
+            output_path = args.canonical_evidence_output.expanduser()
+            if not output_path.is_absolute():
+                output_path = Path(args.work_item).expanduser().resolve().parent / output_path
+            output_path = output_path.resolve()
+            work_item_path = Path(args.work_item).expanduser().resolve()
+            if output_path == work_item_path:
+                raise RequirementsClarificationError(
+                    "Canonical evidence output must not overwrite the work-item document."
+                )
+            write_evidence(
+                requirements_clarification_evidence(
+                    report,
+                    observed_at=datetime.now(timezone.utc),
+                ),
+                output_path,
+            )
+    except (RequirementsClarificationError, EvidenceContractError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

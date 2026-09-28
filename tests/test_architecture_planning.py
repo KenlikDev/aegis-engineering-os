@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import subprocess
+import json
 from dataclasses import dataclass
 from pathlib import Path
 import sys
@@ -96,6 +98,31 @@ class ArchitecturePlanningTests(unittest.TestCase):
         path.write_text(source, encoding="utf-8")
         self.addCleanup(directory.cleanup)
         return path
+
+    def test_cli_can_emit_canonical_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work_item = Path(directory) / "work-item.md"
+            output = Path(directory) / "architecture-evidence.json"
+            work_item.write_text(VALID, encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "tools" / "architecture_planning.py"),
+                    str(work_item),
+                    "--canonical-evidence-output",
+                    str(output),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn('"status": "ready"', completed.stdout)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("architecture-planning", payload["kind"])
+            self.assertEqual("verified", payload["status"])
+            self.assertIsNone(payload["result"]["work_item_id"])
 
     def test_ready_plan_preserves_evidence_and_deductions(self):
         path = self._write(VALID)

@@ -7,8 +7,11 @@ import argparse
 import json
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
+
+from evidence_contract import EvidenceContractError, write_evidence
 
 
 DEFAULT_REGISTRY = (
@@ -210,11 +213,35 @@ def main() -> int:
         default=DEFAULT_REGISTRY,
         help="Aegis skill registry used to validate referenced capabilities.",
     )
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     try:
         composition = compose_workflow(args.kind, registry_path=args.registry)
-    except WorkflowCompositionError as exc:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import workflow_composition_evidence
+
+            output_path = args.canonical_evidence_output.expanduser()
+            if not output_path.is_absolute():
+                output_path = Path(args.registry).expanduser().resolve().parent / output_path
+            output_path = output_path.resolve()
+            registry_path = Path(args.registry).expanduser().resolve()
+            if output_path == registry_path:
+                raise WorkflowCompositionError(
+                    "Canonical evidence output must not overwrite the skill registry."
+                )
+            write_evidence(
+                workflow_composition_evidence(
+                    composition,
+                    observed_at=datetime.now(timezone.utc),
+                ),
+                output_path,
+            )
+    except (WorkflowCompositionError, EvidenceContractError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

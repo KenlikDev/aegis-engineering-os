@@ -352,6 +352,11 @@ Build the deterministic workflow sequence for an explicitly classified work item
 
 The composition layer validates every referenced capability against skills/registry.json, preserves conditional steps explicitly, and never infers the work-item kind from free-form text.
 
+To additionally persist an explicit composition as canonical evidence:
+
+    python3 tools/workflow_composition.py --kind refactoring \
+      --canonical-evidence-output /tmp/workflow-evidence.json
+
 See docs/architecture/workflow-composition.md.
 
 
@@ -362,6 +367,13 @@ Check a work item before planning without inventing missing decisions:
     python3 tools/requirements_clarification.py path/to/work-item.md
 
 Exit code 0 means the required inputs are present. Exit code 2 means blocker-level clarification questions remain. The workflow is read-only and does not alter the work item.
+
+To additionally persist clarification as canonical evidence:
+
+    python3 tools/requirements_clarification.py /path/to/work-item.md \
+      --canonical-evidence-output /tmp/requirements-evidence.json
+
+A complete requirements result is canonical `verified`; unresolved blocker questions remain canonical `failed`.
 
 See docs/architecture/requirements.md for the decision-ownership contract.
 
@@ -380,6 +392,13 @@ When lifecycle verification is required, pass the authoritative GitHub work item
       --work-item-id 123
 
 The planner separates explicit evidence, deterministic technical deductions, user-owned decisions, and blockers. It never changes source files, scope, Git state, or protected branches.
+
+To additionally persist the architecture plan as canonical evidence:
+
+    python3 tools/architecture_planning.py /path/to/work-item.md \
+      --canonical-evidence-output /tmp/architecture-evidence.json
+
+A ready plan is canonical `verified`; a blocked plan is canonical `failed`.
 
 See docs/architecture/architecture-planning.md.
 
