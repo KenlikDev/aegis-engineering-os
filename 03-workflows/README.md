@@ -12,13 +12,14 @@ The repository currently provides:
 - feature implementation;
 - bug fixing;
 - code review;
+- security review;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
 - integration merge;
-- integration delivery.
-
+- integration delivery;
 - knowledge-gap creation.
+- security review.
 ## Planned workflow areas
 
 The architecture also identifies these workflow areas for future dedicated skills:
