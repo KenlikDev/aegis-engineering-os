@@ -402,7 +402,7 @@ def _sync_failure(
     failed_gate_ids: tuple[str, ...],
 ) -> None:
     try:
-        transition = require_verified_mutation(
+        require_verified_mutation(
             provider.transition(
                 work_item_id,
                 LifecycleState.BLOCKED,
@@ -418,7 +418,7 @@ def _sync_failure(
         ]
         if evidence_ref:
             details.append(f"- **Evidence:** {evidence_ref}")
-        comment = require_verified_mutation(
+        require_verified_mutation(
             provider.comment(work_item_id, "\n".join(details)),
             "Quality-gate blocked-state comment",
         )
@@ -434,27 +434,27 @@ def _sync_success(
     evidence_ref: str | None,
 ) -> None:
     try:
-        traceability = None
         if evidence_ref:
-            traceability = require_verified_mutation(
+            require_verified_mutation(
                 provider.attach_traceability(
                     work_item_id,
                     Traceability(evidence_ref=evidence_ref),
                 ),
                 "Quality-gate traceability mutation",
             )
-        comment = require_verified_mutation(
+        require_verified_mutation(
             provider.comment(
-            work_item_id,
-            (
-                "<!-- aegis:quality-gate-success:v1 -->\n"
-                "## Aegis quality verification passed\n"
-                f"- **Work item:** {work_item_id}\n"
-                f"- **Evidence:** {evidence_ref or '(returned in execution output)'}"
+                work_item_id,
+                (
+                    "<!-- aegis:quality-gate-success:v1 -->\n"
+                    "## Aegis quality verification passed\n"
+                    f"- **Work item:** {work_item_id}\n"
+                    f"- **Evidence:** {evidence_ref or '(returned in execution output)'}"
+                ),
             ),
             "Quality-gate success comment",
         )
-        transition = require_verified_mutation(
+        require_verified_mutation(
             provider.transition(
                 work_item_id,
                 LifecycleState.REVIEW,
@@ -466,7 +466,6 @@ def _sync_success(
         raise QualityGateError(
             f"Quality verification passed locally but work-item synchronization failed: {exc}"
         ) from exc
-
 
 def run_with_optional_work_item(
     project: Path,
