@@ -14,6 +14,7 @@ from version_verification import record_version_evidence  # noqa: E402
 from work_item_lifecycle import (  # noqa: E402
     InMemoryWorkItemProvider,
     LifecycleState,
+    MutationEvidence,
     WorkItem,
 )
 
@@ -74,6 +75,57 @@ finally:
             sys.modules.pop(name, None)
         else:
             sys.modules[name] = module
+
+
+class UnverifiedMutationWorkItemProvider(InMemoryWorkItemProvider):
+    def __init__(self, items, unverified_operation):
+        super().__init__(items)
+        self.unverified_operation = unverified_operation
+
+    def transition(self, *args, **kwargs):
+        evidence = super().transition(*args, **kwargs)
+        if self.unverified_operation != "transition":
+            return evidence
+        return MutationEvidence(
+            provider=evidence.provider,
+            operation=evidence.operation,
+            work_item_id=evidence.work_item_id,
+            state_before=evidence.state_before,
+            state_after=evidence.state_after,
+            verified=False,
+            reference=evidence.reference,
+            identifier=evidence.identifier,
+        )
+
+    def attach_traceability(self, *args, **kwargs):
+        evidence = super().attach_traceability(*args, **kwargs)
+        if self.unverified_operation != "traceability":
+            return evidence
+        return MutationEvidence(
+            provider=evidence.provider,
+            operation=evidence.operation,
+            work_item_id=evidence.work_item_id,
+            state_before=evidence.state_before,
+            state_after=evidence.state_after,
+            verified=False,
+            reference=evidence.reference,
+            identifier=evidence.identifier,
+        )
+
+    def comment(self, *args, **kwargs):
+        evidence = super().comment(*args, **kwargs)
+        if self.unverified_operation != "comment":
+            return evidence
+        return MutationEvidence(
+            provider=evidence.provider,
+            operation=evidence.operation,
+            work_item_id=evidence.work_item_id,
+            state_before=evidence.state_before,
+            state_after=evidence.state_after,
+            verified=False,
+            reference=evidence.reference,
+            identifier=evidence.identifier,
+        )
 
 
 class AegisOrchestratorTests(unittest.TestCase):
@@ -243,6 +295,136 @@ Test fixture.
                 )
             }
         )
+
+    def test_ready_to_in_progress_fails_closed_on_unverified_traceability(self) -> None:
+        provider = UnverifiedMutationWorkItemProvider(
+            {
+                "51": WorkItem(
+                    id="51",
+                    title="managed execution",
+                    state=LifecycleState.READY,
+                    provider="memory",
+                )
+            },
+            "traceability",
+        )
+        executed = {"value": False}
+
+        def execute(request):
+            executed["value"] = True
+            raise AssertionError("OpenHands must not start after unverified traceability.")
+
+        with self.assertRaises(aegis_orchestrator.WorkItemLifecycleError):
+            aegis_orchestrator.orchestrate(
+                self._config(work_item_provider=provider),
+                preflight_fn=self._preflight,
+                execute_fn=execute,
+            )
+
+        self.assertFalse(executed["value"])
+        self.assertEqual(LifecycleState.READY, provider.get("51").state)
+
+    def test_ready_to_in_progress_fails_closed_on_unverified_transition(self) -> None:
+        provider = UnverifiedMutationWorkItemProvider(
+            {
+                "51": WorkItem(
+                    id="51",
+                    title="managed execution",
+                    state=LifecycleState.READY,
+                    provider="memory",
+                )
+            },
+            "transition",
+        )
+        executed = {"value": False}
+
+        def execute(request):
+            executed["value"] = True
+            raise AssertionError("OpenHands must not start after unverified transition.")
+
+        with self.assertRaises(aegis_orchestrator.WorkItemLifecycleError):
+            aegis_orchestrator.orchestrate(
+                self._config(work_item_provider=provider),
+                preflight_fn=self._preflight,
+                execute_fn=execute,
+            )
+
+        self.assertFalse(executed["value"])
+        self.assertEqual(LifecycleState.IN_PROGRESS, provider.get("51").state)
+
+    def test_success_to_verification_fails_closed_on_unverified_traceability(self) -> None:
+        provider = UnverifiedMutationWorkItemProvider(
+            {
+                "51": WorkItem(
+                    id="51",
+                    title="managed execution",
+                    state=LifecycleState.READY,
+                    provider="memory",
+                )
+            },
+            "traceability",
+        )
+        project = self.project
+
+        class SuccessClient:
+            def execute(self, request):
+                (project / "result.txt").write_text("done\n", encoding="utf-8")
+                return types.SimpleNamespace(
+                    conversation_id="12345178-1234-5178-1234-517812345178",
+                    execution_status="finished",
+                    outcome="finished",
+                    events=(),
+                )
+
+        original = aegis_orchestrator.OpenHandsExecutionClient
+        aegis_orchestrator.OpenHandsExecutionClient = SuccessClient
+        try:
+            with self.assertRaises(aegis_orchestrator.WorkItemLifecycleError):
+                aegis_orchestrator.orchestrate(
+                    self._config(work_item_provider=provider),
+                    preflight_fn=self._preflight,
+                )
+        finally:
+            aegis_orchestrator.OpenHandsExecutionClient = original
+
+        self.assertEqual(LifecycleState.IN_PROGRESS, provider.get("51").state)
+
+    def test_success_to_verification_fails_closed_on_unverified_transition(self) -> None:
+        provider = UnverifiedMutationWorkItemProvider(
+            {
+                "51": WorkItem(
+                    id="51",
+                    title="managed execution",
+                    state=LifecycleState.READY,
+                    provider="memory",
+                )
+            },
+            "transition",
+        )
+        project = self.project
+
+        class SuccessClient:
+            def execute(self, request):
+                (project / "result.txt").write_text("done\n", encoding="utf-8")
+                return types.SimpleNamespace(
+                    conversation_id="12345178-1234-5178-1234-517812345178",
+                    execution_status="finished",
+                    outcome="finished",
+                    events=(),
+                )
+
+        original = aegis_orchestrator.OpenHandsExecutionClient
+        aegis_orchestrator.OpenHandsExecutionClient = SuccessClient
+        try:
+            with self.assertRaises(aegis_orchestrator.WorkItemLifecycleError):
+                aegis_orchestrator.orchestrate(
+                    self._config(work_item_provider=provider),
+                    preflight_fn=self._preflight,
+                )
+        finally:
+            aegis_orchestrator.OpenHandsExecutionClient = original
+
+        self.assertEqual(LifecycleState.VERIFICATION, provider.get("51").state)
 
     def test_work_item_must_be_ready_before_execution(self) -> None:
         provider = InMemoryWorkItemProvider(
