@@ -8,6 +8,7 @@ import ast
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
@@ -411,11 +412,33 @@ def _to_dict(result: SecurityReviewResult) -> dict[str, object]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a read-only Aegis security review.")
     parser.add_argument("root")
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
+    parser.add_argument(
+        "--revision",
+        help="Optional exact repository revision associated with this review.",
+    )
     args = parser.parse_args()
 
     try:
+        observed_at = datetime.now(timezone.utc)
         result = assess_repository(args.root)
-    except SecurityReviewError as exc:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import security_review_evidence
+            from evidence_contract import write_evidence
+
+            write_evidence(
+                security_review_evidence(
+                    result,
+                    observed_at=observed_at,
+                    revision=args.revision,
+                ),
+                args.canonical_evidence_output,
+            )
+    except (SecurityReviewError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
