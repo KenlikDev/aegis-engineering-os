@@ -8,6 +8,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+from evidence_bundle import build_evidence_bundle, write_evidence_bundle  # noqa: E402
+from evidence_contract import build_evidence, read_and_validate_evidence, write_evidence  # noqa: E402
 from implementation_readiness import (  # noqa: E402
     ImplementationReadinessError,
     evaluate_readiness,
@@ -123,9 +125,67 @@ class ImplementationReadinessTests(unittest.TestCase):
         self.addCleanup(project.cleanup)
         return root, work_item, evidence, provider
 
+    def _evidence_set(self, root: Path, revision: str = "7c2d2247abf2d4463a2167d20e7ab18a808a24ee"):
+        evidence_path = root / ".aegis" / "input-evidence.json"
+        write_evidence(
+            build_evidence(
+                {
+                    "schema_version": 1,
+                    "kind": "testing",
+                    "source": "aegis:testing",
+                    "subject": "project-testing",
+                    "revision": revision,
+                    "observed_at": "2026-09-28T18:00:00Z",
+                    "status": "verified",
+                    "result": {"state": "passed"},
+                    "uncertainty": [],
+                    "references": [],
+                    "artifact_sha256": None,
+                }
+            ),
+            evidence_path,
+        )
+        self.assertEqual(
+            "verified",
+            read_and_validate_evidence(evidence_path).status,
+        )
+
+        bundle_path = root / ".aegis" / "readiness-bundle.json"
+        bundle = build_evidence_bundle(
+            root,
+            "Explicit readiness evidence",
+            [evidence_path],
+        )
+        write_evidence_bundle(bundle, root, bundle_path)
+
+        requirements_path = root / ".aegis" / "readiness-requirements.json"
+        requirements_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "requirements": [
+                        {
+                            "kind": "testing",
+                            "status": "verified",
+                            "subject": "project-testing",
+                            "source": "aegis:testing",
+                            "revision": revision,
+                        }
+                    ],
+                    "allow_extra_members": True,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return bundle_path, requirements_path
+
+
     def test_cli_can_emit_canonical_readiness_evidence(self):
         root, work_item, evidence, _ = self._fixture()
         canonical = root / ".aegis" / "implementation-readiness-evidence.json"
+        bundle, requirements = self._evidence_set(root)
 
         completed = subprocess.run(
             [
@@ -139,6 +199,10 @@ class ImplementationReadinessTests(unittest.TestCase):
                 "--version-evidence-ref",
                 str(evidence),
                 "--architecture-not-required",
+                "--evidence-bundle",
+                str(bundle),
+                "--evidence-set-requirements",
+                str(requirements),
                 "--evidence-output",
                 str(canonical),
             ],
@@ -157,6 +221,82 @@ class ImplementationReadinessTests(unittest.TestCase):
             "feature",
             payload["result"]["work_item_kind"],
         )
+        self.assertEqual("verified", payload["result"]["evidence_set"]["status"])
+        self.assertEqual(1, payload["result"]["evidence_set"]["requirements_satisfied"])
+        self.assertEqual(bundle_id if False else payload["result"]["evidence_set"]["bundle_id"], payload["result"]["evidence_set"]["bundle_id"])
+
+    def test_explicit_evidence_set_is_a_readiness_prerequisite(self):
+        root, work_item, evidence, provider = self._fixture()
+        bundle, requirements = self._evidence_set(root)
+
+        result = evaluate_readiness(
+            work_item,
+            "feature",
+            project_root=root,
+            version_evidence_ref=evidence,
+            architecture_required=False,
+            work_item_provider=provider,
+            work_item_id="106",
+            evidence_bundle_ref=bundle,
+            evidence_set_requirements_ref=requirements,
+        )
+
+        self.assertTrue(result.ready)
+        self.assertIsNotNone(result.evidence_set)
+        assert result.evidence_set is not None
+        self.assertEqual("verified", result.evidence_set.status)
+        self.assertEqual(1, result.evidence_set.requirements_satisfied)
+        self.assertIn(
+            "evidence-set",
+            {item.check for item in result.observations},
+        )
+
+    def test_evidence_set_revision_mismatch_blocks_readiness(self):
+        root, work_item, evidence, provider = self._fixture()
+        bundle, requirements = self._evidence_set(root)
+        payload = json.loads(requirements.read_text(encoding="utf-8"))
+        payload["requirements"][0]["revision"] = "a" * 40
+        requirements.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = evaluate_readiness(
+            work_item,
+            "feature",
+            project_root=root,
+            version_evidence_ref=evidence,
+            architecture_required=False,
+            work_item_provider=provider,
+            work_item_id="106",
+            evidence_bundle_ref=bundle,
+            evidence_set_requirements_ref=requirements,
+        )
+
+        self.assertFalse(result.ready)
+        self.assertIsNotNone(result.evidence_set)
+        assert result.evidence_set is not None
+        self.assertEqual("blocked", result.evidence_set.status)
+        self.assertIn(
+            "Explicit evidence-set requirements are not satisfied.",
+            result.blockers,
+        )
+
+    def test_evidence_set_inputs_must_be_supplied_together(self):
+        root, work_item, evidence, provider = self._fixture()
+        bundle, _ = self._evidence_set(root)
+
+        with self.assertRaisesRegex(
+            ImplementationReadinessError,
+            "must be provided together",
+        ):
+            evaluate_readiness(
+                work_item,
+                "feature",
+                project_root=root,
+                version_evidence_ref=evidence,
+                architecture_required=False,
+                work_item_provider=provider,
+                work_item_id="106",
+                evidence_bundle_ref=bundle,
+            )
 
     def test_cli_refuses_to_overwrite_version_evidence(self):
         root, work_item, evidence, _ = self._fixture()
