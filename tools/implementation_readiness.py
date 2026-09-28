@@ -244,7 +244,7 @@ def evaluate_readiness(
                 architecture: ArchitecturePlan = plan_architecture(
                     document,
                     work_item_reader=work_item_provider,
-                    work_item_id=work_item_id,
+                    work_item_id=work_item_id if work_item_provider is not None else None,
                 )
             except ArchitecturePlanningError as exc:
                 raise ImplementationReadinessError(str(exc)) from exc
