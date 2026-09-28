@@ -178,16 +178,19 @@ def _record_from_dict(data: Mapping[str, Any]) -> KnowledgeGapRecord:
     if not isinstance(raw_candidate, Mapping):
         raise KnowledgeGapError("Knowledge-gap candidate payload is malformed.")
 
+    raw_references = raw_candidate.get("references")
+    if not isinstance(raw_references, list) or not all(
+        isinstance(item, str) for item in raw_references
+    ):
+        raise KnowledgeGapError("Knowledge-gap candidate references are malformed.")
+
     candidate = KnowledgeGapCandidate(
         candidate_id=str(raw_candidate.get("candidate_id", "")),
         scope=str(raw_candidate.get("scope", "")),
         capability=str(raw_candidate.get("capability", "")),
         problem=str(raw_candidate.get("problem", "")),
         proposed_change=str(raw_candidate.get("proposed_change", "")),
-        references=tuple(
-            item for item in raw_candidate.get("references", [])
-            if isinstance(item, str)
-        ),
+        references=tuple(raw_references),
         created_at=str(raw_candidate.get("created_at", "")),
         candidate_sha256=str(raw_candidate.get("candidate_sha256", "")),
     )
@@ -206,6 +209,7 @@ def _record_from_dict(data: Mapping[str, Any]) -> KnowledgeGapRecord:
             validation_outcome != "passed"
             or not isinstance(scenario, str)
             or not isinstance(evidence_refs, list)
+            or not all(isinstance(item, str) for item in evidence_refs)
             or not isinstance(recorded_at, str)
             or not isinstance(evidence_sha256, str)
         ):
