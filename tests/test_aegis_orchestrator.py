@@ -3,7 +3,7 @@ import sys
 import tempfile
 import types
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,8 +82,77 @@ class AegisOrchestratorTests(unittest.TestCase):
         self._git("config", "user.email", "aegis-test@example.invalid")
         self._git("config", "user.name", "Aegis Test")
         (self.project / "README.md").write_text("test\n", encoding="utf-8")
-        self._git("add", "README.md")
+        self._write_readiness_document("51")
+        self._git("add", "README.md", "work-item.md", "version-evidence.txt")
         self._git("commit", "-m", "test: initialize repository")
+
+    def _write_readiness_document(self, work_item_id: str) -> None:
+        document = f"""# Work Item
+
+## Identity
+
+Provider: memory
+Work item ID: {work_item_id}
+Title: Managed execution readiness test
+
+## Intent
+
+The managed execution test must verify readiness before execution.
+
+## Scope
+
+### In scope
+
+- managed readiness verification
+
+### Out of scope
+
+- unrelated product behavior
+
+## Acceptance criteria
+
+- [ ] Readiness is checked before execution.
+
+## Dependencies
+
+- Python runtime
+
+## Roles
+
+Primary role: software engineer
+
+## Technical notes
+
+Affected component: test fixture
+
+## Risks
+
+- Missing readiness evidence must block execution.
+
+## Verification plan
+
+- Run the Aegis policy tests.
+
+## Delivery links
+
+Branch:
+Pull request:
+Documentation:
+ADR:
+
+## Status log
+
+Test fixture.
+
+## Definition of done
+
+- [ ] Acceptance criteria satisfied
+"""
+        (self.project / "work-item.md").write_text(document, encoding="utf-8")
+        (self.project / "version-evidence.txt").write_text(
+            "Python 3.13 toolchain evidence.\n",
+            encoding="utf-8",
+        )
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -106,6 +175,10 @@ class AegisOrchestratorTests(unittest.TestCase):
         return aegis_orchestrator.OrchestratorConfig(
             project_path=self.project,
             work_item_id=work_item_id,
+            work_item_kind="feature",
+            work_item_document=self.project / "work-item.md",
+            version_evidence_ref=self.project / "version-evidence.txt",
+            architecture_required=False,
             work_item_provider=work_item_provider,
             task=task,
             agent_server_url="http://127.0.0.1:8000",
@@ -132,8 +205,8 @@ class AegisOrchestratorTests(unittest.TestCase):
     def _ready_provider(self) -> InMemoryWorkItemProvider:
         return InMemoryWorkItemProvider(
             {
-                "56": WorkItem(
-                    id="56",
+                "51": WorkItem(
+                    id="51",
                     title="managed execution",
                     state=LifecycleState.READY,
                     provider="memory",
@@ -144,8 +217,8 @@ class AegisOrchestratorTests(unittest.TestCase):
     def test_work_item_must_be_ready_before_execution(self) -> None:
         provider = InMemoryWorkItemProvider(
             {
-                "56": WorkItem(
-                    id="56",
+                "51": WorkItem(
+                    id="51",
                     title="managed execution",
                     state=LifecycleState.PLANNED,
                     provider="memory",
@@ -155,13 +228,13 @@ class AegisOrchestratorTests(unittest.TestCase):
         with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
             aegis_orchestrator.orchestrate(
                 self._config(
-                    work_item_id="56",
+                    work_item_id="51",
                     work_item_provider=provider,
                 ),
                 preflight_fn=self._preflight,
             )
         branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
-        self.assertNotIn("ai/feature/56-execution", branches)
+        self.assertNotIn("ai/feature/51-execution", branches)
 
     def test_success_synchronizes_work_item_to_verification(self) -> None:
         provider = self._ready_provider()
@@ -173,7 +246,7 @@ class AegisOrchestratorTests(unittest.TestCase):
                     "done\n", encoding="utf-8"
                 )
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -185,7 +258,7 @@ class AegisOrchestratorTests(unittest.TestCase):
             evidence = aegis_orchestrator.orchestrate(
                 self._config(
                     "Implement result.txt.",
-                    work_item_id="56",
+                    work_item_id="51",
                     work_item_provider=provider,
                 ),
                 preflight_fn=self._preflight,
@@ -193,13 +266,13 @@ class AegisOrchestratorTests(unittest.TestCase):
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        item = provider.get("56")
+        item = provider.get("51")
         self.assertEqual(LifecycleState.VERIFICATION, item.state)
         self.assertEqual("verification", evidence["work_item"]["state_after_execution"])
-        comments = provider.comments["56"]
+        comments = provider.comments["51"]
         self.assertEqual(2, len(comments))
-        self.assertIn("ai/feature/56-execution", comments[0])
-        self.assertIn("12345678-1234-5678-1234-567812345678", comments[1])
+        self.assertIn("ai/feature/51-execution", comments[0])
+        self.assertIn("12345178-1234-5178-1234-517812345178", comments[1])
         self.assertTrue(evidence["work_item"]["verified"])
 
     def test_execution_failure_blocks_work_item_without_leaking_error(self) -> None:
@@ -215,7 +288,7 @@ class AegisOrchestratorTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 aegis_orchestrator.orchestrate(
                     self._config(
-                        work_item_id="56",
+                        work_item_id="51",
                         work_item_provider=provider,
                     ),
                     preflight_fn=self._preflight,
@@ -223,8 +296,8 @@ class AegisOrchestratorTests(unittest.TestCase):
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        self.assertEqual(LifecycleState.BLOCKED, provider.get("56").state)
-        failure_comment = provider.comments["56"][-1]
+        self.assertEqual(LifecycleState.BLOCKED, provider.get("51").state)
+        failure_comment = provider.comments["51"][-1]
         self.assertIn("RuntimeError", failure_comment)
         self.assertNotIn("super-secret-provider-response", failure_comment)
 
@@ -241,7 +314,7 @@ class AegisOrchestratorTests(unittest.TestCase):
                     capture_output=True,
                 )
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -253,7 +326,7 @@ class AegisOrchestratorTests(unittest.TestCase):
             with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
                 aegis_orchestrator.orchestrate(
                     self._config(
-                        work_item_id="56",
+                        work_item_id="51",
                         work_item_provider=provider,
                     ),
                     preflight_fn=self._preflight,
@@ -261,8 +334,8 @@ class AegisOrchestratorTests(unittest.TestCase):
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        self.assertEqual(LifecycleState.BLOCKED, provider.get("56").state)
-        self.assertIn("AegisOrchestratorError", provider.comments["56"][-1])
+        self.assertEqual(LifecycleState.BLOCKED, provider.get("51").state)
+        self.assertIn("AegisOrchestratorError", provider.comments["51"][-1])
 
     def test_build_task_branch_name_preserves_work_item_identity(self) -> None:
         self.assertEqual(
@@ -277,6 +350,43 @@ class AegisOrchestratorTests(unittest.TestCase):
         self.assertIn("Do not commit changes, create commits, amend commits, push", prompt)
         self.assertIn("--- BEGIN USER TASK ---", prompt)
         self.assertIn("Edit the API.", prompt)
+
+    def test_work_item_kind_must_match_branch_kind(self):
+        config = self._config()
+        mismatched = replace(
+            config,
+            work_item_kind="refactoring",
+            branch_kind="feature",
+        )
+        with self.assertRaisesRegex(
+            aegis_orchestrator.AegisOrchestratorError,
+            "requires branch kind",
+        ):
+            aegis_orchestrator.orchestrate(
+                mismatched,
+                preflight_fn=self._preflight,
+            )
+        branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
+        self.assertNotIn("ai/feature/51-execution", branches)
+
+    def test_readiness_failure_prevents_task_branch_creation(self):
+        config = self._config()
+        mismatched = replace(
+            config,
+            version_evidence_ref=self.project / "missing-version-evidence.txt",
+        )
+
+        with self.assertRaisesRegex(
+            aegis_orchestrator.AegisOrchestratorError,
+            "Implementation readiness",
+        ):
+            aegis_orchestrator.orchestrate(
+                mismatched,
+                preflight_fn=self._preflight,
+            )
+
+        branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
+        self.assertNotIn("ai/feature/51-execution", branches)
 
     def test_preflight_failure_does_not_create_task_branch(self) -> None:
         def failed_preflight(*args, **kwargs):  # noqa: ANN002, ANN003
@@ -321,7 +431,7 @@ class AegisOrchestratorTests(unittest.TestCase):
                     "changed\n", encoding="utf-8"
                 )
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -357,7 +467,7 @@ class AegisOrchestratorTests(unittest.TestCase):
         class NoChangeClient:
             def execute(self, request):
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -389,7 +499,7 @@ class AegisOrchestratorTests(unittest.TestCase):
                 self._git("add", "committed.txt")
                 self._git("commit", "-m", "bad: agent-side commit")
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -431,7 +541,7 @@ class AegisOrchestratorTests(unittest.TestCase):
                 )
                 (project / "changed.txt").write_text("bad\n", encoding="utf-8")
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),

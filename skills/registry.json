@@ -62,6 +62,12 @@
       "stability": "core"
     },
     {
+      "name": "implementation-readiness",
+      "path": "skills/workflows/implementation-readiness/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
       "name": "github-issues",
       "path": "skills/integrations/github-issues/SKILL.md",
       "domain": "integration",

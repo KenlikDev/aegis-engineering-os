@@ -77,7 +77,7 @@ Load only the skills required by the task:
 
 If a required skill is missing, invoke knowledge-gap handling.
 
-Establish the explicit work-item kind before workflow execution. For supported engineering kinds, build the deterministic workflow composition and treat any missing or ambiguous kind as an input/decision problem rather than inferring it from free-form text.
+Establish the explicit work-item kind before workflow execution and run the implementation-readiness gate before managed implementation. Managed execution must not start while readiness blockers remain. For supported engineering kinds, build the deterministic workflow composition and treat any missing or ambiguous kind as an input/decision problem rather than inferring it from free-form text.
 
 ### 5. Plan
 

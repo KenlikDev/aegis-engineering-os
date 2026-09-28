@@ -13,6 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
+from implementation_readiness import (
+    ImplementationReadiness,
+    ImplementationReadinessError,
+    evaluate_readiness,
+)
 from openhands_execution import (
     OpenHandsExecutionClient,
     OpenHandsExecutionRequest,
@@ -41,6 +46,12 @@ PROTECTED_BRANCHES = frozenset({"main", "develop"})
 TASK_BRANCH_PATTERN = re.compile(r"^ai/(feature|fix|refactor|chore)/[A-Za-z0-9._-]+$")
 WORK_ITEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 GIT_RUNNER = Callable[..., subprocess.CompletedProcess[str]]
+EXPECTED_BRANCH_KIND = {
+    "feature": "feature",
+    "bug-fix": "fix",
+    "refactoring": "refactor",
+    "ci-remediation": "chore",
+}
 
 
 class AegisOrchestratorError(RuntimeError):
@@ -67,6 +78,10 @@ class OrchestratorConfig:
     task: str
     agent_server_url: str
     container_workspace: str
+    work_item_kind: str
+    work_item_document: Path
+    version_evidence_ref: str
+    architecture_required: bool
     profile_config: Path = DEFAULT_PROFILE_CONFIG
     profile_name: str = "development-local"
     base_branch: str = "ai/integration"
@@ -345,6 +360,35 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
                 f"got {current_work_item.state.value}."
             )
 
+    try:
+        readiness = evaluate_readiness(
+            config.work_item_document,
+            config.work_item_kind,
+            project_root=config.project_path,
+            version_evidence_ref=config.version_evidence_ref,
+            architecture_required=config.architecture_required,
+            work_item_provider=provider,
+            work_item_id=work_item,
+        )
+    except ImplementationReadinessError as exc:
+        raise AegisOrchestratorError(
+            f"Implementation readiness check failed: {exc}"
+        ) from exc
+    if not readiness.ready:
+        raise AegisOrchestratorError(
+            "Implementation readiness is blocked; managed execution must not start."
+        )
+    expected_branch_kind = EXPECTED_BRANCH_KIND.get(config.work_item_kind)
+    if expected_branch_kind is None:
+        raise AegisOrchestratorError(
+            "Unsupported work-item kind for managed execution."
+        )
+    if config.branch_kind != expected_branch_kind:
+        raise AegisOrchestratorError(
+            f"Work-item kind {config.work_item_kind!r} requires branch kind "
+            f"{expected_branch_kind!r}; got {config.branch_kind!r}."
+        )
+
     preflight_result = preflight_fn(
         config.profile_config,
         config.profile_name,
@@ -474,6 +518,22 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
             "diff_check": "passed",
         },
     }
+    if readiness is not None:
+        evidence["implementation_readiness"] = {
+            "ready": readiness.ready,
+            "work_item_kind": readiness.work_item_kind,
+            "architecture_required": readiness.architecture_required,
+            "version_evidence_ref": readiness.version_evidence_ref,
+            "composition_steps": list(readiness.composition_steps),
+            "observations": [
+                {
+                    "check": item.check,
+                    "status": item.status,
+                    "detail": item.detail,
+                }
+                for item in readiness.observations
+            ],
+        }
     if work_item_sync is not None:
         evidence["work_item"] = work_item_sync
 
@@ -494,6 +554,12 @@ def parse_args() -> OrchestratorConfig:
     parser.add_argument("project", type=Path)
     parser.add_argument("work_item_id")
     parser.add_argument("task")
+    parser.add_argument("--work-item-kind", required=True)
+    parser.add_argument("--work-item-document", type=Path, required=True)
+    parser.add_argument("--version-evidence-ref", required=True)
+    architecture = parser.add_mutually_exclusive_group(required=True)
+    architecture.add_argument("--architecture-required", action="store_true")
+    architecture.add_argument("--architecture-not-required", action="store_true")
     parser.add_argument("--agent-server-url", required=True)
     parser.add_argument("--container-workspace", required=True)
     parser.add_argument("--profile-config", type=Path, default=DEFAULT_PROFILE_CONFIG)
@@ -535,8 +601,18 @@ def parse_args() -> OrchestratorConfig:
             )
         except WorkItemLifecycleError as exc:
             parser.error(str(exc))
+    if args.architecture_required:
+        architecture_required = True
+    else:
+        architecture_required = False
+
     return OrchestratorConfig(
-        project_path=args.project, work_item_id=args.work_item_id, task=args.task,
+        project_path=args.project, work_item_id=args.work_item_id,
+        work_item_kind=args.work_item_kind,
+        work_item_document=args.work_item_document,
+        version_evidence_ref=args.version_evidence_ref,
+        architecture_required=architecture_required,
+        task=args.task,
         agent_server_url=args.agent_server_url, container_workspace=args.container_workspace,
         profile_config=args.profile_config, profile_name=args.profile_name, base_branch=args.base_branch,
         branch_name=args.branch_name, branch_kind=args.branch_kind,

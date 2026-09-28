@@ -11,6 +11,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add the provider-neutral testing workflow boundary over the explicit project quality-gate executor;
 - add the controlled refactoring workflow for behavior-preserving structural changes using baseline/post-change testing and independent review;
 - add the deterministic workflow-composition boundary for explicit work-item kinds and registry-validated workflow sequences;
+- add the fail-closed implementation-readiness gate between workflow planning and managed execution;
 - harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;

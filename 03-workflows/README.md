@@ -10,6 +10,7 @@ The repository currently provides:
 - product discovery;
 - work-item lifecycle;
 - workflow composition;
+- implementation readiness;
 - feature implementation;
 - bug fixing;
 - code review;

@@ -45,6 +45,10 @@ Example from the Aegis checkout:
       /path/to/project \\
       51 \\
       "Implement the requested change." \\
+      --work-item-kind feature \\
+      --work-item-document /path/to/project/work-item.md \\
+      --version-evidence-ref version-evidence.txt \\
+      --architecture-not-required \\
       --agent-server-url http://127.0.0.1:8000 \\
       --container-workspace /projects/my-project \\
       --base-branch ai/integration \\
@@ -193,6 +197,33 @@ Or inspect the latest run for a workflow and branch:
 Exit code 0 means the run was healthy or a deterministic diagnosis was produced. Exit code 2 means the failure is inconclusive. The tool never reruns, cancels, edits, approves, dispatches, or merges workflows.
 
 See docs/architecture/ci-remediation.md for the evidence and safety contract.
+
+
+## Implementation readiness
+
+Before managed execution, evaluate the explicit implementation-readiness contract:
+
+    python3 tools/implementation_readiness.py \\
+      /path/to/project/work-item.md \\
+      --project-root /path/to/project \\
+      --kind feature \\
+      --version-evidence-ref version-evidence.txt \\
+      --architecture-not-required
+
+The gate fails closed when requirements are blocked, local version evidence is missing or unreadable, required architecture planning is blocked, or the authoritative work item is not ready. External version URLs remain references only and do not establish readiness.
+
+See docs/architecture/implementation-readiness.md.
+
+
+## Workflow composition
+
+Build the deterministic workflow sequence for an explicitly classified work item:
+
+    python3 tools/workflow_composition.py --kind refactoring
+
+The composition layer validates every referenced capability against skills/registry.json, preserves conditional steps explicitly, and never infers the work-item kind from free-form text.
+
+See docs/architecture/workflow-composition.md.
 
 
 ## Requirements clarification
