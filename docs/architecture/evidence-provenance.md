@@ -82,6 +82,8 @@ Promotion readiness, release readiness, and version verification now have explic
 
 Version verification preserves each source SHA-256 and maps `external_verification_pending` to canonical `pending` status plus explicit uncertainty. The specialized version-evidence artifact remains the source consumed by implementation readiness; the adapted artifact can additionally participate in evidence bundles.
 
+Implementation readiness now has an explicit adapter as well. It preserves the specialized gate result while mapping blocked readiness to `failed` and pending external compatibility to `pending`.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
