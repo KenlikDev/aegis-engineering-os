@@ -294,6 +294,18 @@ def implementation_readiness_evidence(
                 ],
                 "blockers": list(result.blockers),
                 "composition_steps": list(result.composition_steps),
+                "evidence_set": (
+                    {
+                        "status": result.evidence_set.status,
+                        "bundle_id": result.evidence_set.bundle_id,
+                        "requirements_ref": result.evidence_set.requirements_ref,
+                        "requirements_satisfied": result.evidence_set.requirements_satisfied,
+                        "requirements_total": result.evidence_set.requirements_total,
+                        "detail": result.evidence_set.detail,
+                    }
+                    if result.evidence_set is not None
+                    else None
+                ),
             },
             "uncertainty": uncertainty,
             "references": [],
