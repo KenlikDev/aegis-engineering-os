@@ -195,7 +195,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             self._provider(FakeTransport(changelog=changelog))
         )
         self.assertIn(
-            "version section for 0.1.0-alpha.1 is empty",
+            "CHANGELOG.md version section for 0.1.0-alpha.1 is empty.",
             result.blockers,
         )
 
