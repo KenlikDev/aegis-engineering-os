@@ -13,6 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
+from implementation_readiness import (
+    ImplementationReadiness,
+    ImplementationReadinessError,
+    evaluate_readiness,
+)
 from openhands_execution import (
     OpenHandsExecutionClient,
     OpenHandsExecutionRequest,
@@ -345,6 +350,38 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
                 f"got {current_work_item.state.value}."
             )
 
+    readiness: ImplementationReadiness | None = None
+    readiness_inputs = (
+        config.work_item_kind,
+        config.work_item_document,
+        config.version_evidence_ref,
+        config.architecture_required,
+    )
+    if provider is not None or any(value is not None for value in readiness_inputs):
+        if any(value is None for value in readiness_inputs):
+            raise AegisOrchestratorError(
+                "Implementation readiness requires explicit work-item kind, "
+                "work-item document, version evidence, and architecture applicability."
+            )
+        try:
+            readiness = evaluate_readiness(
+                config.work_item_document,
+                config.work_item_kind,
+                project_root=config.project_path,
+                version_evidence_ref=config.version_evidence_ref,
+                architecture_required=config.architecture_required,
+                work_item_provider=provider,
+                work_item_id=work_item,
+            )
+        except ImplementationReadinessError as exc:
+            raise AegisOrchestratorError(
+                f"Implementation readiness check failed: {exc}"
+            ) from exc
+        if not readiness.ready:
+            raise AegisOrchestratorError(
+                "Implementation readiness is blocked; managed execution must not start."
+            )
+
     preflight_result = preflight_fn(
         config.profile_config,
         config.profile_name,
@@ -474,6 +511,22 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
             "diff_check": "passed",
         },
     }
+    if readiness is not None:
+        evidence["implementation_readiness"] = {
+            "ready": readiness.ready,
+            "work_item_kind": readiness.work_item_kind,
+            "architecture_required": readiness.architecture_required,
+            "version_evidence_ref": readiness.version_evidence_ref,
+            "composition_steps": list(readiness.composition_steps),
+            "observations": [
+                {
+                    "check": item.check,
+                    "status": item.status,
+                    "detail": item.detail,
+                }
+                for item in readiness.observations
+            ],
+        }
     if work_item_sync is not None:
         evidence["work_item"] = work_item_sync
 
@@ -494,6 +547,12 @@ def parse_args() -> OrchestratorConfig:
     parser.add_argument("project", type=Path)
     parser.add_argument("work_item_id")
     parser.add_argument("task")
+    parser.add_argument("--work-item-kind")
+    parser.add_argument("--work-item-document", type=Path)
+    parser.add_argument("--version-evidence-ref")
+    architecture = parser.add_mutually_exclusive_group()
+    architecture.add_argument("--architecture-required", action="store_true")
+    architecture.add_argument("--architecture-not-required", action="store_true")
     parser.add_argument("--agent-server-url", required=True)
     parser.add_argument("--container-workspace", required=True)
     parser.add_argument("--profile-config", type=Path, default=DEFAULT_PROFILE_CONFIG)
@@ -535,8 +594,31 @@ def parse_args() -> OrchestratorConfig:
             )
         except WorkItemLifecycleError as exc:
             parser.error(str(exc))
+    if args.architecture_required:
+        architecture_required = True
+    elif args.architecture_not_required:
+        architecture_required = False
+    else:
+        architecture_required = None
+
+    if args.work_item_repository and (
+        args.work_item_kind is None
+        or args.work_item_document is None
+        or args.version_evidence_ref is None
+        or architecture_required is None
+    ):
+        parser.error(
+            "managed execution requires --work-item-kind, --work-item-document, "
+            "--version-evidence-ref, and an architecture applicability flag"
+        )
+
     return OrchestratorConfig(
-        project_path=args.project, work_item_id=args.work_item_id, task=args.task,
+        project_path=args.project, work_item_id=args.work_item_id,
+        work_item_kind=args.work_item_kind,
+        work_item_document=args.work_item_document,
+        version_evidence_ref=args.version_evidence_ref,
+        architecture_required=architecture_required,
+        task=args.task,
         agent_server_url=args.agent_server_url, container_workspace=args.container_workspace,
         profile_config=args.profile_config, profile_name=args.profile_name, base_branch=args.base_branch,
         branch_name=args.branch_name, branch_kind=args.branch_kind,
