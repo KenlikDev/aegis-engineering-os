@@ -324,11 +324,14 @@ def _cleanup_workspace(
 def _event_summary(
     events: tuple[dict[str, Any], ...],
 ) -> dict[str, Any]:
-    types = Counter(
-        event.get("type", "unknown")
-        for event in events
-        if isinstance(event, Mapping)
-    )
+    types = Counter()
+    for event in events:
+        if not isinstance(event, Mapping):
+            continue
+        event_type = event.get("kind") or event.get("type") or "unknown"
+        if not isinstance(event_type, str) or not event_type:
+            event_type = "unknown"
+        types[event_type] += 1
     ids = [
         event.get("id")
         for event in events
