@@ -13,7 +13,11 @@ from evidence_bundle import (  # noqa: E402
     read_and_validate_evidence_bundle,
     write_evidence_bundle,
 )
-from evidence_contract import build_evidence, read_and_validate_evidence, write_evidence  # noqa: E402
+from evidence_contract import (  # noqa: E402
+    build_evidence,
+    read_and_validate_evidence,
+    write_evidence,
+)
 
 
 def _evidence(kind: str, subject: str):
