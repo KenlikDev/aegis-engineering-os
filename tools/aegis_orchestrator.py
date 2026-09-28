@@ -46,6 +46,12 @@ PROTECTED_BRANCHES = frozenset({"main", "develop"})
 TASK_BRANCH_PATTERN = re.compile(r"^ai/(feature|fix|refactor|chore)/[A-Za-z0-9._-]+$")
 WORK_ITEM_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 GIT_RUNNER = Callable[..., subprocess.CompletedProcess[str]]
+EXPECTED_BRANCH_KIND = {
+    "feature": "feature",
+    "bug-fix": "fix",
+    "refactoring": "refactor",
+    "ci-remediation": "chore",
+}
 
 
 class AegisOrchestratorError(RuntimeError):
@@ -371,6 +377,16 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
     if not readiness.ready:
         raise AegisOrchestratorError(
             "Implementation readiness is blocked; managed execution must not start."
+        )
+    expected_branch_kind = EXPECTED_BRANCH_KIND.get(config.work_item_kind)
+    if expected_branch_kind is None:
+        raise AegisOrchestratorError(
+            "Unsupported work-item kind for managed execution."
+        )
+    if config.branch_kind != expected_branch_kind:
+        raise AegisOrchestratorError(
+            f"Work-item kind {config.work_item_kind!r} requires branch kind "
+            f"{expected_branch_kind!r}; got {config.branch_kind!r}."
         )
 
     preflight_result = preflight_fn(
