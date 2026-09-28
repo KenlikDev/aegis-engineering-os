@@ -9,6 +9,7 @@ from evidence_contract import EvidenceContractError, EvidenceRecord, build_evide
 from promotion_readiness import PromotionReadiness
 from release_readiness import ReleaseReadiness
 if TYPE_CHECKING:
+    from implementation_readiness import ImplementationReadiness
     from version_verification import VersionEvidence
 
 
