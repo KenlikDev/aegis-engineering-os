@@ -252,6 +252,30 @@ class DeliveryTests(unittest.TestCase):
             [(method, path) for method, path, _ in transport.calls],
         )
 
+    def test_github_provider_accepts_null_pull_request_body(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.pull_requests[60] = {
+            "number": 60,
+            "title": "nullable body",
+            "body": None,
+            "head": {"ref": request().head},
+            "base": {"ref": request().base},
+            "state": "open",
+            "merged_at": None,
+            "draft": False,
+            "mergeable": None,
+            "mergeable_state": "unknown",
+            "html_url": PR_URL,
+        }
+        provider = GitHubPullRequestProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        pr = provider.get(60)
+        self.assertEqual("", pr.body)
+
     def test_github_provider_parses_merged_state(self) -> None:
         transport = FakeGitHubTransport()
         transport.pull_requests[60] = {
