@@ -30,7 +30,7 @@ SECRET_PATTERNS = (
     re.compile(r"\bASIA[0-9A-Z]{16}\b"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
 )
-PROTECTED_REF_RE = re.compile(r"refs/heads/(?:main|develop)\b")
+PROTECTED_REF_VALUES = {"refs/heads/main", "refs/heads/develop"}
 GITHUB_API_RE = re.compile(r"https://api\.github\.com\b")
 API_VERSION_HEADER = "X-GitHub-Api-Version"
 PERMISSIONS_RE = re.compile(r"^permissions:\s*$", re.MULTILINE)
@@ -291,20 +291,34 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                         line=child.lineno,
                     )
 
-    if PROTECTED_REF_RE.search(text) and re.search(
-        r"(POST|PUT|PATCH).{0,160}refs/heads/(?:main|develop)",
-        text,
-        re.DOTALL,
-    ):
-        match = PROTECTED_REF_RE.search(text)
+    protected_literals: list[ast.Constant] = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value in PROTECTED_REF_VALUES
+    ]
+    write_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in {"_request", "request"}
+        and any(
+            isinstance(argument, ast.Constant)
+            and argument.value in {"POST", "PUT", "PATCH"}
+            for argument in node.args
+        )
+    ]
+    if protected_literals and write_calls:
         _finding(
             findings,
             rule_id="git.protected-direct-write",
             severity=HIGH,
             path=path,
             root=root,
-            message="Executable tooling appears to write directly to protected main/develop refs.",
-            line=_line_number(text, match.start()),
+            message="Executable tooling contains hardcoded protected refs alongside a write request.",
+            line=protected_literals[0].lineno,
         )
 
 
