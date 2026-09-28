@@ -58,6 +58,7 @@ work-item lifecycle
 work-item lifecycle
 -> requirements clarification
 -> project discovery
+-> version verification
 -> architecture planning (when applicable)
 -> bug fix
 -> testing
@@ -70,6 +71,7 @@ work-item lifecycle
 work-item lifecycle
 -> requirements clarification
 -> project discovery
+-> version verification
 -> architecture planning (when applicable)
 -> refactoring
 -> testing
@@ -82,6 +84,8 @@ work-item lifecycle
 work-item lifecycle
 -> requirements clarification
 -> project discovery
+-> version verification
+-> architecture planning (when applicable)
 -> CI remediation
 -> testing
 -> security review (when applicable)
