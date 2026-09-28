@@ -35,6 +35,25 @@ Subscription login and direct API access are represented as separate connection 
 
 See `docs/architecture/ai-backends.md` and `templates/ai-profiles.example.json` for the provider contract and user-selectable profile format.
 
+## Managed project execution
+
+The first executable project workflow is the managed Aegis/OpenHands coordinator. It requires a stable work-item ID, starts from an autonomous `ai/*` base branch, runs the verified local runtime preflight, executes one task through OpenHands, and verifies that OpenHands did not change Git HEAD or create a commit.
+
+Example from the Aegis checkout:
+
+    python3 tools/aegis_orchestrator.py \\
+      /path/to/project \\
+      51 \\
+      "Implement the requested change." \\
+      --agent-server-url http://127.0.0.1:8000 \\
+      --container-workspace /projects/my-project \\
+      --base-branch ai/integration \\
+      --profile-config templates/ai-profiles.example.json \\
+      --profile-name development-local \\
+      --evidence-path /tmp/aegis-execution.json
+
+The coordinator never commits, pushes, switches branches, resets, rebases, or silently changes providers/models. A successful run leaves the task changes uncommitted on the generated `ai/feature/<work-item>-execution` branch for Aegis review and Git hygiene.
+
 ## Repository structure
 
 - `00-constitution/` — non-negotiable operating rules.
