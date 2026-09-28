@@ -32,6 +32,7 @@ from implementation_readiness import (  # noqa: E402
     ReadinessObservation,
 )
 from security_review import SecurityFinding, SecurityReviewResult  # noqa: E402
+from work_item_lifecycle import MutationEvidence  # noqa: E402
 from release_readiness import ChangelogSnapshot, ReleaseReadiness  # noqa: E402
 from version_verification import VersionClaim, VersionEvidence  # noqa: E402
 
@@ -220,6 +221,72 @@ class EvidenceAdapterTests(unittest.TestCase):
             self.assertEqual(canonical, read_and_validate_evidence(path))
 
 
+
+
+    def test_verified_lifecycle_mutation_is_verified(self):
+        result = MutationEvidence(
+            provider="github-issues",
+            operation="transition",
+            work_item_id="128",
+            state_before="verification",
+            state_after="review",
+            verified=True,
+            reference="https://github.com/KenlikDev/aegis-engineering-os/issues/128",
+            identifier=128,
+        )
+
+        canonical = mutation_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("work-item:128", canonical.subject)
+        self.assertEqual("verification", canonical.result["state_before"])
+        self.assertEqual("review", canonical.result["state_after"])
+        self.assertEqual(128, canonical.result["identifier"])
+        self.assertEqual(
+            ["https://github.com/KenlikDev/aegis-engineering-os/issues/128"],
+            list(canonical.references),
+        )
+
+    def test_unverified_lifecycle_mutation_is_unknown(self):
+        result = MutationEvidence(
+            provider="memory",
+            operation="transition",
+            work_item_id="128",
+            state_before="verification",
+            state_after="review",
+            verified=False,
+            reference=None,
+            identifier="transition-1",
+        )
+
+        canonical = mutation_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("unknown", canonical.status)
+        self.assertFalse(canonical.result["verified"])
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("read-after-write", canonical.uncertainty[0])
+
+    def test_lifecycle_mutation_evidence_round_trips(self):
+        result = MutationEvidence(
+            provider="github-issues",
+            operation="comment",
+            work_item_id="128",
+            verified=True,
+            reference="https://github.com/KenlikDev/aegis-engineering-os/issues/128#issuecomment-1",
+            identifier=1,
+        )
+        canonical = mutation_evidence(result, observed_at="2026-09-28T18:00:00Z")
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "mutation-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
 
     def test_openhands_finished_result_is_verified(self):
         result = OpenHandsExecutionResult(
