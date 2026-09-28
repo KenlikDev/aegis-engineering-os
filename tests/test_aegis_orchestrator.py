@@ -351,6 +351,26 @@ Test fixture.
         self.assertIn("--- BEGIN USER TASK ---", prompt)
         self.assertIn("Edit the API.", prompt)
 
+    def test_work_item_kind_must_match_branch_kind(self):
+        config = self._config()
+        mismatched = aegis_orchestrator.OrchestratorConfig(
+            **{
+                **config.__dict__,
+                "work_item_kind": "refactoring",
+                "branch_kind": "feature",
+            }
+        )
+        with self.assertRaisesRegex(
+            aegis_orchestrator.AegisOrchestratorError,
+            "requires branch kind",
+        ):
+            aegis_orchestrator.orchestrate(
+                mismatched,
+                preflight_fn=self._preflight,
+            )
+        branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
+        self.assertNotIn("ai/feature/51-execution", branches)
+
     def test_readiness_failure_prevents_task_branch_creation(self):
         readiness_evidence = self.project / "version-evidence.txt"
         readiness_evidence.unlink()
