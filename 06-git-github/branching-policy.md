@@ -48,3 +48,18 @@ Squash merge task branches into ai/integration when that improves history clarit
 For promotion branches, create a clean snapshot from the target branch containing only the verified delta from ai/integration. Use squash merge into develop or main according to the target branch policy.
 
 The exact strategy can be revised after real-world validation.
+
+
+## Pull-request delivery boundary
+
+The executable delivery boundary is \`tools/delivery.py\`.
+
+The allowed autonomous sequence is:
+
+\`review -> PR created/verified -> integration\`
+
+The delivery layer may create or reuse a PR from an \`ai/*\` task branch into an explicit \`ai/*\` integration branch. It must not approve, merge, or promote into \`develop\` or \`main\`.
+
+After a PR is actually merged, \`sync-merge\` verifies the PR source branch and target branch before advancing the authoritative work item from \`review\` to \`integration\`.
+
+The bridge never treats \`mergeable=true\` or a clean mergeability state as equivalent to an actual merge.

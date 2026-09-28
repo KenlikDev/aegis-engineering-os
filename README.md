@@ -74,3 +74,18 @@ For explicit work-item synchronization, provide `--work-item-repository OWNER/RE
 - `.agents/skills/` — Aegis repository-local skills recognized by OpenHands.
 
 See `docs/architecture/overview.md` for the current system design.
+
+
+## Pull-request delivery
+
+After quality verification places a work item in \`review\`, use \`tools/delivery.py\` to create or reuse an explicit PR from the task branch into \`ai/integration\`:
+
+    python3 tools/delivery.py create OWNER/REPO 60 ai/feature/60-execution ai/integration "feat: implement task" --body "Closes #60."
+
+The delivery bridge verifies the resulting PR and attaches its URL to the work item. It never approves or merges.
+
+After an actual merge, synchronize the delivery state:
+
+    python3 tools/delivery.py sync-merge OWNER/REPO 60 123 ai/feature/60-execution ai/integration
+
+Only a verified merged PR advances the work item from \`review\` to \`integration\`.

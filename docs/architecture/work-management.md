@@ -75,3 +75,16 @@ Escalate to the user when:
 - granting broader access than required;
 - deleting or bulk-migrating external project data;
 - choosing an external provider when the business consequence is material.
+
+
+## Delivery lifecycle
+
+The delivery boundary is implemented in \`tools/delivery.py\`. It remains provider-neutral at the orchestration contract level and keeps GitHub REST details inside \`GitHubPullRequestProvider\`.
+
+A work item may create a pull request only from \`review\`. The source branch must satisfy the Aegis \`ai/<kind>/...\` task-branch policy, and the target must be an explicit \`ai/*\` integration branch. Protected \`develop\` and \`main\` are never valid delivery targets for this bridge.
+
+PR creation is idempotent for an existing open head/base pair. A created or reused pull request is read back and its head/base are verified before the URL is attached to the work item.
+
+Delivery never merges a pull request. The merge synchronization operation only reads the actual PR state and advances \`review -> integration\` when the PR is closed with a verified merge into the configured integration branch and the source branch matches the expected task branch.
+
+A PR that is still open or unmerged does not mutate the work item. A mismatched source or target branch is a hard failure.
