@@ -130,21 +130,22 @@ class LiveE2ESmokeTest(unittest.TestCase):
             self.assertEqual("removed", result["status"])
             self.assertFalse(workspace.exists())
 
-    def test_event_summary_contains_types_and_count(self) -> None:
+    def test_event_summary_uses_openhands_kind_and_legacy_type(self) -> None:
         result = _event_summary(
             (
-                {"id": "1", "type": "AgentStarted"},
-                {"id": "2", "type": "AgentStarted"},
+                {"id": "1", "kind": "AgentStarted"},
+                {"id": "2", "kind": "AgentStarted"},
                 {"id": "3", "type": "AgentFinished"},
+                {"id": "4", "kind": ""},
             )
         )
-        self.assertEqual(3, result["count"])
+        self.assertEqual(4, result["count"])
         self.assertEqual(
-            {"AgentStarted": 2, "AgentFinished": 1},
+            {"AgentStarted": 2, "AgentFinished": 1, "unknown": 1},
             result["type_counts"],
         )
         self.assertEqual("1", result["first_id"])
-        self.assertEqual("3", result["last_id"])
+        self.assertEqual("4", result["last_id"])
 
     def test_full_flow_verifies_and_cleans_isolated_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as root:
