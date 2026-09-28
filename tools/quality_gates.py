@@ -20,6 +20,7 @@ from work_item_lifecycle import (
     Traceability,
     WorkItemLifecycleError,
     WorkItemProvider,
+    require_verified_mutation,
 )
 
 SCHEMA_VERSION = 1
@@ -401,10 +402,13 @@ def _sync_failure(
     failed_gate_ids: tuple[str, ...],
 ) -> None:
     try:
-        provider.transition(
-            work_item_id,
-            LifecycleState.BLOCKED,
-            expected_state=LifecycleState.VERIFICATION,
+        require_verified_mutation(
+            provider.transition(
+                work_item_id,
+                LifecycleState.BLOCKED,
+                expected_state=LifecycleState.VERIFICATION,
+            ),
+            "Quality-gate verification -> blocked transition",
         )
         details = [
             "<!-- aegis:quality-gate-failure:v1 -->",
@@ -414,7 +418,10 @@ def _sync_failure(
         ]
         if evidence_ref:
             details.append(f"- **Evidence:** {evidence_ref}")
-        provider.comment(work_item_id, "\n".join(details))
+        require_verified_mutation(
+            provider.comment(work_item_id, "\n".join(details)),
+            "Quality-gate blocked-state comment",
+        )
     except WorkItemLifecycleError as exc:
         raise QualityGateError(
             f"Quality verification failed and work-item synchronization also failed: {exc}"
@@ -428,29 +435,37 @@ def _sync_success(
 ) -> None:
     try:
         if evidence_ref:
-            provider.attach_traceability(
-                work_item_id,
-                Traceability(evidence_ref=evidence_ref),
+            require_verified_mutation(
+                provider.attach_traceability(
+                    work_item_id,
+                    Traceability(evidence_ref=evidence_ref),
+                ),
+                "Quality-gate traceability mutation",
             )
-        provider.comment(
-            work_item_id,
-            (
-                "<!-- aegis:quality-gate-success:v1 -->\n"
-                "## Aegis quality verification passed\n"
-                f"- **Work item:** {work_item_id}\n"
-                f"- **Evidence:** {evidence_ref or '(returned in execution output)'}"
+        require_verified_mutation(
+            provider.comment(
+                work_item_id,
+                (
+                    "<!-- aegis:quality-gate-success:v1 -->\n"
+                    "## Aegis quality verification passed\n"
+                    f"- **Work item:** {work_item_id}\n"
+                    f"- **Evidence:** {evidence_ref or '(returned in execution output)'}"
+                ),
             ),
+            "Quality-gate success comment",
         )
-        provider.transition(
-            work_item_id,
-            LifecycleState.REVIEW,
-            expected_state=LifecycleState.VERIFICATION,
+        require_verified_mutation(
+            provider.transition(
+                work_item_id,
+                LifecycleState.REVIEW,
+                expected_state=LifecycleState.VERIFICATION,
+            ),
+            "Quality-gate verification -> review transition",
         )
     except WorkItemLifecycleError as exc:
         raise QualityGateError(
             f"Quality verification passed locally but work-item synchronization failed: {exc}"
         ) from exc
-
 
 def run_with_optional_work_item(
     project: Path,

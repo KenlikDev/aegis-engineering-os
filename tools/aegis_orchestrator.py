@@ -30,6 +30,7 @@ from work_item_lifecycle import (
     Traceability,
     WorkItemLifecycleError,
     WorkItemProvider,
+    require_verified_mutation,
 )
 
 DEFAULT_OLLAMA_VERSION = "0.34.3"
@@ -271,10 +272,13 @@ def _sync_blocked_work_item(
 ) -> None:
     """Record an execution failure without leaking the exception contents."""
     try:
-        provider.transition(
-            work_item_id,
-            LifecycleState.BLOCKED,
-            expected_state=LifecycleState.IN_PROGRESS,
+        require_verified_mutation(
+            provider.transition(
+                work_item_id,
+                LifecycleState.BLOCKED,
+                expected_state=LifecycleState.IN_PROGRESS,
+            ),
+            "Managed execution -> blocked transition",
         )
         details = [
             "<!-- aegis:execution-failure:v1 -->",
@@ -286,7 +290,10 @@ def _sync_blocked_work_item(
             details.append(f"- **OpenHands conversation:** {conversation_id}")
         if outcome is not None:
             details.append(f"- **Execution outcome:** {outcome}")
-        provider.comment(work_item_id, "\n".join(details))
+        require_verified_mutation(
+            provider.comment(work_item_id, "\n".join(details)),
+            "Managed execution blocked-state comment",
+        )
     except WorkItemLifecycleError as sync_error:
         raise AegisOrchestratorError(
             "Execution failed and Aegis could not synchronize the work item "
@@ -299,14 +306,20 @@ def _sync_ready_to_in_progress(
     work_item_id: str,
     task_branch: str,
 ) -> None:
-    provider.attach_traceability(
-        work_item_id,
-        Traceability(branch=task_branch),
+    require_verified_mutation(
+        provider.attach_traceability(
+            work_item_id,
+            Traceability(branch=task_branch),
+        ),
+        "Managed execution task-branch traceability",
     )
-    provider.transition(
-        work_item_id,
-        LifecycleState.IN_PROGRESS,
-        expected_state=LifecycleState.READY,
+    require_verified_mutation(
+        provider.transition(
+            work_item_id,
+            LifecycleState.IN_PROGRESS,
+            expected_state=LifecycleState.READY,
+        ),
+        "Managed execution ready -> in_progress transition",
     )
 
 
@@ -317,20 +330,25 @@ def _sync_success_to_verification(
     conversation_id: str,
     evidence_ref: str | None,
 ) -> None:
-    provider.attach_traceability(
-        work_item_id,
-        Traceability(
-            branch=task_branch,
-            conversation_id=conversation_id,
-            evidence_ref=evidence_ref,
+    require_verified_mutation(
+        provider.attach_traceability(
+            work_item_id,
+            Traceability(
+                branch=task_branch,
+                conversation_id=conversation_id,
+                evidence_ref=evidence_ref,
+            ),
         ),
+        "Managed execution verification traceability",
     )
-    provider.transition(
-        work_item_id,
-        LifecycleState.VERIFICATION,
-        expected_state=LifecycleState.IN_PROGRESS,
+    require_verified_mutation(
+        provider.transition(
+            work_item_id,
+            LifecycleState.VERIFICATION,
+            expected_state=LifecycleState.IN_PROGRESS,
+        ),
+        "Managed execution in_progress -> verification transition",
     )
-
 
 def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[str, Any]] = preflight,
                 execute_fn: Callable[[OpenHandsExecutionRequest], Any] | None = None,
