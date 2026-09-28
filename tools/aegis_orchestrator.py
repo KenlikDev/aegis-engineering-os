@@ -72,6 +72,10 @@ class OrchestratorConfig:
     task: str
     agent_server_url: str
     container_workspace: str
+    work_item_kind: str | None = None
+    work_item_document: Path | None = None
+    version_evidence_ref: str | None = None
+    architecture_required: bool | None = None
     profile_config: Path = DEFAULT_PROFILE_CONFIG
     profile_name: str = "development-local"
     base_branch: str = "ai/integration"
