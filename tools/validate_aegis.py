@@ -149,6 +149,8 @@ def main() -> int:
         "tools/validate_ai_config.py",
         "tools/render_openhands_profile.py",
         "tools/preflight_runtime.py",
+        "tools/openhands_execution.py",
+        "tools/live_e2e_smoke_test.py",
         "tools/aegis_orchestrator.py",
         "tools/quality_gates.py",
         "tools/delivery.py",
