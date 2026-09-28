@@ -177,6 +177,53 @@ def _classify_failure(
 ) -> DiagnosticFinding:
     text = f"{step_name or ''}\n{log}".lower()
 
+    normalized_step = (step_name or "").strip().lower()
+    step_categories = {
+        "run security review": (
+            "security-review",
+            "high",
+            True,
+            "The failed step is the Aegis security review.",
+        ),
+        "run policy tests": (
+            "test-failure",
+            "medium",
+            True,
+            "The failed step is the Aegis policy test suite.",
+        ),
+        "validate repository structure": (
+            "repository-structure",
+            "high",
+            True,
+            "The failed step is the repository structural validation.",
+        ),
+        "exercise project bootstrap": (
+            "bootstrap-failure",
+            "high",
+            True,
+            "The failed step is the project bootstrap verification.",
+        ),
+        "compile aegis tools": (
+            "source-syntax",
+            "high",
+            True,
+            "The failed step is Python tool compilation.",
+        ),
+    }
+    direct = step_categories.get(normalized_step)
+    if direct is not None:
+        category, severity, actionable, message = direct
+        return DiagnosticFinding(
+            category=category,
+            severity=severity,
+            actionable=actionable,
+            job_id=job.job_id,
+            job=job.name,
+            step=step_name,
+            message=message,
+            evidence=f"Failed step: {step_name}.\n{_bounded_excerpt(log)}",
+        )
+
     rules = (
         (
             "ci-permission",
