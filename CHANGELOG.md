@@ -23,6 +23,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add the CI-diagnosis provenance adapter while preserving deterministic classification and redacted evidence;
 - add the OpenHands execution provenance adapter while preserving the existing redaction and execution boundary;
 - add the lifecycle mutation provenance adapter while preserving read-after-write verification semantics;
+- add the knowledge-gap provenance adapter while preserving candidate-only activation semantics;
 - harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;

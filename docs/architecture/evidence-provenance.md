@@ -94,6 +94,8 @@ OpenHands execution now has an explicit adapter as well. It preserves the alread
 
 Lifecycle mutations now have an explicit adapter as well. It preserves provider, operation, work-item identity, state transition, verification state, reference, and identifier. Verified mutations become `verified`; unverified mutations remain `unknown` with explicit read-after-write uncertainty.
 
+Knowledge-gap records now have an explicit adapter as well. It preserves candidate provenance and controlled lifecycle state; candidate/validated/rejected map to `pending`/`verified`/`failed`, without treating verified candidate knowledge as active guidance.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.

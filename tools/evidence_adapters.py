@@ -33,6 +33,7 @@ def _canonical_safe(value: Any) -> Any:
 
 if TYPE_CHECKING:
     from ci_diagnosis import DiagnosticReport
+    from knowledge_gap import KnowledgeGapRecord
     from work_item_lifecycle import MutationEvidence
     from openhands_execution import OpenHandsExecutionResult
     from implementation_readiness import ImplementationReadiness
@@ -544,6 +545,73 @@ def mutation_evidence(
                 if evidence.reference is not None
                 else []
             ),
+            "artifact_sha256": None,
+        }
+    )
+
+def knowledge_gap_evidence(
+    record: "KnowledgeGapRecord",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a knowledge-gap record into canonical evidence without activating knowledge."""
+    if record.state == "candidate":
+        status = "pending"
+        uncertainty = [
+            "Knowledge-gap candidate has not completed focused validation."
+        ]
+    elif record.state == "validated":
+        status = "verified"
+        uncertainty = []
+    elif record.state == "rejected":
+        status = "failed"
+        uncertainty = [
+            "Knowledge-gap candidate was explicitly rejected and must not be treated as active guidance."
+        ]
+    else:
+        raise EvidenceContractError(
+            f"Unsupported knowledge-gap state: {record.state!r}."
+        )
+
+    validation = _canonical_safe(record.validation)
+    transitions = _canonical_safe(list(record.transitions))
+
+    references = list(record.candidate.references)
+    if isinstance(validation, Mapping):
+        raw_refs = validation.get("evidence_refs")
+        if isinstance(raw_refs, list):
+            references.extend(
+                item
+                for item in raw_refs
+                if isinstance(item, str)
+            )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "knowledge-gap",
+            "source": "aegis:knowledge-gap-registry",
+            "subject": f"candidate:{record.candidate.candidate_id}",
+            "revision": record.candidate.candidate_sha256,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "state": record.state,
+                "candidate": {
+                    "candidate_id": record.candidate.candidate_id,
+                    "scope": record.candidate.scope,
+                    "capability": record.candidate.capability,
+                    "problem": record.candidate.problem,
+                    "proposed_change": record.candidate.proposed_change,
+                    "references": list(record.candidate.references),
+                    "created_at": record.candidate.created_at,
+                    "candidate_sha256": record.candidate.candidate_sha256,
+                },
+                "validation": validation,
+                "transitions": transitions,
+            },
+            "uncertainty": uncertainty,
+            "references": references,
             "artifact_sha256": None,
         }
     )
