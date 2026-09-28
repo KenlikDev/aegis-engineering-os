@@ -370,15 +370,19 @@ Test fixture.
         self.assertNotIn("ai/feature/51-execution", branches)
 
     def test_readiness_failure_prevents_task_branch_creation(self):
-        readiness_evidence = self.project / "version-evidence.txt"
-        readiness_evidence.unlink()
+        config = self._config(
+        )
+        mismatched = replace(
+            config,
+            version_evidence_ref=self.project / "missing-version-evidence.txt",
+        )
 
         with self.assertRaisesRegex(
             aegis_orchestrator.AegisOrchestratorError,
             "Implementation readiness",
         ):
             aegis_orchestrator.orchestrate(
-                self._config(),
+                mismatched,
                 preflight_fn=self._preflight,
             )
 
