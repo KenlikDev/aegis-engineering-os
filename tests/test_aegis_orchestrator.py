@@ -9,6 +9,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+from work_item_lifecycle import (  # noqa: E402
+    InMemoryWorkItemProvider,
+    LifecycleState,
+    WorkItem,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class FakeRequest:
@@ -114,6 +120,132 @@ class AegisOrchestratorTests(unittest.TestCase):
                 "conversation_runtime": "local",
             },
         }
+
+    def _ready_provider(self) -> InMemoryWorkItemProvider:
+        return InMemoryWorkItemProvider(
+            {
+                "56": WorkItem(
+                    id="56",
+                    title="managed execution",
+                    state=LifecycleState.READY,
+                    provider="memory",
+                )
+            }
+        )
+
+    def test_work_item_must_be_ready_before_execution(self) -> None:
+        provider = InMemoryWorkItemProvider(
+            {
+                "56": WorkItem(
+                    id="56",
+                    title="managed execution",
+                    state=LifecycleState.PLANNED,
+                    provider="memory",
+                )
+            }
+        )
+        with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
+            aegis_orchestrator.orchestrate(
+                self._config(),
+                preflight_fn=self._preflight,
+                work_item_provider=provider,
+            )
+        branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
+        self.assertNotIn("ai/feature/56-execution", branches)
+
+    def test_success_synchronizes_work_item_to_verification(self) -> None:
+        provider = self._ready_provider()
+        project = self.project
+
+        class SuccessClient:
+            def execute(self, request):
+                (project / "result.txt").write_text(
+                    "done\n", encoding="utf-8"
+                )
+                return types.SimpleNamespace(
+                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    execution_status="finished",
+                    outcome="finished",
+                    events=(),
+                )
+
+        original = aegis_orchestrator.OpenHandsExecutionClient
+        aegis_orchestrator.OpenHandsExecutionClient = SuccessClient
+        try:
+            evidence = aegis_orchestrator.orchestrate(
+                self._config("Implement result.txt."),
+                preflight_fn=self._preflight,
+                work_item_provider=provider,
+                )
+        finally:
+            aegis_orchestrator.OpenHandsExecutionClient = original
+
+        item = provider.get("56")
+        self.assertEqual(LifecycleState.VERIFICATION, item.state)
+        self.assertEqual("verification", evidence["work_item"]["state_after_execution"])
+        comments = provider.comments["56"]
+        self.assertEqual(2, len(comments))
+        self.assertIn("ai/feature/56-execution", comments[0])
+        self.assertIn("12345678-1234-5678-1234-567812345678", comments[1])
+        self.assertTrue(evidence["work_item"]["verified"])
+
+    def test_execution_failure_blocks_work_item_without_leaking_error(self) -> None:
+        provider = self._ready_provider()
+
+        class FailingClient:
+            def execute(self, request):
+                raise RuntimeError("super-secret-provider-response")
+
+        original = aegis_orchestrator.OpenHandsExecutionClient
+        aegis_orchestrator.OpenHandsExecutionClient = FailingClient
+        try:
+            with self.assertRaises(RuntimeError):
+                aegis_orchestrator.orchestrate(
+                    self._config(),
+                    preflight_fn=self._preflight,
+                    work_item_provider=provider,
+                )
+        finally:
+            aegis_orchestrator.OpenHandsExecutionClient = original
+
+        self.assertEqual(LifecycleState.BLOCKED, provider.get("56").state)
+        failure_comment = provider.comments["56"][-1]
+        self.assertIn("RuntimeError", failure_comment)
+        self.assertNotIn("super-secret-provider-response", failure_comment)
+
+    def test_post_execution_git_integrity_failure_blocks_work_item(self) -> None:
+        provider = self._ready_provider()
+        project = self.project
+
+        class BranchChangingClient:
+            def execute(self, request):
+                subprocess.run(
+                    ["git", "-C", str(project), "switch", "-c", "ai/fix/other"],
+                    check=True,
+                    text=True,
+                    capture_output=True,
+                )
+                return types.SimpleNamespace(
+                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    execution_status="finished",
+                    outcome="finished",
+                    events=(),
+                )
+
+        original = aegis_orchestrator.OpenHandsExecutionClient
+        aegis_orchestrator.OpenHandsExecutionClient = BranchChangingClient
+        try:
+            with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
+                aegis_orchestrator.orchestrate(
+                    self._config(),
+                    preflight_fn=self._preflight,
+                    work_item_provider=provider,
+                )
+        finally:
+            aegis_orchestrator.OpenHandsExecutionClient = original
+
+        self.assertEqual(LifecycleState.BLOCKED, provider.get("56").state)
+        self.assertIn("AegisOrchestratorError", provider.comments["56"][-1])
 
     def test_build_task_branch_name_preserves_work_item_identity(self) -> None:
         self.assertEqual(
