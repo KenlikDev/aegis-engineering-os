@@ -42,6 +42,7 @@ _module_backups = {
 
 fake_openhands = types.ModuleType("openhands_execution")
 fake_openhands.OpenHandsExecutionClient = object
+fake_openhands.OpenHandsExecutionError = RuntimeError
 fake_openhands.OpenHandsExecutionRequest = FakeRequest
 sys.modules["openhands_execution"] = fake_openhands
 
@@ -95,10 +96,17 @@ class AegisOrchestratorTests(unittest.TestCase):
             capture_output=True,
         )
 
-    def _config(self, task: str = "Implement the requested change.") -> aegis_orchestrator.OrchestratorConfig:
+    def _config(
+        self,
+        task: str = "Implement the requested change.",
+        *,
+        work_item_id: str = "51",
+        work_item_provider: InMemoryWorkItemProvider | None = None,
+    ) -> aegis_orchestrator.OrchestratorConfig:
         return aegis_orchestrator.OrchestratorConfig(
             project_path=self.project,
-            work_item_id="51",
+            work_item_id=work_item_id,
+            work_item_provider=work_item_provider,
             task=task,
             agent_server_url="http://127.0.0.1:8000",
             container_workspace="/projects/aegis-target",
@@ -146,9 +154,11 @@ class AegisOrchestratorTests(unittest.TestCase):
         )
         with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
             aegis_orchestrator.orchestrate(
-                self._config(),
+                self._config(
+                    work_item_id="56",
+                    work_item_provider=provider,
+                ),
                 preflight_fn=self._preflight,
-                work_item_provider=provider,
             )
         branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
         self.assertNotIn("ai/feature/56-execution", branches)
@@ -173,9 +183,12 @@ class AegisOrchestratorTests(unittest.TestCase):
         aegis_orchestrator.OpenHandsExecutionClient = SuccessClient
         try:
             evidence = aegis_orchestrator.orchestrate(
-                self._config("Implement result.txt."),
+                self._config(
+                    "Implement result.txt.",
+                    work_item_id="56",
+                    work_item_provider=provider,
+                ),
                 preflight_fn=self._preflight,
-                work_item_provider=provider,
                 )
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
@@ -201,9 +214,11 @@ class AegisOrchestratorTests(unittest.TestCase):
         try:
             with self.assertRaises(RuntimeError):
                 aegis_orchestrator.orchestrate(
-                    self._config(),
+                    self._config(
+                        work_item_id="56",
+                        work_item_provider=provider,
+                    ),
                     preflight_fn=self._preflight,
-                    work_item_provider=provider,
                 )
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
