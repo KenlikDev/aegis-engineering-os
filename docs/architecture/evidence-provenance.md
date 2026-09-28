@@ -102,7 +102,9 @@ Local runtime preflight now has an explicit adapter as well. It preserves the se
 
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
-The integration-merge adapter preserves the exact validation head SHA when the merge caller supplied it, the merged pull-request identity, the merge commit SHA, the post-merge `ai/integration` SHA/protection state, and read-after-write verification flags. A `not-merged` result remains canonical `unknown` with explicit uncertainty. The adapter does not create merge authorization or validation evidence.
+The integration-merge adapter preserves the exact validation head SHA when the merge caller supplied it, the merged pull-request identity, the merge commit SHA, the post-merge `ai/integration` SHA/protection state, and read-after-write verification flags.
+
+The composed integration-delivery adapter preserves the exact validation head, validation run identity, task pull-request identity, merge commit, post-merge integration SHA/protection state, and lifecycle verification as one canonical observation. It additionally checks consistency across those identities before emitting `verified` evidence. It does not create validation evidence, merge authorization, or promotion authorization. A `not-merged` result remains canonical `unknown` with explicit uncertainty. The adapter does not create merge authorization or validation evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
 

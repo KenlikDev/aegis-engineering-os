@@ -9,6 +9,7 @@ from evidence_adapters import (  # noqa: E402
     architecture_planning_evidence,
     ci_diagnosis_evidence,
     implementation_readiness_evidence,
+    integration_delivery_evidence,
     integration_merge_evidence,
     knowledge_gap_evidence,
     mutation_evidence,
@@ -66,6 +67,101 @@ TARGET_SHA = "2222222222222222222222222222222222222222"
 
 
 class EvidenceAdapterTests(unittest.TestCase):
+    def test_integration_delivery_verified_result_preserves_exact_chain(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "150",
+            "traceability_verified": True,
+            "pull_request": {
+                "number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/150",
+                "head": "ai/feature/150-integration-delivery-provenance",
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "validation": {
+                "id": 1500,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": SOURCE_SHA,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        canonical = integration_delivery_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("integration-delivery", canonical.kind)
+        self.assertEqual("work-item:150", canonical.subject)
+        self.assertEqual(TARGET_SHA, canonical.revision)
+        self.assertEqual(SOURCE_SHA, canonical.result["validation"]["head_sha"])
+        self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
+        self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "integration-delivery.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
+
+    def test_integration_delivery_rejects_validation_head_mismatch(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "150",
+            "traceability_verified": True,
+            "pull_request": {
+                "number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/150",
+                "head": "ai/feature/150-integration-delivery-provenance",
+                "head_sha": TARGET_SHA,
+                "base": "ai/integration",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "validation": {
+                "id": 1500,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": SOURCE_SHA,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "validation head does not match",
+        ):
+            integration_delivery_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
     def test_runtime_preflight_without_agent_server_is_verified(self):
         result = {
             "status": "verified",

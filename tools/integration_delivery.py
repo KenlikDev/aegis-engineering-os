@@ -7,7 +7,11 @@ import argparse
 import json
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Protocol
+
+from evidence_contract import EvidenceContractError, write_evidence
 
 from delivery import (
     CreatePullRequestRequest,
@@ -191,6 +195,7 @@ def deliver_to_integration(
             else None
         ),
         "integration": merge_result.get("integration"),
+        "traceability_verified": merge_result.get("traceability_verified"),
         "work_item": merge_result.get("work_item"),
     }
 
@@ -206,6 +211,11 @@ def main() -> int:
     parser.add_argument("--body", default="")
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     try:
@@ -236,6 +246,23 @@ def main() -> int:
         WorkItemLifecycleError,
         ValueError,
     ) as exc:
+        print(f"ERROR: {exc}", file=os.sys.stderr)
+        return 1
+
+    try:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import integration_delivery_evidence
+
+            canonical = integration_delivery_evidence(
+                result,
+                repository=args.repository,
+                observed_at=datetime.now(timezone.utc),
+            )
+            write_evidence(
+                canonical,
+                args.canonical_evidence_output.expanduser().resolve(),
+            )
+    except (EvidenceContractError, OSError, ValueError, IntegrationDeliveryError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
 
