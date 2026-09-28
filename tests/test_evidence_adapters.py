@@ -6,6 +6,7 @@ ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from evidence_adapters import (  # noqa: E402
+    ci_diagnosis_evidence,
     promotion_readiness_evidence,
     implementation_readiness_evidence,
     release_readiness_evidence,
@@ -16,6 +17,12 @@ from evidence_adapters import (  # noqa: E402
 from evidence_contract import (  # noqa: E402
     read_and_validate_evidence,
     write_evidence,
+)
+from ci_diagnosis import (  # noqa: E402
+    DiagnosticFinding,
+    DiagnosticReport,
+    JobSnapshot,
+    WorkflowRunSnapshot,
 )
 from promotion_readiness import BranchSnapshot, CompareSnapshot, PromotionReadiness, ValidationRun  # noqa: E402
 from implementation_readiness import (  # noqa: E402
@@ -207,6 +214,170 @@ class EvidenceAdapterTests(unittest.TestCase):
 
         with __import__("tempfile").TemporaryDirectory() as temp:
             path = __import__("pathlib").Path(temp) / "version-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
+
+
+    def test_ci_diagnosis_healthy_result_is_verified(self):
+        run = WorkflowRunSnapshot(
+            repository=REPOSITORY,
+            run_id=101,
+            name="Aegis Validation",
+            workflow_path=".github/workflows/validate.yml",
+            event="push",
+            status="completed",
+            conclusion="success",
+            head_branch="ai/integration",
+            head_sha="3" * 40,
+            url="https://github.com/example/actions/runs/101",
+        )
+        report = DiagnosticReport(
+            run=run,
+            jobs=(
+                JobSnapshot(
+                    job_id=11,
+                    name="Validate Aegis",
+                    status="completed",
+                    conclusion="success",
+                    url="https://github.com/example/jobs/11",
+                ),
+            ),
+            findings=(),
+            status="healthy",
+        )
+
+        canonical = ci_diagnosis_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("workflow-run:101", canonical.subject)
+        self.assertEqual("3" * 40, canonical.revision)
+        self.assertEqual([], canonical.result["findings"])
+
+    def test_ci_diagnosis_diagnosed_result_is_failed(self):
+        run = WorkflowRunSnapshot(
+            repository=REPOSITORY,
+            run_id=102,
+            name="Aegis Validation",
+            workflow_path=".github/workflows/validate.yml",
+            event="pull_request",
+            status="completed",
+            conclusion="failure",
+            head_branch="ai/feature/test",
+            head_sha="4" * 40,
+            url="https://github.com/example/actions/runs/102",
+        )
+        finding = DiagnosticFinding(
+            category="test-failure",
+            severity="medium",
+            actionable=True,
+            job_id=12,
+            job="Validate Aegis",
+            step="Run policy tests",
+            message="The observed CI output indicates a test failure.",
+            evidence="FAILED (failures=1)",
+        )
+        report = DiagnosticReport(
+            run=run,
+            jobs=(
+                JobSnapshot(
+                    job_id=12,
+                    name="Validate Aegis",
+                    status="completed",
+                    conclusion="failure",
+                    url="https://github.com/example/jobs/12",
+                    failed_steps=("Run policy tests",),
+                ),
+            ),
+            findings=(finding,),
+            status="diagnosed",
+        )
+
+        canonical = ci_diagnosis_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual("test-failure", canonical.result["findings"][0]["category"])
+        self.assertEqual("medium", canonical.result["findings"][0]["severity"])
+        self.assertEqual("FAILED (failures=1)", canonical.result["findings"][0]["evidence"])
+
+    def test_ci_diagnosis_inconclusive_result_is_unknown(self):
+        run = WorkflowRunSnapshot(
+            repository=REPOSITORY,
+            run_id=103,
+            name="Aegis Validation",
+            workflow_path=".github/workflows/validate.yml",
+            event="pull_request",
+            status="completed",
+            conclusion="failure",
+            head_branch="ai/feature/test",
+            head_sha="5" * 40,
+            url="https://github.com/example/actions/runs/103",
+        )
+        finding = DiagnosticFinding(
+            category="unknown",
+            severity="low",
+            actionable=False,
+            job_id=13,
+            job="Unknown",
+            step=None,
+            message="No supported deterministic failure signature was found in the observed evidence.",
+            evidence="unexpected failure",
+        )
+        report = DiagnosticReport(
+            run=run,
+            jobs=(
+                JobSnapshot(
+                    job_id=13,
+                    name="Unknown",
+                    status="completed",
+                    conclusion="failure",
+                    url="https://github.com/example/jobs/13",
+                ),
+            ),
+            findings=(finding,),
+            status="inconclusive",
+        )
+
+        canonical = ci_diagnosis_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("unknown", canonical.status)
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("deterministic failure signature", canonical.uncertainty[0])
+
+    def test_ci_diagnosis_evidence_round_trips(self):
+        run = WorkflowRunSnapshot(
+            repository=REPOSITORY,
+            run_id=104,
+            name="Aegis Validation",
+            workflow_path=".github/workflows/validate.yml",
+            event="pull_request",
+            status="completed",
+            conclusion="failure",
+            head_branch="ai/feature/test",
+            head_sha="6" * 40,
+            url="https://github.com/example/actions/runs/104",
+        )
+        report = DiagnosticReport(
+            run=run,
+            jobs=(),
+            findings=(),
+            status="inconclusive",
+        )
+        canonical = ci_diagnosis_evidence(
+            report,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "ci-diagnosis.json"
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
 

@@ -214,6 +214,13 @@ Or inspect the latest run for a workflow and branch:
 
 Exit code 0 means the run was healthy or a deterministic diagnosis was produced. Exit code 2 means the failure is inconclusive. The tool never reruns, cancels, edits, approves, dispatches, or merges workflows.
 
+To additionally persist the diagnosis in the canonical provenance envelope:
+
+    python3 tools/ci_diagnosis.py OWNER/REPO --run-id 123 \
+      --canonical-evidence-output /tmp/ci-diagnosis-evidence.json
+
+The canonical artifact preserves the workflow run head SHA as its revision and maps healthy/diagnosed/inconclusive states to verified/failed/unknown.
+
 See docs/architecture/ci-remediation.md for the evidence and safety contract.
 
 

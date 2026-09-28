@@ -1,5 +1,10 @@
+import io
+import json
+import os
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +16,7 @@ from ci_diagnosis import (  # noqa: E402
     JobSnapshot,
     WorkflowRunSnapshot,
     diagnose,
+    main,
     _redact,
     _bounded_excerpt,
 )
@@ -54,6 +60,49 @@ class FakeProvider:
 
 
 class CIDiagnosisTests(unittest.TestCase):
+
+    def test_cli_can_emit_canonical_evidence(self):
+        success_run = WorkflowRunSnapshot(
+            repository=REPOSITORY,
+            run_id=101,
+            name="Aegis Validation",
+            workflow_path=".github/workflows/validate.yml",
+            event="pull_request",
+            status="completed",
+            conclusion="success",
+            head_branch="ai/integration",
+            head_sha="1" * 40,
+            url="https://github.com/example/actions/runs/101",
+        )
+        provider = FakeProvider(run=success_run, jobs=[], logs={})
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "ci-evidence.json"
+            argv = [
+                "ci_diagnosis.py",
+                REPOSITORY,
+                "--run-id",
+                "101",
+                "--canonical-evidence-output",
+                str(output),
+            ]
+            stdout = io.StringIO()
+
+            with (
+                patch("ci_diagnosis.GitHubCIDiagnosisProvider", return_value=provider),
+                patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}),
+                patch.object(sys, "argv", argv),
+                patch("sys.stdout", stdout),
+            ):
+                result = main()
+
+            self.assertEqual(0, result)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("ci-diagnosis", payload["kind"])
+            self.assertEqual("verified", payload["status"])
+            self.assertEqual("1" * 40, payload["revision"])
+            self.assertEqual("workflow-run:101", payload["subject"])
+
     def test_failed_step_is_exposed_and_classified(self):
         job = JobSnapshot(
             job_id=10,

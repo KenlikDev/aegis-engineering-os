@@ -10,6 +10,7 @@ from promotion_readiness import PromotionReadiness
 from release_readiness import ReleaseReadiness
 
 if TYPE_CHECKING:
+    from ci_diagnosis import DiagnosticReport
     from implementation_readiness import ImplementationReadiness
     from security_review import SecurityReviewResult
     from version_verification import VersionEvidence
@@ -339,6 +340,97 @@ def security_review_evidence(
             },
             "uncertainty": [],
             "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
+def ci_diagnosis_evidence(
+    report: "DiagnosticReport",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a read-only CI diagnosis into canonical provenance evidence."""
+    if report.status == "healthy":
+        status = "verified"
+        uncertainty: list[str] = []
+    elif report.status == "diagnosed":
+        status = "failed"
+        uncertainty = []
+    elif report.status == "inconclusive":
+        status = "unknown"
+        uncertainty = [
+            "No supported deterministic failure signature was established; remediation must not assume a root cause."
+        ]
+    else:
+        raise EvidenceContractError(
+            f"Unsupported CI diagnosis status: {report.status!r}."
+        )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "ci-diagnosis",
+            "source": f"github:{report.run.repository}",
+            "subject": f"workflow-run:{report.run.run_id}",
+            "revision": report.run.head_sha,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "run": {
+                    "repository": report.run.repository,
+                    "run_id": report.run.run_id,
+                    "name": report.run.name,
+                    "workflow_path": report.run.workflow_path,
+                    "event": report.run.event,
+                    "status": report.run.status,
+                    "conclusion": report.run.conclusion,
+                    "head_branch": report.run.head_branch,
+                    "head_sha": report.run.head_sha,
+                    "url": report.run.url,
+                },
+                "jobs": [
+                    {
+                        "job_id": job.job_id,
+                        "name": job.name,
+                        "status": job.status,
+                        "conclusion": job.conclusion,
+                        "url": job.url,
+                        "failed_steps": list(job.failed_steps),
+                    }
+                    for job in report.jobs
+                ],
+                "findings": [
+                    {
+                        "category": finding.category,
+                        "severity": finding.severity,
+                        "actionable": finding.actionable,
+                        "job_id": finding.job_id,
+                        "job": finding.job,
+                        "step": finding.step,
+                        "message": finding.message,
+                        "evidence": finding.evidence,
+                    }
+                    for finding in report.findings
+                ],
+                "status": report.status,
+                "actionable": report.actionable,
+                "summary": {
+                    "actionable": sum(
+                        finding.actionable for finding in report.findings
+                    ),
+                    "high": sum(
+                        finding.severity == "high" for finding in report.findings
+                    ),
+                    "medium": sum(
+                        finding.severity == "medium" for finding in report.findings
+                    ),
+                    "low": sum(
+                        finding.severity == "low" for finding in report.findings
+                    ),
+                },
+            },
+            "uncertainty": uncertainty,
+            "references": [report.run.url],
             "artifact_sha256": None,
         }
     )
