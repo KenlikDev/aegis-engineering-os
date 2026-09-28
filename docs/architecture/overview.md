@@ -95,6 +95,8 @@ OpenHands execution can now emit canonical provenance from its already-redacted 
 
 Lifecycle mutation results can now emit canonical provenance after provider-specific read-after-write verification.
 
+Knowledge-gap records can now emit canonical provenance while preserving the candidate-only activation boundary.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
