@@ -75,6 +75,10 @@ The executable boundaries are documented in:
 - docs/architecture/release.md.
 
 
+### Evidence provenance
+
+The evidence-provenance boundary provides a canonical provider-neutral envelope for material state observations. It preserves source, subject, revision, observation time, result, uncertainty, and a canonical self-hash without mutating the observed system. Provider-specific adapters remain separate.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
