@@ -207,7 +207,7 @@ class ImplementationReadinessTests(unittest.TestCase):
         outside = root.parent / "version-evidence.txt"
         outside.write_text("external", encoding="utf-8")
         self.addCleanup(lambda: outside.unlink(missing_ok=True))
-        with self.assertRaisesRegex(ImplementationReadinessError, "inside the project root"):
+        with self.assertRaisesRegex(ImplementationReadinessError, "local schema-validated"):
             evaluate_readiness(
                 work_item,
                 "feature",
