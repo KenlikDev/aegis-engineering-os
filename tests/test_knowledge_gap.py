@@ -202,6 +202,9 @@ class KnowledgeGapTests(unittest.TestCase):
             self.assertNotIn("ghp_SUPERSECRET123", serialized)
             self.assertIn("[REDACTED]", serialized)
 
+            rejected = reject_candidate(path, reason="validated evidence no longer applies.")
+            self.assertEqual("rejected", rejected.state)
+
     def test_rejects_activation_like_state_from_disk(self):
         with tempfile.TemporaryDirectory() as directory:
             record = create_candidate(
