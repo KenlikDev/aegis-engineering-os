@@ -84,10 +84,16 @@ class FakeTransport:
                 ],
             }
 
+        if method == "GET" and path == f"/repos/{REPOSITORY}/commits/{OTHER_SHA}":
+            return 200, {
+                "sha": OTHER_SHA,
+                "commit": {"tree": {"sha": OTHER_SHA}},
+                "parents": [],
+            }
         if method == "GET" and path == f"/repos/{REPOSITORY}/git/ref/heads/ai%2F1-develop-promotion":
-            if self.existing_branch is None:
+            if self.existing_branch is None and not self.created_branch:
                 return 404, {}
-            return 200, {"object": {"sha": self.existing_branch}}
+            return 200, {"object": {"sha": self.existing_branch or SNAPSHOT_SHA}}
 
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/refs":
             self.created_branch = True
@@ -250,11 +256,12 @@ class PromotionSnapshotTests(unittest.TestCase):
         calls = {"target_reads": 0}
 
         def changing_call(method, url, headers, payload):  # noqa: ANN001
+            result = transport(method, url, headers, payload)
             if method == "GET" and url.endswith("/commits/develop"):
                 calls["target_reads"] += 1
                 if calls["target_reads"] >= 2:
                     transport.target_sha = OTHER_SHA
-            return transport(method, url, headers, payload)
+            return result
 
         provider = GitHubPromotionSnapshotProvider(
             REPOSITORY,
