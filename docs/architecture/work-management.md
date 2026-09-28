@@ -88,3 +88,12 @@ PR creation is idempotent for an existing open head/base pair. A created or reus
 Delivery never merges a pull request. The merge synchronization operation only reads the actual PR state and advances \`review -> integration\` when the PR is closed with a verified merge into the configured integration branch and the source branch matches the expected task branch.
 
 A PR that is still open or unmerged does not mutate the work item. A mismatched source or target branch is a hard failure.
+
+
+## Release promotion readiness
+
+Promotion from \`ai/integration\` into \`develop\` or \`main\` is a separate human-controlled delivery stage.
+
+\`tools/promotion_readiness.py\` provides a read-only evidence gate. It verifies exact current branch SHAs, source/target divergence, protected status, and a successful \`Aegis Validation\` workflow run on the exact \`ai/integration\` SHA.
+
+A readiness result is evidence, not a merge authorization. Protected-branch policy and human approval remain authoritative.
