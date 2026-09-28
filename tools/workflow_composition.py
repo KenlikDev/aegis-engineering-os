@@ -117,10 +117,7 @@ COMPOSITIONS: Mapping[str, tuple[WorkflowStep, ...]] = {
             condition="Run when implementation changes are ready for controlled integration.",
         ),
     ),
-    "ci-remediation": (
-        _step("work-item-lifecycle"),
-        _step("requirements-clarification"),
-        _step("project-discovery"),
+    "ci-remediation": COMMON_PREFIX + (
         _step("ci-remediation"),
         _step("testing"),
         _step(
