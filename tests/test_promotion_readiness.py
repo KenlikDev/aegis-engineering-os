@@ -103,18 +103,26 @@ class FakeTransport:
                         "status": "completed",
                         "conclusion": "success",
                         "head_sha": "4444444444444444444444444444444444444444",
+                        "head_branch": "ai/test/84-runtime-tool-inventory",
                         "event": "pull_request",
                         "path": ".github/workflows/validate.yml",
                         "html_url": "https://github.com/KenlikDev/aegis-engineering-os/actions/runs/200",
-                        "pull_requests": [
-                            {
-                                "number": 123,
-                                "base": {"ref": self.merged_pr_base},
-                            }
-                        ],
                     }
                 ]
             }
+
+        if path.startswith(f"/repos/{REPOSITORY}/pulls?"):
+            query = parse_qs(urlparse(path).query)
+            self.calls.append(("GET", path))
+            if query.get("state") != ["closed"]:
+                return 200, []
+            return 200, [
+                {
+                    "number": 123,
+                    "base": {"ref": "ai/integration"},
+                    "head": {"ref": "ai/test/84-runtime-tool-inventory"},
+                }
+            ]
 
         if path == f"/repos/{REPOSITORY}/pulls/123":
             if not self.merged_pr_validation:
@@ -125,6 +133,10 @@ class FakeTransport:
                 "merged_at": "2026-09-28T14:00:00Z" if self.merged_pr_merged else None,
                 "merge_commit_sha": self.merged_pr_merge_sha if self.merged_pr_merged else None,
                 "base": {"ref": self.merged_pr_base},
+                "head": {
+                    "ref": "ai/test/84-runtime-tool-inventory",
+                    "sha": "4444444444444444444444444444444444444444",
+                },
             }
 
         raise AssertionError(f"Unexpected request: {method} {path}")
