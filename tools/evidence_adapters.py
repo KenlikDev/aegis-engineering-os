@@ -58,6 +58,168 @@ def _repository_reference(repository: str) -> str:
     return f"https://github.com/{repository}"
 
 
+def integration_delivery_evidence(
+    result: Mapping[str, Any],
+    *,
+    repository: str,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a completed integration-delivery composition into canonical provenance."""
+    status = result.get("status")
+    if status == "not-merged":
+        canonical_status = "unknown"
+        uncertainty = ["The composed integration delivery did not produce a merged PR."]
+    elif status == "verified":
+        canonical_status = "verified"
+        uncertainty = []
+    else:
+        raise EvidenceContractError(
+            f"Unsupported integration delivery status: {status!r}."
+        )
+
+    work_item_id = result.get("work_item_id")
+    if not isinstance(work_item_id, str) or not work_item_id:
+        raise EvidenceContractError("Integration delivery work_item_id is required.")
+
+    pull_request = result.get("pull_request")
+    validation = result.get("validation")
+    integration = result.get("integration")
+    work_item = result.get("work_item")
+    for field, value in (
+        ("pull_request", pull_request),
+        ("validation", validation),
+        ("integration", integration),
+        ("work_item", work_item),
+    ):
+        if status == "verified" and not isinstance(value, Mapping):
+            raise EvidenceContractError(
+                f"Integration delivery {field} result is required for verified status."
+            )
+
+    revision: str | None = None
+    if canonical_status == "verified":
+        assert isinstance(pull_request, Mapping)
+        assert isinstance(validation, Mapping)
+        assert isinstance(integration, Mapping)
+        assert isinstance(work_item, Mapping)
+
+        validation_head = validation.get("head_sha")
+        pr_head = pull_request.get("head_sha")
+        merge_sha = pull_request.get("merge_commit_sha")
+        integration_sha = integration.get("sha")
+        traceability_verified = result.get("traceability_verified")
+        transition_verified = work_item.get("transition_verified")
+
+        for field, value in (
+            ("validation head SHA", validation_head),
+            ("pull-request head SHA", pr_head),
+            ("merge commit SHA", merge_sha),
+            ("integration SHA", integration_sha),
+        ):
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
+                raise EvidenceContractError(
+                    f"Integration delivery {field} must be a 40-character hexadecimal SHA."
+                )
+
+        if validation_head != pr_head:
+            raise EvidenceContractError(
+                "Integration delivery validation head does not match the PR head."
+            )
+        if merge_sha != integration_sha:
+            raise EvidenceContractError(
+                "Integration delivery merge commit does not match the post-merge integration SHA."
+            )
+        if pull_request.get("base") != "ai/integration":
+            raise EvidenceContractError(
+                "Integration delivery pull request base must be ai/integration."
+            )
+        if result.get("traceability_verified") is not True:
+            raise EvidenceContractError(
+                "Integration delivery traceability must be read-after-write verified."
+            )
+        if transition_verified is not True:
+            raise EvidenceContractError(
+                "Integration delivery lifecycle transition must be read-after-write verified."
+            )
+        if validation.get("status") != "completed" or validation.get("conclusion") != "success":
+            raise EvidenceContractError(
+                "Integration delivery validation must be a completed successful run."
+            )
+        revision = merge_sha
+
+    pull_request_payload = (
+        {
+            "number": pull_request.get("number"),
+            "url": pull_request.get("url"),
+            "head": pull_request.get("head"),
+            "head_sha": pull_request.get("head_sha"),
+            "base": pull_request.get("base"),
+            "merged": pull_request.get("merged"),
+            "merge_commit_sha": pull_request.get("merge_commit_sha"),
+        }
+        if isinstance(pull_request, Mapping)
+        else None
+    )
+    validation_payload = (
+        {
+            "id": validation.get("id"),
+            "workflow": validation.get("workflow"),
+            "status": validation.get("status"),
+            "conclusion": validation.get("conclusion"),
+            "head_sha": validation.get("head_sha"),
+            "url": validation.get("url"),
+        }
+        if isinstance(validation, Mapping)
+        else None
+    )
+    integration_payload = (
+        {
+            "branch": integration.get("branch"),
+            "sha": integration.get("sha"),
+            "protected": integration.get("protected"),
+        }
+        if isinstance(integration, Mapping)
+        else None
+    )
+    work_item_payload = (
+        {
+            "state_after": work_item.get("state_after"),
+            "transition_verified": work_item.get("transition_verified"),
+        }
+        if isinstance(work_item, Mapping)
+        else None
+    )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "integration-delivery",
+            "source": f"github:{repository}",
+            "subject": f"work-item:{work_item_id}",
+            "revision": revision,
+            "observed_at": _timestamp(observed_at),
+            "status": canonical_status,
+            "result": {
+                "work_item_id": work_item_id,
+                "pull_request": pull_request_payload,
+                "validation": validation_payload,
+                "integration": integration_payload,
+                "work_item": work_item_payload,
+                "traceability_verified": result.get("traceability_verified"),
+            },
+            "uncertainty": uncertainty,
+            "references": (
+                [pull_request.get("url")]
+                if isinstance(pull_request, Mapping)
+                and isinstance(pull_request.get("url"), str)
+                and pull_request.get("url").startswith("https://")
+                else []
+            ),
+            "artifact_sha256": None,
+        }
+    )
+
+
 def runtime_preflight_evidence(
     result: Mapping[str, Any],
     *,
