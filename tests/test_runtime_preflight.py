@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.request import Request
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +15,14 @@ from evidence_contract import read_and_validate_evidence  # noqa: E402
 class RuntimePreflightTests(unittest.TestCase):
     def setUp(self) -> None:
         self.profile_path = ROOT / "templates" / "ai-profiles.example.json"
+
+    def test_request_json_rejects_redirects(self) -> None:
+        handler = preflight_runtime._NoRedirectHandler()
+        with self.assertRaisesRegex(
+            preflight_runtime.RuntimePreflightError,
+            "unexpected redirect",
+        ):
+            handler.redirect_request(Request("http://127.0.0.1:9000/api/settings"))
 
     def test_preflight_verifies_exact_local_model(self) -> None:
         responses = {
