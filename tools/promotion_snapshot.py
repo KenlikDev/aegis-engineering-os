@@ -58,6 +58,8 @@ class PromotionSnapshotProvider(Protocol):
 
     def get_commit(self, ref: str) -> GitCommitSnapshot: ...
 
+    def is_ancestor(self, target_sha: str, source_sha: str) -> bool: ...
+
     def get_ref_commit(self, branch: str) -> GitCommitSnapshot | None: ...
 
     def create_ref(self, branch: str, sha: str) -> None: ...
@@ -274,6 +276,14 @@ class GitHubPromotionSnapshotProvider:
             parents=tuple(parents),
         )
 
+    def is_ancestor(self, target_sha: str, source_sha: str) -> bool:
+        comparison = self._readiness_provider().compare(target_sha, source_sha)
+        return (
+            comparison.status == "ahead"
+            and comparison.behind_by == 0
+            and comparison.ahead_by > 0
+        )
+
     def get_ref_commit(self, branch: str) -> GitCommitSnapshot | None:
         status, data = self._request(
             "GET",
@@ -460,33 +470,17 @@ def _ensure_ready(
     source = provider.get_commit(request.source_branch)
     target = provider.get_commit(request.target_branch)
 
-    # The provider reuses the read-only readiness evaluator. The second compare
-    # is intentionally performed by the concrete provider after fresh commit reads
-    # so a target that moved during the readiness window cannot be silently accepted.
+    # The provider reuses the read-only readiness evaluator. The ancestry check
+    # is intentionally performed after fresh commit reads so a target that moved
+    # during the readiness window cannot be silently accepted.
     if source.sha == target.sha:
         raise PromotionSnapshotError("Promotion contains no delta.")
-    if not provider_is_ancestor(provider, target.sha, source.sha):
+    if not provider.is_ancestor(target.sha, source.sha):
         raise PromotionSnapshotError(
             "Promotion target is not an ancestor of ai/integration."
         )
     return source, target
 
-
-def provider_is_ancestor(
-    provider: PromotionSnapshotProvider,
-    target_sha: str,
-    source_sha: str,
-) -> bool:
-    """Ask the concrete provider to validate ancestry using its readiness boundary."""
-    readiness_provider = getattr(provider, "_readiness_provider", None)
-    if callable(readiness_provider):
-        result = readiness_provider().compare(target_sha, source_sha)
-        return (
-            result.status == "ahead"
-            and result.behind_by == 0
-            and result.ahead_by > 0
-        )
-    return True
 
 
 def prepare_promotion_snapshot(
