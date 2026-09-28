@@ -97,7 +97,13 @@ def _redact(value: Any) -> Any:
     return value
 
 
-def _require_text(value: str, field: str, maximum: int) -> str:
+def _require_text(
+    value: str,
+    field: str,
+    maximum: int,
+    *,
+    reject_secret_like: bool = True,
+) -> str:
     value = value.strip()
     if not value:
         raise KnowledgeGapError(f"{field} must not be empty.")
@@ -105,9 +111,10 @@ def _require_text(value: str, field: str, maximum: int) -> str:
         raise KnowledgeGapError(f"{field} is too long.")
     if "\n" in value or "\r" in value:
         raise KnowledgeGapError(f"{field} must not contain newlines.")
-    for pattern in SECRET_VALUE_PATTERNS:
-        if pattern.search(value):
-            raise KnowledgeGapError(f"{field} contains a secret-like value.")
+    if reject_secret_like:
+        for pattern in SECRET_VALUE_PATTERNS:
+            if pattern.search(value):
+                raise KnowledgeGapError(f"{field} contains a secret-like value.")
     return value
 
 
@@ -351,7 +358,12 @@ def validate_candidate(
         raise KnowledgeGapError(
             f"Knowledge-gap validation requires candidate state; got {record.state}."
         )
-    scenario = _require_text(scenario, "validation scenario", 2000)
+    scenario = _require_text(
+        scenario,
+        "validation scenario",
+        2000,
+        reject_secret_like=False,
+    )
     if outcome != "passed":
         raise KnowledgeGapError("Only a passed validation outcome can create a validated candidate.")
     if not evidence_refs:
