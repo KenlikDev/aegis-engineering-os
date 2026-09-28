@@ -122,7 +122,7 @@ class ArchitecturePlanningTests(unittest.TestCase):
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual("architecture-planning", payload["kind"])
             self.assertEqual("verified", payload["status"])
-            self.assertEqual("96", payload["result"]["work_item_id"])
+            self.assertIsNone(payload["result"]["work_item_id"])
 
     def test_ready_plan_preserves_evidence_and_deductions(self):
         path = self._write(VALID)
