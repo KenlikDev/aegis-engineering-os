@@ -9,6 +9,7 @@ from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
     implementation_readiness_evidence,
     release_readiness_evidence,
+    security_review_evidence,
     testing_evidence,
     version_verification_evidence,
 )
@@ -21,6 +22,7 @@ from implementation_readiness import (  # noqa: E402
     ImplementationReadiness,
     ReadinessObservation,
 )
+from security_review import SecurityFinding, SecurityReviewResult  # noqa: E402
 from release_readiness import ChangelogSnapshot, ReleaseReadiness  # noqa: E402
 from version_verification import VersionClaim, VersionEvidence  # noqa: E402
 
@@ -402,6 +404,55 @@ class EvidenceAdapterTests(unittest.TestCase):
             path = __import__("pathlib").Path(temp) / "testing-evidence.json"
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
+
+
+    def test_security_review_without_high_findings_is_verified(self):
+        result = SecurityReviewResult(
+            root="/tmp/project",
+            status="ready",
+            findings=(
+                SecurityFinding(
+                    rule_id="workflow.permissions-write",
+                    severity="medium",
+                    path=".github/workflows/example.yml",
+                    message="Verify that the write permission is strictly required.",
+                    line=12,
+                ),
+            ),
+        )
+        canonical = security_review_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+            revision="3872d1e1e6766acf0e6efa9031c6c94edb49571b",
+        )
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("repository-security", canonical.subject)
+        self.assertEqual("medium", canonical.result["findings"][0]["severity"])
+        self.assertEqual(
+            "3872d1e1e6766acf0e6efa9031c6c94edb49571b",
+            canonical.revision,
+        )
+
+    def test_security_review_high_finding_is_failed(self):
+        result = SecurityReviewResult(
+            root="/tmp/project",
+            status="blocked",
+            findings=(
+                SecurityFinding(
+                    rule_id="secrets.high-confidence",
+                    severity="high",
+                    path="tools/example.py",
+                    message="High-confidence credential material appears in a reviewed source/config file.",
+                    line=4,
+                ),
+            ),
+        )
+        canonical = security_review_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual(1, canonical.result["summary"]["high"])
 
 
     def test_release_ready_result_is_verified(self):
