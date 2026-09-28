@@ -97,6 +97,10 @@ Lifecycle mutation results can now emit canonical provenance after provider-spec
 
 Knowledge-gap records can now emit canonical provenance while preserving the candidate-only activation boundary.
 
+### Evidence set requirements
+
+The evidence-set consumer validates an explicitly supplied requirement document against a canonical evidence bundle. It is fail-closed, does not infer requirements, and does not itself define readiness or promotion policy.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
