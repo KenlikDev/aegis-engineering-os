@@ -269,12 +269,16 @@ def validate_version_evidence(
             )
         )
 
+    pending = payload.get("external_verification_pending", False)
+    if not isinstance(pending, bool):
+        raise VersionVerificationError(
+            "external_verification_pending must be boolean when provided."
+        )
+
     return VersionEvidence(
         schema_version=SCHEMA_VERSION,
         claims=tuple(parsed),
-        external_verification_pending=bool(
-            payload.get("external_verification_pending", False)
-        ),
+        external_verification_pending=pending,
     )
 
 
