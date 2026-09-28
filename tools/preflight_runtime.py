@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 import os
 import sys
 from pathlib import Path
@@ -275,9 +276,7 @@ def main() -> int:
             )
         canonical = runtime_preflight_evidence(
             result,
-            observed_at=__import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            ),
+            observed_at=datetime.now(timezone.utc),
         )
         write_evidence(canonical, canonical_path)
 
