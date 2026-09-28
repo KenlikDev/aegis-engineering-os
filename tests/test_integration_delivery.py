@@ -1,11 +1,14 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from delivery import PullRequest
+import integration_delivery as integration_delivery_module  # noqa: E402
 from integration_delivery import (  # noqa: E402
     IntegrationDeliveryError,
     IntegrationDeliveryRequest,
@@ -13,6 +16,7 @@ from integration_delivery import (  # noqa: E402
 )
 from integration_merge import IntegrationPullRequest, MergeResult
 from promotion_readiness import BranchSnapshot, ValidationRun
+from evidence_contract import read_and_validate_evidence  # noqa: E402
 from work_item_lifecycle import (
     InMemoryWorkItemProvider,
     LifecycleState,
@@ -172,6 +176,45 @@ class IntegrationDeliveryTests(unittest.TestCase):
             FakeValidationProvider(validation),
             work_items(),
         )
+
+    def test_cli_writes_canonical_integration_delivery_evidence(self):
+        pr, merge, validation, items = self.providers()
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "integration-delivery.json"
+            argv = [
+                "integration_delivery.py",
+                REPOSITORY,
+                WORK_ITEM,
+                self.request().head,
+                "feat: deliver integration",
+                "--body",
+                "Closes #77.",
+                "--canonical-evidence-output",
+                str(output),
+            ]
+
+            with (
+                patch.object(integration_delivery_module, "_build_pr_provider", return_value=pr),
+                patch.object(integration_delivery_module, "_build_merge_provider", return_value=merge),
+                patch.object(
+                    integration_delivery_module,
+                    "_build_validation_provider",
+                    return_value=validation,
+                ),
+                patch.object(
+                    integration_delivery_module,
+                    "_build_work_item_provider",
+                    return_value=items,
+                ),
+                patch.object(sys, "argv", argv),
+            ):
+                self.assertEqual(0, integration_delivery_module.main())
+
+            canonical = read_and_validate_evidence(output)
+            self.assertEqual("integration-delivery", canonical.kind)
+            self.assertEqual(MERGE, canonical.revision)
+            self.assertEqual(HEAD, canonical.result["validation"]["head_sha"])
 
     def test_composes_pr_validation_and_merge(self):
         pr, merge, validation, items = self.providers()
