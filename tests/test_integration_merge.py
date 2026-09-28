@@ -24,6 +24,7 @@ PR_NUMBER = 75
 HEAD_SHA = "1111111111111111111111111111111111111111"
 INTEGRATION_SHA = "2222222222222222222222222222222222222222"
 MERGE_SHA = "3333333333333333333333333333333333333333"
+ADVANCED_SHA = "4444444444444444444444444444444444444444"
 
 
 def work_items(state=LifecycleState.REVIEW):
@@ -48,7 +49,8 @@ class FakeIntegrationProvider:
         draft=False,
         mergeable_state="clean",
         protected=True,
-        contains_merge=True,
+        exact_merge=True,
+        post_merge_sha=MERGE_SHA,
         base="ai/integration",
         head="ai/feature/75-integration-merge",
         merge_commit_sha=None,
@@ -72,7 +74,8 @@ class FakeIntegrationProvider:
             sha=INTEGRATION_SHA,
             protected=protected,
         )
-        self.contains_merge = contains_merge
+        self.exact_merge = exact_merge
+        self.post_merge_sha = post_merge_sha
         self.merge_calls = []
 
     def get_pull_request(self, number):
@@ -83,11 +86,17 @@ class FakeIntegrationProvider:
     def get_branch(self, branch):
         if branch != "ai/integration":
             raise AssertionError(f"Unexpected branch: {branch}")
+        if self.pr.merged:
+            return BranchSnapshot(
+                branch=self.integration.branch,
+                sha=self.post_merge_sha,
+                protected=self.integration.protected,
+            )
         return self.integration
 
-    def target_contains_commit(self, target_branch, commit_sha):
-        self.merge_calls.append(("contains", target_branch, commit_sha))
-        return self.contains_merge
+    def target_matches_commit(self, target_branch, commit_sha):
+        self.merge_calls.append(("exact", target_branch, commit_sha))
+        return self.exact_merge
 
     def merge_pull_request(self, number, expected_head_sha):
         self.merge_calls.append(("merge", number, expected_head_sha))
@@ -113,6 +122,7 @@ class FakeGitHubTransport:
         self.calls = []
         self.pr_reads = 0
         self.merge_payload = None
+        self.comparison = {"status": "identical", "ahead_by": 0, "behind_by": 0}
 
     def __call__(self, method, url, headers, payload):
         path = url.removeprefix("https://api.github.com")
@@ -146,12 +156,8 @@ class FakeGitHubTransport:
             self.merge_payload = payload
             return 200, {"merged": True, "sha": MERGE_SHA}
 
-        if path == f"/repos/{REPOSITORY}/compare/{MERGE_SHA}...ai%2Fintegration":
-            return 200, {
-                "status": "identical",
-                "ahead_by": 0,
-                "behind_by": 0,
-            }
+        if path == f"/repos/{REPOSITORY}/compare/ai%2Fintegration...{MERGE_SHA}":
+            return 200, dict(self.comparison)
 
         raise AssertionError(f"Unexpected GitHub request: {method} {path}")
 
@@ -166,12 +172,13 @@ class IntegrationMergeTests(unittest.TestCase):
             items,
             "75",
             PR_NUMBER,
+            expected_head_sha=HEAD_SHA,
         )
 
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
         self.assertEqual(
-            [("merge", PR_NUMBER, HEAD_SHA), ("contains", "ai/integration", MERGE_SHA)],
+            [("merge", PR_NUMBER, HEAD_SHA), ("exact", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
         self.assertIn(MERGE_SHA, items.comments["75"][0])
@@ -194,7 +201,7 @@ class IntegrationMergeTests(unittest.TestCase):
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
         self.assertEqual(
-            [("contains", "ai/integration", MERGE_SHA)],
+            [("exact", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
 
@@ -270,6 +277,37 @@ class IntegrationMergeTests(unittest.TestCase):
         with self.assertRaisesRegex(IntegrationMergeError, "base does not match"):
             sync_integration_merge(provider, items, "75", PR_NUMBER)
 
+    def test_rejects_open_pr_without_validation_head_sha(self):
+        provider = FakeIntegrationProvider()
+        items = work_items()
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "exact validation head SHA is required",
+        ):
+            sync_integration_merge(provider, items, "75", PR_NUMBER)
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+        self.assertEqual([], provider.merge_calls)
+
+    def test_rejects_integration_branch_advanced_after_exact_compare(self):
+        provider = FakeIntegrationProvider(post_merge_sha=ADVANCED_SHA)
+        items = work_items()
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "advanced after exact merge verification",
+        ):
+            sync_integration_merge(
+                provider,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+
     def test_rejects_missing_merge_commit(self):
         provider = FakeIntegrationProvider(pr_state="closed", merged=True)
         items = work_items()
@@ -278,7 +316,7 @@ class IntegrationMergeTests(unittest.TestCase):
             sync_integration_merge(provider, items, "75", PR_NUMBER)
 
     def test_rejects_merge_commit_not_in_target(self):
-        provider = FakeIntegrationProvider(contains_merge=False)
+        provider = FakeIntegrationProvider(exact_merge=False)
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "not contained in ai/integration"):
@@ -294,6 +332,23 @@ class IntegrationMergeTests(unittest.TestCase):
             sync_integration_merge(provider, items, "75", PR_NUMBER)
 
         self.assertEqual([], provider.merge_calls)
+
+    def test_github_provider_rejects_non_identical_compare_result(self):
+        transport = FakeGitHubTransport()
+        provider = GitHubIntegrationMergeProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        self.assertTrue(provider.target_matches_commit("ai/integration", MERGE_SHA))
+        transport.comparison = {
+            "status": "ahead",
+            "ahead_by": 1,
+            "behind_by": 0,
+        }
+        self.assertFalse(provider.target_matches_commit("ai/integration", MERGE_SHA))
+
 
     def test_github_provider_uses_exact_sha_and_squash_merge(self):
         transport = FakeGitHubTransport()
@@ -317,7 +372,7 @@ class IntegrationMergeTests(unittest.TestCase):
         )
 
         self.assertTrue(
-            provider.target_contains_commit("ai/integration", MERGE_SHA)
+            provider.target_matches_commit("ai/integration", MERGE_SHA)
         )
 
 
