@@ -329,7 +329,7 @@ def main() -> int:
     parser.add_argument(
         "--version-evidence-ref",
         required=True,
-        help="Explicit toolchain/version evidence: an HTTPS reference or project-local file.",
+        help="Explicit toolchain/version evidence: a non-empty project-local UTF-8 file. External URLs remain blocked until independently verified.",
     )
     architecture = parser.add_mutually_exclusive_group(required=True)
     architecture.add_argument(
