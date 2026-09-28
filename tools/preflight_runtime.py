@@ -266,19 +266,19 @@ def main() -> int:
 
     try:
         if args.canonical_evidence_output is not None:
-        from evidence_adapters import runtime_preflight_evidence
-        from evidence_contract import write_evidence
+            from evidence_adapters import runtime_preflight_evidence
+            from evidence_contract import write_evidence
 
-        canonical_path = args.canonical_evidence_output.expanduser().resolve()
-        profile_path = args.profile_config.expanduser().resolve()
-        if canonical_path == profile_path:
-            raise RuntimePreflightError(
-                "Canonical evidence output must not overwrite the AI profile configuration."
+            canonical_path = args.canonical_evidence_output.expanduser().resolve()
+            profile_path = args.profile_config.expanduser().resolve()
+            if canonical_path == profile_path:
+                raise RuntimePreflightError(
+                    "Canonical evidence output must not overwrite the AI profile configuration."
+                )
+            canonical = runtime_preflight_evidence(
+                result,
+                observed_at=datetime.now(timezone.utc),
             )
-        canonical = runtime_preflight_evidence(
-            result,
-            observed_at=datetime.now(timezone.utc),
-        )
             write_evidence(canonical, canonical_path)
     except (ValueError, RuntimePreflightError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
