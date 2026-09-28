@@ -272,10 +272,14 @@ def create_candidate(
         candidate_sha256="",
     )
     candidate = KnowledgeGapCandidate(
-        **{
-            **candidate.__dict__,
-            "candidate_sha256": _hash(_candidate_payload(candidate)),
-        }
+        candidate_id=candidate.candidate_id,
+        scope=candidate.scope,
+        capability=candidate.capability,
+        problem=candidate.problem,
+        proposed_change=candidate.proposed_change,
+        references=candidate.references,
+        created_at=candidate.created_at,
+        candidate_sha256=_hash(_candidate_payload(candidate)),
     )
     _validate_candidate(candidate)
     record = KnowledgeGapRecord(
