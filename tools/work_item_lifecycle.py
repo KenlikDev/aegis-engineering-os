@@ -329,12 +329,21 @@ class GitHubIssuesProvider:
 
     @staticmethod
     def _extract_state(labels: list[str]) -> LifecycleState:
-        states = [
-            LifecycleState(label.removeprefix(STATUS_LABEL_PREFIX))
+        state_values = [
+            label.removeprefix(STATUS_LABEL_PREFIX)
             for label in labels
             if STATUS_LABEL_RE.fullmatch(label)
-            and label.removeprefix(STATUS_LABEL_PREFIX) in LifecycleState._value2member_map_
         ]
+        invalid = [
+            value
+            for value in state_values
+            if value not in LifecycleState._value2member_map_
+        ]
+        if invalid:
+            raise WorkItemLifecycleError(
+                f"GitHub issue contains invalid Aegis status labels: {invalid!r}."
+            )
+        states = [LifecycleState(value) for value in state_values]
         if len(states) > 1:
             raise WorkItemLifecycleError("GitHub issue contains multiple Aegis status labels.")
         if states:
@@ -635,61 +644,12 @@ class InMemoryWorkItemProvider:
         return self.comment(work_item_id, render_traceability_comment(traceability))
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Manage an Aegis work-item lifecycle.")
-    parser.add_argument("repository", help="GitHub repository in owner/name form.")
-    parser.add_argument("issue_number", help="Numeric GitHub issue number.")
-    parser.add_argument("target_state", choices=[state.value for state in LifecycleState])
-    parser.add_argument(
-        "--expected-state",
-        choices=[state.value for state in LifecycleState],
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Read the current issue state and print the proposed transition without mutation.",
-    )
-    parser.add_argument(
-        "--token-env",
-        default="GITHUB_TOKEN",
-        help="Environment variable containing the GitHub token.",
-    )
-    args = parser.parse_args()
+def _build_provider(args: argparse.Namespace) -> GitHubIssuesProvider:
+    token = os.environ.get(args.token_env, "")
+    return GitHubIssuesProvider(args.repository, token)
 
-    try:
-        token = os.environ.get(args.token_env, "")
-        provider = GitHubIssuesProvider(args.repository, token)
-        current = provider.get(args.issue_number)
-        target = LifecycleState(args.target_state)
-        expected = LifecycleState(args.expected_state) if args.expected_state else None
-        if expected is not None and current.state != expected:
-            raise WorkItemLifecycleError(
-                f"Expected {expected.value}, but issue is {current.state.value}."
-            )
-        validate_transition(current.state, target)
-        if args.dry_run:
-            print(
-                json.dumps(
-                    {
-                        "status": "dry-run",
-                        "work_item_id": args.issue_number,
-                        "state_before": current.state.value,
-                        "state_after": target.value,
-                        "provider": "github-issues",
-                    },
-                    indent=2,
-                )
-            )
-            return 0
-        evidence = provider.transition(
-            args.issue_number,
-            target,
-            expected_state=expected,
-        )
-    except (WorkItemLifecycleError, ValueError) as exc:
-        print(f"ERROR: {exc}", file=os.sys.stderr)
-        return 1
 
+def _print_evidence(evidence: MutationEvidence) -> None:
     print(
         json.dumps(
             {
@@ -706,8 +666,94 @@ def main() -> int:
             sort_keys=True,
         )
     )
-    return 0
 
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Manage an Aegis work-item lifecycle.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    transition = subparsers.add_parser("transition")
+    transition.add_argument("repository")
+    transition.add_argument("issue_number")
+    transition.add_argument("target_state", choices=[state.value for state in LifecycleState])
+    transition.add_argument("--expected-state", choices=[state.value for state in LifecycleState])
+    transition.add_argument("--dry-run", action="store_true")
+    transition.add_argument("--token-env", default="GITHUB_TOKEN")
+
+    comment = subparsers.add_parser("comment")
+    comment.add_argument("repository")
+    comment.add_argument("issue_number")
+    comment.add_argument("body")
+    comment.add_argument("--token-env", default="GITHUB_TOKEN")
+
+    trace = subparsers.add_parser("trace")
+    trace.add_argument("repository")
+    trace.add_argument("issue_number")
+    trace.add_argument("--branch")
+    trace.add_argument("--pull-request-url")
+    trace.add_argument("--evidence-ref")
+    trace.add_argument("--conversation-id")
+    trace.add_argument("--token-env", default="GITHUB_TOKEN")
+
+    args = parser.parse_args()
+
+    try:
+        if args.command == "transition":
+            provider = _build_provider(args)
+            current = provider.get(args.issue_number)
+            target = LifecycleState(args.target_state)
+            expected = LifecycleState(args.expected_state) if args.expected_state else None
+            if expected is not None and current.state != expected:
+                raise WorkItemLifecycleError(
+                    f"Expected {expected.value}, but issue is {current.state.value}."
+                )
+            validate_transition(
+                current.state,
+                target,
+                resume_state=current.resume_state,
+            )
+            if args.dry_run:
+                print(
+                    json.dumps(
+                        {
+                            "status": "dry-run",
+                            "work_item_id": args.issue_number,
+                            "state_before": current.state.value,
+                            "state_after": target.value,
+                            "provider": "github-issues",
+                        },
+                        indent=2,
+                    )
+                )
+                return 0
+            _print_evidence(
+                provider.transition(
+                    args.issue_number,
+                    target,
+                    expected_state=expected,
+                )
+            )
+            return 0
+
+        if args.command == "comment":
+            provider = _build_provider(args)
+            _print_evidence(provider.comment(args.issue_number, args.body))
+            return 0
+
+        traceability = Traceability(
+            branch=args.branch,
+            pull_request_url=args.pull_request_url,
+            evidence_ref=args.evidence_ref,
+            conversation_id=args.conversation_id,
+        )
+        provider = _build_provider(args)
+        _print_evidence(
+            provider.attach_traceability(args.issue_number, traceability)
+        )
+    except (WorkItemLifecycleError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=os.sys.stderr)
+        return 1
+    return 0
 
 if __name__ == "__main__":
     raise SystemExit(main())
