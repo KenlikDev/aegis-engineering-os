@@ -474,7 +474,7 @@ class QualityGateTests(unittest.TestCase):
 
             with self.assertRaisesRegex(
                 QualityGateError,
-                "work-item synchronization failed",
+                "work-item synchronization also failed",
             ):
                 run_with_optional_work_item(
                     root,
