@@ -22,13 +22,15 @@ review
 -> require the head SHA to remain unchanged
 -> squash merge with the exact validated SHA
 -> verify merged PR and merge commit
+-> compare `ai/integration` against the merge commit and require `identical`
+-> re-read `ai/integration` and require its SHA to equal the merge commit
 -> advance work item review -> integration
 
 ## Race safety
 
 Validation evidence is bound to the exact PR head SHA.
 
-The integration merge operation accepts an optional expected_head_sha. When supplied, it fails closed if the current PR head differs from the validated SHA.
+The integration merge operation requires `expected_head_sha` for every open pull request. It fails closed if the current PR head differs from the exact SHA supplied by the higher-level validation boundary. Already-merged pull requests may omit the SHA because no new merge mutation is performed.
 
 This prevents a new commit pushed after validation from being merged using stale validation evidence.
 
@@ -60,9 +62,13 @@ GitHub-specific implementations are selected only by the CLI adapter layer.
 
 ## Failure behavior
 
-No successful exact-head validation:
+No exact-head validation SHA for an open PR:
 - do not merge;
 - leave the work item in review.
+
+Post-merge comparison is not `identical`:
+- do not advance the work item lifecycle;
+- do not report integration as verified.
 
 PR head changed after validation:
 - do not merge;

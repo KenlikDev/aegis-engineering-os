@@ -4,6 +4,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
 
+- harden autonomous integration merge to require exact validation head evidence and exact post-merge `ai/integration` identity;
 - connect explicit evidence-set requirements to implementation readiness and support exact evidence revision selectors while preserving fail-closed semantics;
 - add the read-only security review workflow with deterministic high/medium findings for Actions, Git, GitHub API, subprocess, and credential risks;
 - add the read-only CI remediation workflow for deterministic GitHub Actions failure diagnosis and bounded redacted evidence;
