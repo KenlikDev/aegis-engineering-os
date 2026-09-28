@@ -105,6 +105,33 @@ class QualityGateTests(unittest.TestCase):
             gates = load_quality_gates(manifest)
             self.assertEqual(["format", "tests"], [gate.id for gate in gates])
 
+    def test_evidence_output_rejects_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._write_manifest(
+                root,
+                [{"id": "tests", "command": ["echo", "ok"], "required": True}],
+            )
+            target = root / "external.json"
+            target.write_text("protected\n", encoding="utf-8")
+            output = root / "evidence.json"
+            output.symlink_to(target)
+
+            with self.assertRaisesRegex(
+                QualityGateError,
+                "must not be a symbolic link",
+            ):
+                run_with_optional_work_item(
+                    root,
+                    manifest,
+                    evidence_path=output,
+                    run_command=lambda command, **kwargs: subprocess.CompletedProcess(
+                        command, 0, "ok\n", ""
+                    ),
+                )
+
+            self.assertEqual("protected\n", target.read_text(encoding="utf-8"))
+
     def test_manifest_requires_at_least_one_required_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
