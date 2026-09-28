@@ -2,8 +2,6 @@
 
 All notable changes to Aegis Engineering OS will be documented here.
 
-- harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
-
 ## Unreleased
 
 - harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
@@ -27,16 +25,6 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add the executable provider-neutral work-item lifecycle bridge with GitHub Issues persistence, optimistic state checks, blocked-state resume metadata, traceability comments, and read-after-write verification;
 - compose managed OpenHands execution with explicit work-item lifecycle synchronization, safe failure blocking, and verification-stage traceability;
 - add the executable project quality-gate runner with explicit manifest commands, bounded redacted evidence, and verification-to-review/blocked lifecycle synchronization.
-- constitution and agent operating rules;
-- orchestrator workflow;
-- product discovery and delegated idea selection;
-- user decision model;
-- version verification;
-- Git and GitHub hygiene;
-- offline operation model;
-- knowledge lifecycle;
-- project bootstrap templates;
-- repository validation scaffold.
 - add the read-only promotion readiness verifier for ai/integration -> develop/main, including exact-SHA CI evidence and protection checks;
 - add the owner-controlled promotion snapshot bridge, which prepares an exact integration-tree snapshot on a short-lived target-based branch and opens or reuses a draft promotion pull request without merging protected branches;
 - add the read-only release readiness verifier and release-preparation workflow for protected main;
@@ -50,3 +38,13 @@ All notable changes to Aegis Engineering OS will be documented here.
 ## 0.1.0-alpha.1
 
 Initial experimental foundation:
+- constitution and agent operating rules;
+- orchestrator workflow;
+- product discovery and delegated idea selection;
+- user decision model;
+- version verification;
+- Git and GitHub hygiene;
+- offline operation model;
+- knowledge lifecycle;
+- project bootstrap templates;
+- repository validation scaffold.
