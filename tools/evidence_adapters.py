@@ -33,6 +33,7 @@ def _canonical_safe(value: Any) -> Any:
 
 if TYPE_CHECKING:
     from ci_diagnosis import DiagnosticReport
+    from work_item_lifecycle import MutationEvidence
     from openhands_execution import OpenHandsExecutionResult
     from implementation_readiness import ImplementationReadiness
     from security_review import SecurityReviewResult
@@ -499,6 +500,50 @@ def openhands_execution_evidence(
             },
             "uncertainty": uncertainty,
             "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
+def mutation_evidence(
+    evidence: "MutationEvidence",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a lifecycle mutation result into canonical provenance evidence."""
+    if not evidence.verified:
+        status = "unknown"
+        uncertainty = [
+            "The provider mutation result was not read-after-write verified."
+        ]
+    else:
+        status = "verified"
+        uncertainty = []
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "work-item-mutation",
+            "source": f"work-item-provider:{evidence.provider}",
+            "subject": f"work-item:{evidence.work_item_id}",
+            "revision": None,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "provider": evidence.provider,
+                "operation": evidence.operation,
+                "work_item_id": evidence.work_item_id,
+                "state_before": evidence.state_before,
+                "state_after": evidence.state_after,
+                "verified": evidence.verified,
+                "reference": evidence.reference,
+                "identifier": evidence.identifier,
+            },
+            "uncertainty": uncertainty,
+            "references": (
+                [evidence.reference]
+                if evidence.reference is not None
+                else []
+            ),
             "artifact_sha256": None,
         }
     )
