@@ -53,6 +53,22 @@ class QualityGateTests(unittest.TestCase):
             gates = load_quality_gates(manifest)
             self.assertEqual(["format", "tests"], [gate.id for gate in gates])
 
+    def test_manifest_requires_at_least_one_required_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = self._write_manifest(
+                root,
+                [
+                    {
+                        "id": "optional-check",
+                        "command": ["echo", "optional"],
+                        "required": False,
+                    }
+                ],
+            )
+            with self.assertRaises(QualityGateError):
+                load_quality_gates(manifest)
+
     def test_manifest_rejects_duplicate_ids(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
