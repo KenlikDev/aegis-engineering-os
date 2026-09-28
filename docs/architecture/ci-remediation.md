@@ -21,6 +21,26 @@ The report preserves:
 
 No credential value belongs in the report.
 
+## Canonical provenance
+
+The read-only diagnosis can emit its existing result into the canonical evidence envelope with `--canonical-evidence-output`.
+
+The adapter preserves:
+
+- workflow run identity, URL, workflow path, event, branch, and exact head SHA;
+- job identity and state;
+- failed step names;
+- deterministic category, severity, actionability, message, and bounded redacted evidence;
+- the full diagnosis status and summary.
+
+Canonical status mapping is explicit:
+
+- healthy -> `verified`;
+- diagnosed -> `failed`;
+- inconclusive -> `unknown`.
+
+An inconclusive result records explicit uncertainty and is never upgraded to a verified root cause.
+
 ## Diagnosis semantics
 
 Supported signatures are intentionally narrow. The tool may report:
