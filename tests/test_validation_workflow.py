@@ -26,6 +26,22 @@ class ValidationWorkflowContractTests(unittest.TestCase):
             self.workflow,
         )
 
+    def test_separates_push_and_pull_request_concurrency(self):
+        self.assertIn(
+            "github.event_name",
+            self.workflow.split("  group:", 1)[1].split("\n", 1)[0],
+        )
+        self.assertIn(
+            "github.event.pull_request.number || github.ref",
+            self.workflow.split("  group:", 1)[1].split("\n", 1)[0],
+        )
+
+    def test_limits_closed_event_path_to_merged_integration(self):
+        self.assertIn(
+            "github.event.pull_request.base.ref == 'ai/integration'",
+            self.workflow,
+        )
+
     def test_keeps_existing_pr_target_filters(self):
         pull_request_block = self.workflow.split("  pull_request:\n", 1)[1]
         pull_request_block = pull_request_block.split("\n\npermissions:", 1)[0]
