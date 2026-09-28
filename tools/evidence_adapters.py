@@ -58,6 +58,127 @@ def _repository_reference(repository: str) -> str:
     return f"https://github.com/{repository}"
 
 
+def promotion_sync_evidence(
+    result: Mapping[str, Any],
+    *,
+    repository: str,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a human-controlled promotion synchronization result into canonical provenance."""
+    status = result.get("status")
+    if status == "not-merged":
+        canonical_status = "unknown"
+        uncertainty = ["The promotion pull request was not merged into the selected target."]
+    elif status == "verified":
+        canonical_status = "verified"
+        uncertainty = []
+    else:
+        raise EvidenceContractError(
+            f"Unsupported promotion synchronization status: {status!r}."
+        )
+
+    work_item_id = result.get("work_item_id")
+    target_branch = result.get("target_branch")
+    pull_request = result.get("pull_request")
+    target = result.get("target")
+    work_item = result.get("work_item")
+
+    if not isinstance(work_item_id, str) or not work_item_id:
+        raise EvidenceContractError("Promotion synchronization work_item_id is required.")
+    if not isinstance(target_branch, str) or target_branch not in {"develop", "main"}:
+        raise EvidenceContractError(
+            "Promotion synchronization target_branch must be develop or main."
+        )
+    if not isinstance(pull_request, Mapping):
+        raise EvidenceContractError(
+            "Promotion synchronization pull_request result is malformed."
+        )
+
+    if canonical_status == "unknown":
+        return build_evidence(
+            {
+                "schema_version": 1,
+                "kind": "promotion-sync",
+                "source": f"github:{repository}",
+                "subject": f"promotion:{work_item_id}->{target_branch}",
+                "revision": None,
+                "observed_at": _timestamp(observed_at),
+                "status": "unknown",
+                "result": _canonical_safe(dict(result)),
+                "uncertainty": uncertainty,
+                "references": (
+                    [pull_request["url"]]
+                    if isinstance(pull_request.get("url"), str)
+                    and pull_request.get("url").startswith("https://")
+                    else []
+                ),
+                "artifact_sha256": None,
+            }
+        )
+
+    if not isinstance(target, Mapping):
+        raise EvidenceContractError(
+            "Verified promotion synchronization requires target evidence."
+        )
+    if not isinstance(work_item, Mapping):
+        raise EvidenceContractError(
+            "Verified promotion synchronization requires work-item evidence."
+        )
+
+    merge_sha = pull_request.get("merge_commit_sha")
+    target_sha = target.get("sha")
+    if (
+        not isinstance(merge_sha, str)
+        or not re.fullmatch(r"[0-9a-f]{40}", merge_sha)
+        or not isinstance(target_sha, str)
+        or not re.fullmatch(r"[0-9a-f]{40}", target_sha)
+    ):
+        raise EvidenceContractError(
+            "Promotion synchronization merge and target SHAs must be valid 40-character hexadecimal revisions."
+        )
+    if merge_sha != target_sha:
+        raise EvidenceContractError(
+            "Promotion synchronization merge commit does not match the protected target SHA."
+        )
+    if target.get("branch") != target_branch or target.get("protected") is not True:
+        raise EvidenceContractError(
+            "Promotion synchronization target identity or protection state is invalid."
+        )
+    if pull_request.get("base") != target_branch or pull_request.get("merged") is not True:
+        raise EvidenceContractError(
+            "Promotion synchronization pull request does not describe the verified promotion merge."
+        )
+    if result.get("traceability_verified") is not True:
+        raise EvidenceContractError(
+            "Promotion synchronization traceability is not read-after-write verified."
+        )
+    if work_item.get("transition_verified") is not True:
+        raise EvidenceContractError(
+            "Promotion synchronization lifecycle transition is not read-after-write verified."
+        )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "promotion-sync",
+            "source": f"github:{repository}",
+            "subject": f"promotion:{work_item_id}->{target_branch}",
+            "revision": target_sha,
+            "observed_at": _timestamp(observed_at),
+            "status": "verified",
+            "result": _canonical_safe(dict(result)),
+            "uncertainty": [],
+            "references": (
+                [pull_request["url"]]
+                if isinstance(pull_request.get("url"), str)
+                and pull_request.get("url").startswith("https://")
+                else []
+            ),
+            "artifact_sha256": None,
+        }
+    )
+
+
 def integration_delivery_evidence(
     result: Mapping[str, Any],
     *,

@@ -18,14 +18,17 @@ Advance an integrated work item to done only after a promotion pull request has 
 5. The pull request is closed and actually merged.
 6. A merge commit SHA is present.
 7. The target branch is still protected.
-8. The target branch contains the promotion merge commit.
+8. A GitHub compare of target branch -> merge commit returns exact `identical` with zero ahead/behind counts.
+9. The target branch is re-read after the compare and its exact SHA matches the merge commit.
 
 ## Rules
 
 - Never approve or merge a pull request.
 - Never force-push or modify a protected branch.
 - Do not treat an open or merely mergeable pull request as merged.
-- Do not advance the lifecycle when the target branch does not contain the merge commit.
+- Do not advance the lifecycle when the target branch compare is not exact `identical` or the post-compare target SHA differs.
+- Require traceability and lifecycle transition mutation evidence to report read-after-write verification before returning `Verified`.
+- Optionally emit canonical `promotion-sync` evidence with `--canonical-evidence-output`; this evidence is observational and never authorization.
 - Record only non-secret promotion evidence on the work item.
 - Use the work-item provider's optimistic transition so concurrent lifecycle changes fail safely.
 

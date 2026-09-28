@@ -100,6 +100,8 @@ The operation requires the work item to be in integration, verifies the determin
 
 Open or unmerged promotion PRs are non-mutating. The synchronizer never approves, merges, force-pushes, or changes protected branches.
 
+The synchronized result can also be serialized as canonical `promotion-sync` evidence. A verified record binds the human-controlled target branch, exact promotion merge revision, protected target identity, pull-request identity, traceability verification, and integration -> done lifecycle verification. A `not-merged` result remains canonical `unknown`. This evidence is observational and does not authorize or perform promotion.
+
 
 ## Validation evidence types
 
