@@ -67,6 +67,8 @@ jobs:
 
       - name: Validate repository structure
         run: python tools/validate_aegis.py
+      - name: Run security review
+        run: python tools/security_review.py .
 
       - name: Run policy tests
         run: python -m unittest discover -s tests
