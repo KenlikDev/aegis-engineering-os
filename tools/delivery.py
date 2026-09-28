@@ -88,6 +88,7 @@ class MutationEvidence:
     operation: str
     reference: str
     verified: bool
+    identifier: int | str | None = None
 
 
 def _validate_repository(repository: str) -> str:
@@ -324,6 +325,7 @@ class GitHubPullRequestProvider:
                 operation="reuse_existing",
                 reference=existing.url,
                 verified=True,
+                identifier=existing.number,
             )
 
         status, data = self._request(
@@ -354,6 +356,7 @@ class GitHubPullRequestProvider:
             operation="create",
             reference=created.url,
             verified=True,
+            identifier=created.number,
         )
 
 
@@ -373,7 +376,11 @@ def create_review_pull_request(
         )
 
     mutation = provider.create(request)
-    pull_number = int(mutation.reference.rstrip("/").rsplit("/", 1)[-1])
+    if not isinstance(mutation.identifier, int) or mutation.identifier <= 0:
+        raise DeliveryError(
+            "Pull-request creation provider did not return a numeric pull-request identifier."
+        )
+    pull_number = mutation.identifier
     pull_request = provider.get(pull_number)
     if pull_request.head != request.head or pull_request.base != request.base:
         raise DeliveryError("Pull-request traceability verification failed.")
@@ -500,8 +507,6 @@ def main() -> int:
 
     try:
         provider = _build_provider(args.repository, args.token_env)
-        from work_item_lifecycle import GitHubIssuesProvider
-
         work_item_provider = GitHubIssuesProvider(
             args.repository,
             os.environ.get(args.token_env, ""),
