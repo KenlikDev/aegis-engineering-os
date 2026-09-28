@@ -25,6 +25,7 @@ from ci_diagnosis import (  # noqa: E402
     WorkflowRunSnapshot,
 )
 from promotion_readiness import BranchSnapshot, CompareSnapshot, PromotionReadiness, ValidationRun  # noqa: E402
+from openhands_execution import OpenHandsExecutionResult  # noqa: E402
 from implementation_readiness import (  # noqa: E402
     ImplementationReadiness,
     ReadinessObservation,
@@ -217,6 +218,86 @@ class EvidenceAdapterTests(unittest.TestCase):
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
 
+
+
+    def test_openhands_finished_result_is_verified(self):
+        result = OpenHandsExecutionResult(
+            conversation_id="12345178-1234-5178-1234-517812345178",
+            execution_status="finished",
+            outcome="finished",
+            state={"execution_status": "finished", "api_key": "[REDACTED]"},
+            events=(
+                {"kind": "message", "content": "completed"},
+            ),
+        )
+
+        canonical = openhands_execution_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual(
+            "conversation:12345178-1234-5178-1234-517812345178",
+            canonical.subject,
+        )
+        self.assertEqual(
+            {"execution_status": "finished"},
+            canonical.result["state"],
+        )
+        self.assertEqual(1, canonical.result["event_count"])
+
+    def test_openhands_failed_result_is_failed_with_uncertainty(self):
+        result = OpenHandsExecutionResult(
+            conversation_id="22345178-1234-5178-1234-517812345178",
+            execution_status="error",
+            outcome="error",
+            state={"execution_status": "error"},
+            events=(),
+        )
+
+        canonical = openhands_execution_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("error", canonical.uncertainty[0])
+
+    def test_openhands_stuck_result_is_failed(self):
+        result = OpenHandsExecutionResult(
+            conversation_id="32345178-1234-5178-1234-517812345178",
+            execution_status="stuck",
+            outcome="stuck",
+            state={"execution_status": "stuck"},
+            events=(),
+        )
+
+        canonical = openhands_execution_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual("stuck", canonical.result["outcome"])
+
+    def test_openhands_blocked_result_is_failed(self):
+        result = OpenHandsExecutionResult(
+            conversation_id="42345178-1234-5178-1234-517812345178",
+            execution_status="waiting_for_confirmation",
+            outcome="blocked",
+            state={"execution_status": "waiting_for_confirmation"},
+            events=(),
+        )
+
+        canonical = openhands_execution_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual("blocked", canonical.result["outcome"])
 
     def test_ci_diagnosis_healthy_result_is_verified(self):
         run = WorkflowRunSnapshot(
