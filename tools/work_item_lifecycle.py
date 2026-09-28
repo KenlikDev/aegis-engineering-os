@@ -24,7 +24,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 STATUS_LABEL_PREFIX = "aegis:status:"
+RESUME_LABEL_PREFIX = "aegis:resume:"
 STATUS_LABEL_RE = re.compile(r"^aegis:status:[a-z_]+$")
+RESUME_LABEL_RE = re.compile(r"^aegis:resume:[a-z_]+$")
 BRANCH_RE = re.compile(r"^ai/(feature|fix|refactor|chore)/[A-Za-z0-9._/-]+$")
 UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
@@ -72,7 +74,7 @@ TRANSITIONS: dict[LifecycleState, frozenset[LifecycleState]] = {
         {LifecycleState.INTEGRATION, LifecycleState.BLOCKED}
     ),
     LifecycleState.INTEGRATION: frozenset({LifecycleState.DONE, LifecycleState.BLOCKED}),
-    LifecycleState.BLOCKED: frozenset({LifecycleState.IN_PROGRESS}),
+    LifecycleState.BLOCKED: frozenset(ACTIVE_STATES),
     LifecycleState.DONE: frozenset(),
 }
 
@@ -118,6 +120,7 @@ class WorkItem:
     provider: str
     provider_url: str | None = None
     labels: tuple[str, ...] = ()
+    resume_state: LifecycleState | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,8 +169,19 @@ class WorkItemProvider(Protocol):
 def validate_transition(
     current: LifecycleState,
     target: LifecycleState,
+    *,
+    resume_state: LifecycleState | None = None,
 ) -> None:
     """Fail closed when a requested lifecycle transition is invalid."""
+    if current == LifecycleState.BLOCKED:
+        if resume_state is None:
+            raise WorkItemLifecycleError("Blocked work item has no recorded resume state.")
+        if target != resume_state:
+            raise WorkItemLifecycleError(
+                f"Blocked work item must resume at {resume_state.value}; "
+                f"requested {target.value}."
+            )
+        return
     if target not in TRANSITIONS[current]:
         raise WorkItemLifecycleError(
             f"Invalid lifecycle transition: {current.value} -> {target.value}."
@@ -327,6 +341,31 @@ class GitHubIssuesProvider:
             return states[0]
         return LifecycleState.INTAKE
 
+    @staticmethod
+    def _extract_resume_state(
+        labels: list[str],
+        state: LifecycleState,
+    ) -> LifecycleState | None:
+        resume_values = [
+            label.removeprefix(RESUME_LABEL_PREFIX)
+            for label in labels
+            if RESUME_LABEL_RE.fullmatch(label)
+        ]
+        if state != LifecycleState.BLOCKED:
+            if resume_values:
+                raise WorkItemLifecycleError(
+                    "Non-blocked GitHub issue contains a stale Aegis resume label."
+                )
+            return None
+        if len(resume_values) != 1:
+            raise WorkItemLifecycleError(
+                "Blocked GitHub issue must contain exactly one Aegis resume label."
+            )
+        value = resume_values[0]
+        if value not in {item.value for item in ACTIVE_STATES}:
+            raise WorkItemLifecycleError("Aegis resume label contains an invalid lifecycle state.")
+        return LifecycleState(value)
+
     def get(self, work_item_id: str) -> WorkItem:
         status, data = self._request("GET", self._issue_path(work_item_id))
         if status != 200 or not isinstance(data, Mapping):
@@ -344,6 +383,7 @@ class GitHubIssuesProvider:
             )
         )
         state = self._extract_state(list(labels))
+        resume_state = self._extract_resume_state(list(labels), state)
         if state == LifecycleState.DONE and data.get("state") != "closed":
             raise WorkItemLifecycleError("Aegis done state requires a closed GitHub issue.")
         if state != LifecycleState.DONE and data.get("state") != "open":
@@ -358,6 +398,7 @@ class GitHubIssuesProvider:
             provider="github-issues",
             provider_url=html_url if isinstance(html_url, str) else None,
             labels=labels,
+            resume_state=resume_state,
         )
 
     def _ensure_status_label(self, state: LifecycleState) -> None:
@@ -386,6 +427,31 @@ class GitHubIssuesProvider:
             )
         self._verify_label_exists(label_name)
 
+    def _ensure_resume_label(self, state: LifecycleState) -> None:
+        label_name = f"{RESUME_LABEL_PREFIX}{state.value}"
+        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
+        status, _ = self._request("GET", path)
+        if status == 200:
+            return
+        if status != 404:
+            raise WorkItemLifecycleError(
+                f"Unable to inspect Aegis resume label {label_name!r}; HTTP {status}."
+            )
+        status, _ = self._request(
+            "POST",
+            f"/repos/{self.repository}/labels",
+            {
+                "name": label_name,
+                "description": f"Aegis blocked-work resume target: {state.value}.",
+                "color": "8250df",
+            },
+        )
+        if status not in {200, 201}:
+            raise WorkItemLifecycleError(
+                f"Unable to create Aegis resume label {label_name!r}; HTTP {status}."
+            )
+        self._verify_label_exists(label_name)
+
     def _verify_label_exists(self, label_name: str) -> None:
         path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
         status, _ = self._request("GET", path)
@@ -407,11 +473,28 @@ class GitHubIssuesProvider:
                 f"Work item #{work_item_id} state changed concurrently: "
                 f"expected {expected_state.value}, got {current.state.value}."
             )
-        validate_transition(current.state, target)
+        validate_transition(
+            current.state,
+            target,
+            resume_state=current.resume_state,
+        )
         self._ensure_status_label(target)
+        if target == LifecycleState.BLOCKED:
+            if current.state not in ACTIVE_STATES:
+                raise WorkItemLifecycleError(
+                    "Only active work items can enter blocked state."
+                )
+            self._ensure_resume_label(current.state)
 
-        status_labels = [label for label in current.labels if not STATUS_LABEL_RE.fullmatch(label)]
-        status_labels.append(f"{STATUS_LABEL_PREFIX}{target.value}")
+        labels = [
+            label
+            for label in current.labels
+            if not STATUS_LABEL_RE.fullmatch(label)
+            and not RESUME_LABEL_RE.fullmatch(label)
+        ]
+        labels.append(f"{STATUS_LABEL_PREFIX}{target.value}")
+        if target == LifecycleState.BLOCKED:
+            labels.append(f"{RESUME_LABEL_PREFIX}{current.state.value}")
         payload: dict[str, Any] = {
             "labels": sorted(status_labels),
             "state": "closed" if target == LifecycleState.DONE else "open",
@@ -513,7 +596,7 @@ class InMemoryWorkItemProvider:
         current = self.get(work_item_id)
         if expected_state is not None and current.state != expected_state:
             raise WorkItemLifecycleError("Concurrent lifecycle change detected.")
-        validate_transition(current.state, target)
+        validate_transition(current.state, target, resume_state=current.resume_state)
         updated = WorkItem(
             id=current.id,
             title=current.title,
@@ -521,6 +604,7 @@ class InMemoryWorkItemProvider:
             provider=current.provider,
             provider_url=current.provider_url,
             labels=current.labels,
+            resume_state=None if target != LifecycleState.BLOCKED else current.state,
         )
         self.items[work_item_id] = updated
         return MutationEvidence(
