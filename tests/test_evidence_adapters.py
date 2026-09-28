@@ -6,6 +6,7 @@ ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from evidence_adapters import (  # noqa: E402
+    architecture_planning_evidence,
     ci_diagnosis_evidence,
     implementation_readiness_evidence,
     knowledge_gap_evidence,
@@ -13,9 +14,11 @@ from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
     openhands_execution_evidence,
     release_readiness_evidence,
+    requirements_clarification_evidence,
     security_review_evidence,
     testing_evidence,
     version_verification_evidence,
+    workflow_composition_evidence,
 )
 from evidence_contract import (  # noqa: E402
     read_and_validate_evidence,
