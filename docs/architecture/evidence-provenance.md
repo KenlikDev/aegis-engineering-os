@@ -92,6 +92,8 @@ CI diagnosis now has an explicit adapter as well. It preserves exact workflow-ru
 
 OpenHands execution now has an explicit adapter as well. It preserves the already-redacted conversation state and events; finished maps to canonical `verified`, while error/stuck/blocked map to `failed` with explicit uncertainty. Secret-like keys are removed before canonical validation.
 
+Lifecycle mutations now have an explicit adapter as well. It preserves provider, operation, work-item identity, state transition, verification state, reference, and identifier. Verified mutations become `verified`; unverified mutations remain `unknown` with explicit read-after-write uncertainty.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.

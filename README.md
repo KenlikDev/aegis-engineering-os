@@ -95,6 +95,12 @@ After an actual merge, synchronize the delivery state:
 Only a verified merged PR advances the work item from \`review\` to \`integration\`.
 
 
+## Lifecycle mutation provenance
+
+Verified work-item lifecycle mutations can be adapted into canonical provenance through the `mutation_evidence` adapter. It records provider, operation, work-item identity, state transition, verification state, and reference without changing lifecycle behavior.
+
+An unverified mutation remains canonical `unknown` with explicit read-after-write uncertainty.
+
 ## Promotion readiness
 
 Before promoting \`ai/integration\`, run the read-only verifier against the explicit protected target:

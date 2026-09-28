@@ -93,6 +93,8 @@ CI diagnosis can now emit canonical provenance from its read-only run/job/step e
 
 OpenHands execution can now emit canonical provenance from its already-redacted terminal execution result without changing the execution boundary.
 
+Lifecycle mutation results can now emit canonical provenance after provider-specific read-after-write verification.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.

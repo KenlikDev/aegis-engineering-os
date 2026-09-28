@@ -90,6 +90,12 @@ Delivery never merges a pull request. The merge synchronization operation only r
 A PR that is still open or unmerged does not mutate the work item. A mismatched source or target branch is a hard failure.
 
 
+## Lifecycle mutation provenance
+
+The lifecycle provider returns `MutationEvidence` as the provider-neutral result of a transition, comment, or traceability operation. Canonical provenance is derived only after the provider-specific operation completes and any read-after-write verification has run.
+
+A mutation with `verified=True` becomes canonical `verified`. A mutation with `verified=False` remains canonical `unknown` with explicit uncertainty. The adapter does not retry, repair, or reinterpret the provider result.
+
 ## Release promotion readiness
 
 Promotion from \`ai/integration\` into \`develop\` or \`main\` is a separate human-controlled delivery stage.
