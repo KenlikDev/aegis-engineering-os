@@ -117,6 +117,50 @@ class EvidenceSetRequirementsTests(unittest.TestCase):
         self.assertEqual(2, result.requirements_total)
         self.assertEqual(1, len(result.extra_members))
 
+    def test_overlapping_requirements_find_distinct_members(self):
+        root, _, requirements, _, testing, _ = self._project()
+
+        secondary = root / ".aegis" / "testing-secondary.json"
+        write_evidence(
+            _evidence(
+                "testing",
+                "pending",
+                "project-testing:secondary",
+                "aegis:testing",
+            ),
+            secondary,
+        )
+        overlap_bundle = root / ".aegis" / "overlap-bundle.json"
+        overlap = build_evidence_bundle(
+            root,
+            "Overlapping selector test",
+            [testing, secondary],
+        )
+        write_evidence_bundle(overlap, root, overlap_bundle)
+
+        payload = {
+            "schema_version": 1,
+            "requirements": [
+                {
+                    "kind": "testing",
+                    "status": None,
+                    "subject": None,
+                    "source": None,
+                },
+                {
+                    "kind": "testing",
+                    "status": "verified",
+                    "subject": "project-testing",
+                    "source": "aegis:testing",
+                },
+            ],
+            "allow_extra_members": True,
+        }
+        requirements.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = validate_evidence_set(root, overlap_bundle, requirements)
+        self.assertEqual(2, result.requirements_satisfied)
+
     def test_missing_requirement_fails_closed(self):
         root, bundle, requirements, *_ = self._project()
         payload = json.loads(requirements.read_text(encoding="utf-8"))
