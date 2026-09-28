@@ -39,7 +39,7 @@ class WorkflowCatalogTests(unittest.TestCase):
                         implemented,
                     )
                 elif display_name == "integration delivery":
-                    self.assertIn("- integration delivery.", implemented)
+                    self.assertIn("- integration delivery;", implemented)
                 else:
                     self.assertIn(f"- {display_name};", implemented)
 
@@ -50,7 +50,7 @@ class WorkflowCatalogTests(unittest.TestCase):
         )[0]
         planned = catalog.split("## Planned workflow areas", 1)[1]
 
-        self.assertIn("- integration delivery.", implemented)
+        self.assertIn("- integration delivery;", implemented)
         self.assertNotIn("- integration delivery.", planned)
         self.assertIn("- CI remediation.", planned)
 
