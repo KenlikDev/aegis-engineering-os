@@ -1,11 +1,16 @@
 import sys
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from promotion_readiness import BranchSnapshot
+import promotion_sync as promotion_sync_module
+from evidence_contract import read_and_validate_evidence
 from promotion_sync import (
     GitHubPromotionSyncProvider,
     PromotionPullRequest,
@@ -175,6 +180,41 @@ class FakeGitHubTransport:
         transport.status = "identical"
         self.assertTrue(provider.target_matches_commit("main", MERGE_SHA))
 
+
+    def test_cli_writes_canonical_promotion_sync_evidence(self):
+        provider = FakePromotionProvider()
+        work_items = FakeWorkItemProvider()
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "promotion-sync.json"
+            argv = [
+                "promotion_sync.py",
+                REPOSITORY,
+                "1",
+                str(PROMOTION_PR),
+                "main",
+                "--canonical-evidence-output",
+                str(output),
+            ]
+            with (
+                patch.object(
+                    promotion_sync_module,
+                    "GitHubPromotionSyncProvider",
+                    return_value=provider,
+                ),
+                patch.object(
+                    promotion_sync_module,
+                    "_build_work_item_provider",
+                    return_value=work_items,
+                ),
+                patch.object(sys, "argv", argv),
+            ):
+                self.assertEqual(0, promotion_sync_module.main())
+
+            canonical = read_and_validate_evidence(output)
+            self.assertEqual("promotion-sync", canonical.kind)
+            self.assertEqual(MERGE_SHA, canonical.revision)
+            self.assertEqual("promotion:1->main", canonical.subject)
 
 class PromotionSyncTests(unittest.TestCase):
     def test_successful_merge_advances_integration_to_done(self):
