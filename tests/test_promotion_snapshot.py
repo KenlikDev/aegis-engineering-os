@@ -43,6 +43,8 @@ class FakeTransport:
         self.updated_ref = False
         self.created_pr = False
         self.target_reads = 0
+        self.create_commit_payload = None
+        self.update_ref_payload = None
 
     def __call__(self, method, url, headers, payload):  # noqa: ANN001
         path = url.removeprefix("https://api.github.com")
@@ -92,9 +94,11 @@ class FakeTransport:
             return 201, {"ref": "refs/heads/ai/1-develop-promotion"}
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/commits":
             self.created_commit = True
+            self.create_commit_payload = payload
             return 201, {"sha": SNAPSHOT_SHA}
         if method == "PATCH" and path == f"/repos/{REPOSITORY}/git/refs/heads/ai%2F1-develop-promotion":
             self.updated_ref = True
+            self.update_ref_payload = payload
             return 200, {"ref": "refs/heads/ai/1-develop-promotion"}
 
         if method == "GET" and path.startswith(f"/repos/{REPOSITORY}/pulls?"):
@@ -176,6 +180,12 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertTrue(transport.created_commit)
         self.assertTrue(transport.updated_ref)
         self.assertTrue(transport.created_pr)
+        self.assertEqual(
+            [TARGET_SHA, SOURCE_SHA],
+            transport.create_commit_payload["parents"],
+        )
+        self.assertEqual(SOURCE_TREE, transport.create_commit_payload["tree"])
+        self.assertEqual({"sha": SNAPSHOT_SHA, "force": False}, transport.update_ref_payload)
         self.assertEqual(["KenlikDev:ai/1-develop-promotion"], transport.assert_query["head"])
         self.assertEqual(["develop"], transport.assert_query["base"])
 
