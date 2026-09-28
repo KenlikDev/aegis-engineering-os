@@ -2,6 +2,7 @@
 
 All notable changes to Aegis Engineering OS will be documented here.
 
+- harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 ## Unreleased
 
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;

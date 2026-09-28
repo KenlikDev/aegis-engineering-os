@@ -52,6 +52,9 @@ class ValidationRun:
     conclusion: str | None
     head_sha: str
     url: str
+    evidence_type: str = "branch-push"
+    validated_sha: str | None = None
+    pull_request_number: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,18 +214,20 @@ class GitHubPromotionProvider:
             changed_files_complete=changed_files_reported < 300,
         )
 
-    def latest_successful_validation(
+    def _workflow_runs(
         self,
         workflow: str,
-        head_sha: str,
-    ) -> ValidationRun | None:
+        *,
+        head_sha: str | None = None,
+    ) -> list[Mapping[str, Any]]:
         if not workflow.strip():
             raise PromotionReadinessError("Validation workflow must not be empty.")
-        if not SHA_RE.fullmatch(head_sha):
+        if head_sha is not None and not SHA_RE.fullmatch(head_sha):
             raise PromotionReadinessError("Validation head SHA is malformed.")
-        query = urlencode(
-            {"head_sha": head_sha, "per_page": "20"},
-        )
+        parameters = {"per_page": "20"}
+        if head_sha is not None:
+            parameters["head_sha"] = head_sha
+        query = urlencode(parameters)
         status, data = self._request(
             "GET",
             f"/repos/{self.repository}/actions/workflows/{quote(workflow, safe='')}/runs?{query}",
@@ -236,42 +241,201 @@ class GitHubPromotionProvider:
             raise PromotionReadinessError(
                 "GitHub workflow-run response is malformed."
             )
+        return [item for item in runs if isinstance(item, Mapping)]
+
+    @staticmethod
+    def _parse_successful_run(
+        workflow: str,
+        item: Mapping[str, Any],
+        *,
+        validated_sha: str,
+        evidence_type: str,
+        expected_head_sha: str | None = None,
+        pull_request_number: int | None = None,
+    ) -> ValidationRun | None:
+        run_id = item.get("id")
+        run_status = item.get("status")
+        conclusion = item.get("conclusion")
+        run_sha = item.get("head_sha")
+        run_url = item.get("html_url")
+        run_name = item.get("name")
+        if not (
+            isinstance(run_id, int)
+            and isinstance(run_status, str)
+            and isinstance(conclusion, str)
+            and isinstance(run_sha, str)
+            and SHA_RE.fullmatch(run_sha)
+            and isinstance(run_url, str)
+            and isinstance(run_name, str)
+            and run_status == "completed"
+            and conclusion == "success"
+            and run_name == "Aegis Validation"
+            and (
+                expected_head_sha is None
+                or run_sha == expected_head_sha
+            )
+        ):
+            return None
+        return ValidationRun(
+            id=run_id,
+            workflow=workflow,
+            status=run_status,
+            conclusion=conclusion,
+            head_sha=run_sha,
+            url=run_url,
+            evidence_type=evidence_type,
+            validated_sha=validated_sha,
+            pull_request_number=pull_request_number,
+        )
+
+    def _get_pull_request(
+        self,
+        number: int,
+    ) -> Mapping[str, Any] | None:
+        if number <= 0:
+            raise PromotionReadinessError("Pull-request number must be positive.")
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/pulls/{number}",
+        )
+        if status != 200 or not isinstance(data, Mapping):
+            return None
+        return data
+
+    def _list_closed_pull_requests(
+        self,
+        *,
+        head_branch: str,
+        base_branch: str,
+    ) -> list[Mapping[str, Any]]:
+        if not head_branch or not base_branch:
+            return []
+        owner = self.repository.split("/", 1)[0]
+        query = urlencode(
+            {
+                "state": "closed",
+                "head": f"{owner}:{head_branch}",
+                "base": base_branch,
+                "per_page": "20",
+            }
+        )
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/pulls?{query}",
+        )
+        if status != 200 or not isinstance(data, list):
+            raise PromotionReadinessError(
+                f"Unable to read closed pull requests; HTTP {status}."
+            )
+        return [item for item in data if isinstance(item, Mapping)]
+
+    def _latest_successful_merged_pr_validation(
+        self,
+        workflow: str,
+        merge_commit_sha: str,
+    ) -> ValidationRun | None:
+        for item in self._workflow_runs(workflow):
+            if item.get("event") != "pull_request":
+                continue
+            if item.get("path") not in {None, workflow}:
+                continue
+
+            successful = self._parse_successful_run(
+                workflow,
+                item,
+                validated_sha=merge_commit_sha,
+                evidence_type="merged-pull-request",
+            )
+            if successful is None:
+                continue
+
+            head_branch = item.get("head_branch")
+            if not isinstance(head_branch, str) or not head_branch:
+                continue
+
+            run_head_sha = item.get("head_sha")
+            if not isinstance(run_head_sha, str) or not SHA_RE.fullmatch(run_head_sha):
+                continue
+
+            candidates = self._list_closed_pull_requests(
+                head_branch=head_branch,
+                base_branch=DEFAULT_SOURCE_BRANCH,
+            )
+            matching_prs: list[tuple[int, Mapping[str, Any]]] = []
+            for candidate in candidates:
+                number = candidate.get("number")
+                if not isinstance(number, int) or number <= 0:
+                    continue
+                pull_request = self._get_pull_request(number)
+                if pull_request is None:
+                    continue
+
+                head_data = pull_request.get("head")
+                base_data = pull_request.get("base")
+                head_ref = head_data.get("ref") if isinstance(head_data, Mapping) else None
+                head_sha = head_data.get("sha") if isinstance(head_data, Mapping) else None
+                base_ref = base_data.get("ref") if isinstance(base_data, Mapping) else None
+                state = pull_request.get("state")
+                merged_at = pull_request.get("merged_at")
+                pr_merge_sha = pull_request.get("merge_commit_sha")
+
+                if (
+                    state == "closed"
+                    and isinstance(merged_at, str)
+                    and head_ref == head_branch
+                    and head_sha == run_head_sha
+                    and base_ref == DEFAULT_SOURCE_BRANCH
+                    and pr_merge_sha == merge_commit_sha
+                ):
+                    matching_prs.append((number, pull_request))
+
+            if len(matching_prs) == 1:
+                number, _ = matching_prs[0]
+                return ValidationRun(
+                    id=successful.id,
+                    workflow=successful.workflow,
+                    status=successful.status,
+                    conclusion=successful.conclusion,
+                    head_sha=successful.head_sha,
+                    url=successful.url,
+                    evidence_type="merged-pull-request",
+                    validated_sha=merge_commit_sha,
+                    pull_request_number=number,
+                )
+            if len(matching_prs) > 1:
+                raise PromotionReadinessError(
+                    "Multiple merged pull requests match one successful validation run."
+                )
+        return None
+
+    def latest_successful_validation(
+        self,
+        workflow: str,
+        head_sha: str,
+    ) -> ValidationRun | None:
+        if not SHA_RE.fullmatch(head_sha):
+            raise PromotionReadinessError("Validation head SHA is malformed.")
 
         candidates: list[ValidationRun] = []
-        for item in runs:
-            if not isinstance(item, Mapping):
-                continue
-            run_id = item.get("id")
-            run_status = item.get("status")
-            conclusion = item.get("conclusion")
-            run_sha = item.get("head_sha")
-            run_url = item.get("html_url")
-            run_name = item.get("name")
-            if (
-                isinstance(run_id, int)
-                and isinstance(run_status, str)
-                and (conclusion is None or isinstance(conclusion, str))
-                and isinstance(run_sha, str)
-                and isinstance(run_url, str)
-                and isinstance(run_name, str)
-                and run_sha == head_sha
-                and run_status == "completed"
-                and conclusion == "success"
-                and run_name == "Aegis Validation"
-            ):
-                candidates.append(
-                    ValidationRun(
-                        id=run_id,
-                        workflow=workflow,
-                        status=run_status,
-                        conclusion=conclusion,
-                        head_sha=run_sha,
-                        url=run_url,
-                    )
-                )
+        for item in self._workflow_runs(workflow, head_sha=head_sha):
+            parsed = self._parse_successful_run(
+                workflow,
+                item,
+                validated_sha=head_sha,
+                evidence_type="branch-push",
+                expected_head_sha=head_sha,
+            )
+            if parsed is not None:
+                candidates.append(parsed)
 
-        candidates.sort(key=lambda run: run.id, reverse=True)
-        return candidates[0] if candidates else None
+        if candidates:
+            candidates.sort(key=lambda run: run.id, reverse=True)
+            return candidates[0]
+
+        return self._latest_successful_merged_pr_validation(
+            workflow,
+            head_sha,
+        )
 
     def assess(
         self,
@@ -362,6 +526,9 @@ def _to_dict(result: PromotionReadiness) -> dict[str, Any]:
                 "status": result.validation.status,
                 "conclusion": result.validation.conclusion,
                 "head_sha": result.validation.head_sha,
+                "validated_sha": result.validation.validated_sha,
+                "evidence_type": result.validation.evidence_type,
+                "pull_request_number": result.validation.pull_request_number,
                 "url": result.validation.url,
             }
             if result.validation
