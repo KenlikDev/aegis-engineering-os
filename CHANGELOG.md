@@ -2,9 +2,9 @@
 
 All notable changes to Aegis Engineering OS will be documented here.
 
-- harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 ## Unreleased
 
+- harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;
 - distinguish subscription login from direct API authentication and billing;
@@ -25,6 +25,15 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add the executable provider-neutral work-item lifecycle bridge with GitHub Issues persistence, optimistic state checks, blocked-state resume metadata, traceability comments, and read-after-write verification;
 - compose managed OpenHands execution with explicit work-item lifecycle synchronization, safe failure blocking, and verification-stage traceability;
 - add the executable project quality-gate runner with explicit manifest commands, bounded redacted evidence, and verification-to-review/blocked lifecycle synchronization.
+- add the read-only promotion readiness verifier for ai/integration -> develop/main, including exact-SHA CI evidence and protection checks;
+- add the owner-controlled promotion snapshot bridge, which prepares an exact integration-tree snapshot on a short-lived target-based branch and opens or reuses a draft promotion pull request without merging protected branches;
+- add the read-only release readiness verifier and release-preparation workflow for protected main;
+- guarantee an explicit validation path after merged pull requests, including the actual merge commit for ai/integration, with event-isolated concurrency so the exact integration push validation is not cancelled;
+- add promotion merge synchronization so an owner-controlled develop/main merge can advance an integration work item to done after exact merge verification;
+- add the controlled ai/integration merge boundary using exact-head SHA preconditions, squash-only merges, and post-merge verification;
+- reconcile the workflow catalog and architecture index with the implemented integration, promotion, release, and OpenHands architecture boundaries;
+- add the executable knowledge-gap candidate registry with provenance hashes, validated evidence, and fail-closed lifecycle transitions;
+- add a composed integration delivery controller that binds exact-head validation to the controlled ai/integration merge;
 
 ## 0.1.0-alpha.1
 
@@ -39,13 +48,3 @@ Initial experimental foundation:
 - knowledge lifecycle;
 - project bootstrap templates;
 - repository validation scaffold.
-
-- add the read-only promotion readiness verifier for ai/integration -> develop/main, including exact-SHA CI evidence and protection checks;
-- add the owner-controlled promotion snapshot bridge, which prepares an exact integration-tree snapshot on a short-lived target-based branch and opens or reuses a draft promotion pull request without merging protected branches;
-- add the read-only release readiness verifier and release-preparation workflow for protected main;
-- guarantee an explicit validation path after merged pull requests, including the actual merge commit for ai/integration, with event-isolated concurrency so the exact integration push validation is not cancelled;
-- add promotion merge synchronization so an owner-controlled develop/main merge can advance an integration work item to done after exact merge verification;
-- add the controlled ai/integration merge boundary using exact-head SHA preconditions, squash-only merges, and post-merge verification;
-- reconcile the workflow catalog and architecture index with the implemented integration, promotion, release, and OpenHands architecture boundaries;
-- add the executable knowledge-gap candidate registry with provenance hashes, validated evidence, and fail-closed lifecycle transitions;
-- add a composed integration delivery controller that binds exact-head validation to the controlled ai/integration merge;
