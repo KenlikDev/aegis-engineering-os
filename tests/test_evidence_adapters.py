@@ -23,6 +23,7 @@ from evidence_adapters import (  # noqa: E402
     workflow_composition_evidence,
 )
 from evidence_contract import (  # noqa: E402
+    EvidenceContractError,
     read_and_validate_evidence,
     write_evidence,
 )
@@ -148,7 +149,7 @@ class EvidenceAdapterTests(unittest.TestCase):
             "model_available": False,
         }
 
-        with self.assertRaisesRegex(Exception, "exact installed model"):
+        with self.assertRaisesRegex(EvidenceContractError, "exact installed model"):
             runtime_preflight_evidence(
                 result,
                 observed_at="2026-09-28T18:00:00Z",
