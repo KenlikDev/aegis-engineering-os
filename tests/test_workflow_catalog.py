@@ -19,6 +19,7 @@ CORE_WORKFLOW_DISPLAY_NAMES = {
     "integration-delivery": "integration delivery",
     "security-review": "security review",
     "ci-remediation": "ci remediation",
+    "requirements-clarification": "requirements clarification",
 }
 
 
