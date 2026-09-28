@@ -237,3 +237,12 @@ Execute the explicit contract:
 With lifecycle synchronization, the work item must already be in `verification`; required gates passing advances it through the existing quality-gate contract to `review`, while required failures block it.
 
 See docs/architecture/testing.md.
+
+
+## Refactoring
+
+For behavior-preserving structural changes, use the controlled refactoring workflow. It establishes a verified baseline, applies the normal implementation boundary, repeats the explicit testing contract, and requires independent review focused on semantic preservation.
+
+The workflow never invents behavior invariants or silently turns refactoring into feature work.
+
+See docs/architecture/refactoring.md.
