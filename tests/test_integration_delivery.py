@@ -75,6 +75,7 @@ class FakePullRequestProvider:
             work_item_id=WORK_ITEM,
             reference=self.pull_request.url,
             verified=True,
+            identifier=PR_NUMBER,
         )
 
 
