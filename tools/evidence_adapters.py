@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from evidence_contract import EvidenceContractError, EvidenceRecord, build_evidence
 from promotion_readiness import PromotionReadiness
 from release_readiness import ReleaseReadiness
+if TYPE_CHECKING:
+    from version_verification import VersionEvidence
 
 
 def _timestamp(value: datetime | str) -> str:
@@ -162,3 +164,50 @@ def release_readiness_evidence(
             "artifact_sha256": None,
         }
     )
+
+def version_verification_evidence(
+    evidence: VersionEvidence,
+    *,
+    observed_at: datetime | str,
+    revision: str | None = None,
+) -> EvidenceRecord:
+    """Convert source-pinned version evidence into the canonical envelope."""
+    uncertainty: list[str] = []
+    if evidence.external_verification_pending:
+        uncertainty.append(
+            "External compatibility verification remains pending for the recorded version claims."
+        )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "version-verification",
+            "source": "aegis:version-verification",
+            "subject": "project-version-inventory",
+            "revision": revision,
+            "observed_at": _timestamp(observed_at),
+            "status": (
+                "pending" if evidence.external_verification_pending else "verified"
+            ),
+            "result": {
+                "schema_version": evidence.schema_version,
+                "claims": [
+                    {
+                        "component": claim.component,
+                        "version": claim.version,
+                        "scope": claim.scope,
+                        "source": claim.source,
+                        "source_sha256": claim.source_sha256,
+                    }
+                    for claim in evidence.claims
+                ],
+                "external_verification_pending": (
+                    evidence.external_verification_pending
+                ),
+            },
+            "uncertainty": uncertainty,
+            "references": [],
+            "artifact_sha256": None,
+        }
+    )
+

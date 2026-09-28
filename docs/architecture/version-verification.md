@@ -47,6 +47,18 @@ The evidence format records whether external compatibility verification is pendi
 
 Offline operation may preserve a valid local source inventory while marking external documentation verification as pending.
 
+## Canonical provenance adapter
+
+A validated version inventory can be emitted as the provider-neutral evidence envelope without changing the specialized version-evidence JSON:
+
+    python3 tools/version_verification.py validate \
+      /path/to/project \
+      /path/to/project/.aegis/version-evidence.json \
+      --revision <exact-project-revision> \
+      --evidence-output /tmp/version-verification-evidence.json
+
+The adapter preserves every claim and `source_sha256`. When `external_verification_pending` is true, the canonical artifact uses status `pending` and records the unresolved compatibility limitation as uncertainty. A supplied project revision is preserved as canonical observation provenance.
+
 ## Relationship to implementation readiness
 
 Implementation readiness must consume a structurally validated version-evidence artifact rather than accepting arbitrary non-empty text.

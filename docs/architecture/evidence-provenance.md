@@ -78,7 +78,9 @@ The executable evidence boundary only standardizes the representation and integr
 
 Quality-gate runs, CI diagnosis, security review, knowledge-gap records, and version verification currently expose specialized evidence structures.
 
-Promotion readiness and release readiness now have explicit adapters in `tools/evidence_adapters.py`. They preserve their specialized result schemas while optionally emitting the canonical provenance envelope.
+Promotion readiness, release readiness, and version verification now have explicit adapters in `tools/evidence_adapters.py`. They preserve their specialized result schemas while optionally emitting the canonical provenance envelope.
+
+Version verification preserves each source SHA-256 and maps `external_verification_pending` to canonical `pending` status plus explicit uncertainty. The specialized version-evidence artifact remains the source consumed by implementation readiness; the adapted artifact can additionally participate in evidence bundles.
 
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 

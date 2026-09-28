@@ -8,10 +8,16 @@ sys.path.insert(0, str(ROOT / "tools"))
 from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
     release_readiness_evidence,
+    version_verification_evidence,
 )
-from evidence_contract import read_and_validate_evidence  # noqa: E402
+from evidence_contract import (  # noqa: E402
+    read_and_validate_evidence,
+    write_evidence,
+)
 from promotion_readiness import BranchSnapshot, CompareSnapshot, PromotionReadiness, ValidationRun  # noqa: E402
 from release_readiness import ChangelogSnapshot, ReleaseReadiness  # noqa: E402
+from version_verification import VersionClaim, VersionEvidence  # noqa: E402
+
 
 
 REPOSITORY = "KenlikDev/aegis-engineering-os"
@@ -116,6 +122,85 @@ class EvidenceAdapterTests(unittest.TestCase):
 
             write_evidence(evidence, path)
             self.assertEqual(evidence, read_and_validate_evidence(path))
+
+    def test_version_verification_ready_result_is_verified(self):
+        evidence = VersionEvidence(
+            schema_version=1,
+            claims=(
+                VersionClaim(
+                    component="python",
+                    version="3.13",
+                    scope="language",
+                    source="pyproject.toml",
+                    source_sha256="a" * 64,
+                ),
+            ),
+            external_verification_pending=False,
+        )
+
+        canonical = version_verification_evidence(
+            evidence,
+            observed_at="2026-09-28T18:00:00Z",
+            revision="7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual(
+            "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+            canonical.revision,
+        )
+        self.assertEqual("3.13", canonical.result["claims"][0]["version"])
+        self.assertEqual("a" * 64, canonical.result["claims"][0]["source_sha256"])
+        self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
+
+    def test_version_verification_pending_result_remains_pending(self):
+        evidence = VersionEvidence(
+            schema_version=1,
+            claims=(
+                VersionClaim(
+                    component="python",
+                    version="3.13",
+                    scope="language",
+                    source="pyproject.toml",
+                    source_sha256="b" * 64,
+                ),
+            ),
+            external_verification_pending=True,
+        )
+
+        canonical = version_verification_evidence(
+            evidence,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("pending", canonical.status)
+        self.assertIsNone(canonical.revision)
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("pending", canonical.uncertainty[0].lower())
+
+    def test_version_verification_evidence_round_trips(self):
+        evidence = VersionEvidence(
+            schema_version=1,
+            claims=(
+                VersionClaim(
+                    component="kotlin",
+                    version="2.2.20",
+                    scope="compiler",
+                    source="gradle.properties",
+                    source_sha256="c" * 64,
+                ),
+            ),
+            external_verification_pending=False,
+        )
+        canonical = version_verification_evidence(
+            evidence,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "version-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
 
     def test_release_ready_result_is_verified(self):
         result = ReleaseReadiness(

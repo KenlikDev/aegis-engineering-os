@@ -231,11 +231,18 @@ See docs/architecture/evidence-provenance.md and docs/governance/state-verificat
 
 Compose already validated canonical evidence artifacts into one deterministic reference set:
 
-    python3 tools/evidence_bundle.py create       /path/to/project       .aegis/evidence-bundle.json       "Inputs for implementation readiness"       .aegis/state-evidence.json       .aegis/promotion-evidence.json
+    python3 tools/evidence_bundle.py create \
+      /path/to/project \
+      .aegis/evidence-bundle.json \
+      "Inputs for implementation readiness" \
+      .aegis/state-evidence.json \
+      .aegis/promotion-evidence.json
 
 Validate the bundle and every referenced evidence artifact:
 
-    python3 tools/evidence_bundle.py validate       /path/to/project       .aegis/evidence-bundle.json
+    python3 tools/evidence_bundle.py validate \
+      /path/to/project \
+      .aegis/evidence-bundle.json
 
 Bundles do not infer completeness, upgrade evidence status, contact providers, or mutate observed systems.
 
@@ -256,7 +263,15 @@ Validate the resulting evidence before implementation readiness:
       /path/to/project \
       /path/to/project/.aegis/version-evidence.json
 
-The tool never chooses versions or upgrades dependencies. It verifies explicit claims, source containment, source SHA-256, and the presence of each claimed version string.
+Optionally adapt the validated version inventory into the canonical provenance envelope:
+
+    python3 tools/version_verification.py validate \
+      /path/to/project \
+      /path/to/project/.aegis/version-evidence.json \
+      --revision <exact-project-revision> \
+      --evidence-output /tmp/version-verification-evidence.json
+
+When external compatibility verification is still pending, the canonical artifact remains `pending` and records that uncertainty explicitly. The tool never chooses versions or upgrades dependencies. It verifies explicit claims, source containment, source SHA-256, and the presence of each claimed version string.
 
 See docs/architecture/version-verification.md.
 
