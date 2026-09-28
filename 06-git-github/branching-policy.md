@@ -102,3 +102,7 @@ Aegis may merge a non-draft Aegis task pull request into protected ai/integratio
 - the resulting merged PR and merge commit are read back and verified.
 
 This boundary does not permit merges into develop or main. Those branches remain human-controlled promotion targets.
+
+## Validation evidence identity
+
+A successful Aegis Validation workflow may be associated with a pull-request head SHA even when the workflow checks out the merge commit. Promotion readiness therefore keeps workflow head_sha separate from validated_sha. For merged PR evidence, validated_sha is the verified merge_commit_sha and must equal the current ai/integration SHA.
