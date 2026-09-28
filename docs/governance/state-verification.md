@@ -38,10 +38,15 @@ Only observed facts should be used as proof of current state.
 For material state, record:
 
 - source;
-- object identifier, commit, or revision;
-- observation time;
+- subject or object identifier;
+- commit or revision when available;
+- observation time with an explicit timezone;
 - relevant result;
-- unresolved uncertainty.
+- unresolved uncertainty;
+- reference links when useful;
+- an integrity hash when an evidence artifact is persisted.
+
+The canonical executable envelope is defined by `tools/evidence_contract.py` and recorded through `tools/state_verification.py`. Its SHA-256 identity covers the normalized evidence payload while excluding only the identity fields themselves.
 
 ## Mutation verification
 
