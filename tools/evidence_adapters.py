@@ -11,6 +11,7 @@ from release_readiness import ReleaseReadiness
 
 if TYPE_CHECKING:
     from implementation_readiness import ImplementationReadiness
+    from security_review import SecurityReviewResult
     from version_verification import VersionEvidence
 
 
@@ -294,6 +295,48 @@ def testing_evidence(
             "observed_at": _timestamp(observed_at),
             "status": status,
             "result": dict(result),
+            "uncertainty": [],
+            "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
+def security_review_evidence(
+    result: "SecurityReviewResult",
+    *,
+    observed_at: datetime | str,
+    revision: str | None = None,
+) -> EvidenceRecord:
+    """Convert a deterministic security-review result into canonical evidence."""
+    status = "failed" if any(finding.severity == "high" for finding in result.findings) else "verified"
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "security-review",
+            "source": "aegis:security-review",
+            "subject": "repository-security",
+            "revision": revision,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "root": result.root,
+                "status": result.status,
+                "findings": [
+                    {
+                        "rule_id": finding.rule_id,
+                        "severity": finding.severity,
+                        "path": finding.path,
+                        "message": finding.message,
+                        "line": finding.line,
+                    }
+                    for finding in result.findings
+                ],
+                "summary": {
+                    "high": sum(f.severity == "high" for f in result.findings),
+                    "medium": sum(f.severity == "medium" for f in result.findings),
+                    "low": sum(f.severity == "low" for f in result.findings),
+                },
+            },
             "uncertainty": [],
             "references": [],
             "artifact_sha256": None,

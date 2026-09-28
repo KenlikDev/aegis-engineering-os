@@ -86,6 +86,8 @@ Implementation readiness now has an explicit adapter as well. It preserves the s
 
 Testing now has an explicit adapter as well. It preserves the already-redacted quality-gate result and keeps failed required gates canonical `failed`.
 
+Security review now has an explicit adapter as well. It preserves deterministic findings and maps any high-severity finding to canonical `failed` without exposing credential material.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.

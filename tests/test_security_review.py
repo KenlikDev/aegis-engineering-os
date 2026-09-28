@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,9 +10,48 @@ import sys
 sys.path.insert(0, str(ROOT / "tools"))
 
 from security_review import assess_repository  # noqa: E402
+from evidence_contract import read_and_validate_evidence  # noqa: E402
 
 
 class SecurityReviewTests(unittest.TestCase):
+    def test_cli_can_emit_canonical_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "safe.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: safe\n"
+                "permissions:\n"
+                "  contents: read\n",
+                encoding="utf-8",
+            )
+            output = root / "security-evidence.json"
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "tools" / "security_review.py"),
+                    str(root),
+                    "--canonical-evidence-output",
+                    str(output),
+                    "--revision",
+                    "3872d1e1e6766acf0e6efa9031c6c94edb49571b",
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn('"status": "ready"', completed.stdout)
+            evidence = read_and_validate_evidence(output)
+            self.assertEqual("security-review", evidence.kind)
+            self.assertEqual("verified", evidence.status)
+            self.assertEqual(
+                "3872d1e1e6766acf0e6efa9031c6c94edb49571b",
+                evidence.revision,
+            )
+
+
     def test_current_repository_has_no_high_severity_findings(self):
         result = assess_repository(ROOT)
         self.assertEqual("ready", result.status)
