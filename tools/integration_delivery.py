@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
+from evidence_contract import EvidenceContractError, write_evidence
+
 from delivery import (
     CreatePullRequestRequest,
     DeliveryError,
