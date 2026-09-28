@@ -14,6 +14,7 @@ The repository currently provides:
 - code review;
 - security review;
 - ci remediation;
+- requirements clarification;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
