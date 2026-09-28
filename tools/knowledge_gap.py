@@ -188,8 +188,32 @@ def _record_from_dict(data: Mapping[str, Any]) -> KnowledgeGapRecord:
     _validate_candidate(candidate)
 
     validation = data.get("validation")
-    if validation is not None and not isinstance(validation, Mapping):
-        raise KnowledgeGapError("Knowledge-gap validation metadata is malformed.")
+    if validation is not None:
+        if not isinstance(validation, Mapping):
+            raise KnowledgeGapError("Knowledge-gap validation metadata is malformed.")
+        validation_outcome = validation.get("outcome")
+        scenario = validation.get("scenario")
+        evidence_refs = validation.get("evidence_refs")
+        recorded_at = validation.get("recorded_at")
+        evidence_sha256 = validation.get("evidence_sha256")
+        if (
+            validation_outcome != "passed"
+            or not isinstance(scenario, str)
+            or not isinstance(evidence_refs, list)
+            or not isinstance(recorded_at, str)
+            or not isinstance(evidence_sha256, str)
+        ):
+            raise KnowledgeGapError("Knowledge-gap validation evidence is malformed.")
+        validation_payload = {
+            "outcome": validation_outcome,
+            "scenario": scenario,
+            "evidence_refs": evidence_refs,
+            "recorded_at": recorded_at,
+        }
+        if _hash(validation_payload) != evidence_sha256:
+            raise KnowledgeGapError(
+                "Knowledge-gap validation evidence hash does not match its record."
+            )
 
     raw_transitions = data.get("transitions", [])
     if not isinstance(raw_transitions, list):
@@ -326,20 +350,17 @@ def validate_candidate(
         if not HTTPS_REFERENCE_RE.fullmatch(reference):
             raise KnowledgeGapError("Validation evidence references must use HTTPS URLs.")
     now = _now()
-    validation = {
+    validation_payload = {
         "outcome": "passed",
         "scenario": scenario,
         "evidence_refs": list(evidence_refs),
         "recorded_at": now,
-        "evidence_sha256": _hash(
-            {
-                "outcome": "passed",
-                "scenario": scenario,
-                "evidence_refs": list(evidence_refs),
-                "recorded_at": now,
-            }
-        ),
     }
+    validation = {
+        **validation_payload,
+        "evidence_sha256": _hash(validation_payload),
+    }
+    validation = _redact(validation)
     updated = KnowledgeGapRecord(
         schema_version=SCHEMA_VERSION,
         state="validated",
