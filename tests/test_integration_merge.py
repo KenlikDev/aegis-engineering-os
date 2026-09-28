@@ -236,6 +236,24 @@ class IntegrationMergeTests(unittest.TestCase):
 
         self.assertEqual([], provider.merge_calls)
 
+    def test_rejects_head_sha_change_when_expected_sha_is_supplied(self):
+        provider = FakeIntegrationProvider(head_sha="4444444444444444444444444444444444444444")
+        items = work_items()
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "head SHA changed after validation",
+        ):
+            sync_integration_merge(
+                provider,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
+
+        self.assertEqual([], provider.merge_calls)
+
     def test_rejects_wrong_task_head(self):
         provider = FakeIntegrationProvider(
             head="ai/feature/999-other-task",
