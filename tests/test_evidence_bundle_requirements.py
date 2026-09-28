@@ -179,14 +179,14 @@ class EvidenceSetRequirementsTests(unittest.TestCase):
         payload["requirements"] = [
             {
                 "kind": "implementation-readiness",
-                "status": "verified",
+                "status": None,
                 "subject": None,
                 "source": None,
             },
             {
                 "kind": "implementation-readiness",
                 "status": "verified",
-                "subject": None,
+                "subject": "work-item:132",
                 "source": None,
             },
         ]
