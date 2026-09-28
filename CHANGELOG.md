@@ -5,7 +5,6 @@ All notable changes to Aegis Engineering OS will be documented here.
 ## Unreleased
 
 - enforce read-after-write mutation verification across managed execution, quality-gate synchronization, and lifecycle CLI output;
-- enforce read-after-write mutation verification across managed execution, quality-gate synchronization, and lifecycle CLI output;
 - add canonical provenance for human-controlled protected-branch promotion synchronization;
 - harden protected-branch promotion synchronization to require exact target identity and verified lifecycle mutations;
 - add canonical provenance for composed integration delivery, binding exact validation and post-merge identities into one consistency-checked observation;
