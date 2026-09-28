@@ -46,4 +46,5 @@ Initial experimental foundation:
 - add promotion merge synchronization so an owner-controlled develop/main merge can advance an integration work item to done after exact merge verification;
 - add the controlled ai/integration merge boundary using exact-head SHA preconditions, squash-only merges, and post-merge verification;
 - reconcile the workflow catalog and architecture index with the implemented integration, promotion, release, and OpenHands architecture boundaries;
+- add the executable knowledge-gap candidate registry with provenance hashes, validated evidence, and fail-closed lifecycle transitions;
 - add a composed integration delivery controller that binds exact-head validation to the controlled ai/integration merge;
