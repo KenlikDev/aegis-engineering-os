@@ -104,3 +104,15 @@ For a release target:
 The verifier checks fresh source/target SHAs, compare divergence, protection state, and a successful \`Aegis Validation\` run for the exact \`ai/integration\` SHA. Exit code \`0\` means no readiness blockers were observed; exit code \`2\` means the observed state is not ready.
 
 The verifier is read-only and does not create, merge, or promote anything.
+
+## Promotion snapshot preparation
+
+When promotion readiness passes, prepare an owner-controlled promotion artifact:
+
+    python3 tools/promotion_snapshot.py OWNER/REPO 66 main
+
+The command creates or reuses ai/66-main-promotion, prepares a verified two-parent snapshot commit, and creates or reuses a draft pull request into main. Use --ready only when the promotion pull request should be created as ready for review.
+
+The snapshot tool refuses develop while the selected target is behind or diverged. It never resolves conflicts and never approves or merges protected branches.
+
+See docs/architecture/promotion.md for the complete contract.

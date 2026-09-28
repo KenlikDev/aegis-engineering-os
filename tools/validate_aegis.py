@@ -142,6 +142,7 @@ def main() -> int:
         "tools/quality_gates.py",
         "tools/delivery.py",
         "tools/promotion_readiness.py",
+        "tools/promotion_snapshot.py",
         "templates/quality-gates.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
