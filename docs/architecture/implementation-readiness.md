@@ -34,7 +34,7 @@ The explicit work-item kind must resolve to a deterministic registry-validated c
 
 ### Version evidence
 
-A local version evidence reference must point to an existing non-empty UTF-8 file inside the target project. An HTTPS reference is preserved as an explicit external evidence reference; the gate does not pretend to have independently fetched it.
+A local version evidence reference must point to an existing non-empty UTF-8 file inside the target project. An HTTPS reference is preserved as an explicit external evidence reference, but the gate remains blocked because the current boundary does not independently verify remote contents.
 
 ### Architecture applicability
 
