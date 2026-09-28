@@ -110,6 +110,10 @@ def _validate_version_evidence(project: Path, reference: str) -> tuple[str, str]
         raise ImplementationReadinessError(
             f"Local version evidence must be readable UTF-8 text: {resolved}"
         ) from exc
+    except OSError as exc:
+        raise ImplementationReadinessError(
+            f"Unable to read local version evidence file: {resolved}"
+        ) from exc
     return "local-file", resolved.relative_to(project).as_posix()
 
 
@@ -135,7 +139,12 @@ def evaluate_readiness(
         raise ImplementationReadinessError("work_item_kind must be explicit and non-empty.")
 
     if work_item_id is not None:
-        markdown = document.read_text(encoding="utf-8")
+        try:
+            markdown = document.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ImplementationReadinessError(
+                f"Unable to read canonical work-item document: {document}"
+            ) from exc
         identity_match = re.search(
             r"^Work item ID:\s*(\S+)\s*$",
             markdown,
