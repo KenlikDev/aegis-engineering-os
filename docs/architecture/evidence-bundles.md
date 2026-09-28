@@ -49,7 +49,7 @@ Bundle integrity and evidence-set completeness are intentionally separate concer
 
 `tools/evidence_bundle_requirements.py` validates a canonical bundle against a machine-readable requirements document. The requirements document explicitly supplies the selectors; the tool never derives them from the bundle purpose or free-form text.
 
-Each selector requires an exact `kind` and may additionally require exact `status`, `subject`, and `source`. Every selector must match a distinct bundle member. The bundle and each referenced evidence artifact are fully revalidated before the result is accepted.
+Each selector requires an exact `kind` and may additionally require exact `status`, `subject`, `source`, and `revision`. A supplied `revision` is matched exactly; when omitted, selector behavior remains backward compatible. Every selector must match a distinct bundle member. The bundle and each referenced evidence artifact are fully revalidated before the result is accepted.
 
 Extra members are allowed by default and may be rejected with `allow_extra_members: false`.
 
@@ -61,6 +61,23 @@ Example:
       /path/to/project/templates/evidence-set-requirements.example.json
 
 This consumer reports only evidence-set satisfaction. It does not infer a business decision and does not change any evidence artifact.
+
+## Readiness gate integration
+
+Implementation readiness can consume an explicit evidence bundle and an explicit evidence-set requirements document:
+
+    python3 tools/implementation_readiness.py \\
+      /path/to/project/work-item.md \\
+      --project-root /path/to/project \\
+      --kind feature \\
+      --version-evidence-ref .aegis/version-evidence.json \\
+      --architecture-not-required \\
+      --evidence-bundle .aegis/readiness-bundle.json \\
+      --evidence-set-requirements .aegis/readiness-requirements.json
+
+Both inputs are required together. A satisfied contract is recorded as a passing readiness observation with the bundle identity. A malformed or unsatisfied contract adds a readiness blocker and is never reinterpreted as permission to continue.
+
+The readiness gate does not construct the requirements document, derive selectors from free-form text, infer completeness from the bundle purpose, or upgrade an individual evidence member. Exact `revision` selectors can be used when the owning workflow needs to bind a required observation to a specific source revision.
 
 ## Relationship to provenance
 
