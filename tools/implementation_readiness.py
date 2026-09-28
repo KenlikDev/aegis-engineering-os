@@ -41,6 +41,7 @@ class ImplementationReadiness:
     requirements_status: str
     architecture_required: bool
     version_evidence_ref: str
+    version_external_verification_pending: bool
     observations: tuple[ReadinessObservation, ...]
     blockers: tuple[str, ...]
     composition_steps: tuple[str, ...]
@@ -74,7 +75,7 @@ def _validate_lifecycle(
     return item.state.value
 
 
-def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[str, int]:
+def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[str, int, bool]:
     value = str(reference).strip()
     if not value:
         raise ImplementationReadinessError(
@@ -105,7 +106,11 @@ def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[st
             f"Version evidence validation failed: {exc}"
         ) from exc
 
-    return resolved.relative_to(project).as_posix(), len(evidence.claims)
+    return (
+        resolved.relative_to(project).as_posix(),
+        len(evidence.claims),
+        evidence.external_verification_pending,
+    )
 
 
 def evaluate_readiness(
@@ -194,15 +199,24 @@ def evaluate_readiness(
         )
     )
 
-    normalized_version_ref, version_claim_count = _validate_version_evidence(
+    (
+        normalized_version_ref,
+        version_claim_count,
+        version_external_verification_pending,
+    ) = _validate_version_evidence(
         project,
         version_evidence_ref,
     )
     observations.append(
         ReadinessObservation(
             "version-verification",
-            "passed",
-            f"Validated version evidence contains {version_claim_count} source-pinned claim(s) at {normalized_version_ref}.",
+            "pending" if version_external_verification_pending else "passed",
+            (
+                f"Validated version evidence contains {version_claim_count} source-pinned claim(s) at "
+                f"{normalized_version_ref}; external compatibility verification remains pending."
+                if version_external_verification_pending
+                else f"Validated version evidence contains {version_claim_count} source-pinned claim(s) at {normalized_version_ref}."
+            ),
         )
     )
 
@@ -276,6 +290,7 @@ def evaluate_readiness(
         requirements_status=requirements.status,
         architecture_required=architecture_required,
         version_evidence_ref=normalized_version_ref,
+        version_external_verification_pending=version_external_verification_pending,
         observations=tuple(observations),
         blockers=tuple(blockers),
         composition_steps=tuple(step.name for step in composition.steps),
