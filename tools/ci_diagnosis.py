@@ -10,6 +10,7 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
@@ -628,7 +629,7 @@ def main() -> int:
     parser.add_argument("--log-limit", type=int, default=DEFAULT_LOG_LIMIT)
     parser.add_argument(
         "--canonical-evidence-output",
-        type=__import__("pathlib").Path,
+        type=Path,
         help="Optional canonical evidence-provenance output path.",
     )
     args = parser.parse_args()
