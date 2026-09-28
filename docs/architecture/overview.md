@@ -73,6 +73,10 @@ The executable boundaries are documented in:
 - docs/architecture/release.md.
 
 
+### Workflow composition
+
+The workflow-composition boundary converts an explicit work-item kind into a deterministic ordered capability set and validates every referenced skill against the registry. It does not infer task kind or execute workflows.
+
 ### Refactoring
 
 The refactoring workflow composes requirements clarification, applicable architecture planning, verified baseline testing, normal implementation, post-change testing, and independent review. It does not introduce a separate mutation or test runner.

@@ -56,6 +56,12 @@
       "stability": "core"
     },
     {
+      "name": "workflow-composition",
+      "path": "skills/workflows/workflow-composition/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
       "name": "github-issues",
       "path": "skills/integrations/github-issues/SKILL.md",
       "domain": "integration",
