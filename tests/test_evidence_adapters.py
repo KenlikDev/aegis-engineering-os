@@ -126,7 +126,7 @@ class EvidenceAdapterTests(unittest.TestCase):
         )
 
         self.assertEqual("a" * 40, canonical.revision)
-        self.assertEqual(True, canonical.result["openhands_agent_server"]["credentials_configured"])
+        self.assertEqual(True, canonical.result["openhands_agent_server"]["llm_auth_configured"])
         self.assertNotIn("llm_api_key_is_set", str(canonical.result))
         self.assertNotIn("secret", str(canonical.result).lower())
 
