@@ -140,3 +140,17 @@ After OpenHands reports `finished`, the coordinator verifies:
 The coordinator does not automatically commit, push, create a pull request, merge, or discard a failed execution workspace. A failed execution therefore remains inspectable for recovery and diagnosis.
 
 The container workspace path is explicit because the OpenHands adapter operates in the Agent Server/container namespace. Aegis does not infer Docker mounts. The local installation must establish the corresponding host-to-container mapping before the coordinator is used.
+
+## Managed execution and work-item lifecycle
+
+The managed coordinator can compose with the provider-neutral work-item contract from `tools/work_item_lifecycle.py`. Synchronization is optional and must be explicitly supplied by the caller.
+
+When a provider is enabled, execution requires the work item to be in `ready` before the task branch is created. Aegis then records the branch traceability and transitions `ready -> in_progress`. This mutation order keeps a newly created branch from being presented as active work unless the provider has accepted the traceability record.
+
+After OpenHands reaches `finished` and the Git post-execution integrity checks pass, Aegis records the OpenHands conversation and optional evidence reference, then transitions `in_progress -> verification`. It deliberately stops at `verification`: project-specific tests, review, integration, and completion remain separate quality/work-item stages.
+
+If OpenHands raises an execution error, returns a non-finished outcome, or violates the post-execution Git boundary, Aegis attempts `in_progress -> blocked` and records only safe failure metadata (failure class, optional conversation ID, and outcome). The exception text itself is not copied to the external work item.
+
+If provider synchronization itself fails, Aegis does not guess the remote state or perform an automatic compensating transition. The operation fails and the repository/task branch remains available for diagnosis.
+
+For GitHub Issues, the lifecycle adapter maps a closed unlabeled issue to `done`, while open unlabeled issues remain `intake`. Explicit Aegis status labels remain authoritative when present.

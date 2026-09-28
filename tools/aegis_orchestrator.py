@@ -13,9 +13,19 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
-from openhands_execution import OpenHandsExecutionClient, OpenHandsExecutionRequest
+from openhands_execution import (
+    OpenHandsExecutionClient,
+    OpenHandsExecutionRequest,
+)
 from preflight_runtime import RuntimePreflightError, preflight
 from render_openhands_profile import render_profile
+from work_item_lifecycle import (
+    GitHubIssuesProvider,
+    LifecycleState,
+    Traceability,
+    WorkItemLifecycleError,
+    WorkItemProvider,
+)
 
 DEFAULT_OLLAMA_VERSION = "0.34.3"
 DEFAULT_MODEL = "gemma4:31b"
@@ -71,6 +81,8 @@ class OrchestratorConfig:
     session_api_key: str | None = None
     allow_no_change: bool = False
     evidence_path: Path | None = None
+    evidence_ref: str | None = None
+    work_item_provider: WorkItemProvider | None = None
 
 
 def _run_git(root: Path, args: tuple[str, ...], *, check: bool = True,
@@ -223,23 +235,119 @@ def _verify_post_execution(state: GitState, task_branch: str, *, allow_no_change
     return final
 
 
+def _resolve_evidence_ref(config: OrchestratorConfig) -> str | None:
+    if config.evidence_ref is not None:
+        value = config.evidence_ref.strip()
+        if not value:
+            raise AegisOrchestratorError("evidence_ref must not be empty when supplied.")
+        return value
+    if config.evidence_path is not None:
+        return config.evidence_path.name
+    return None
+
+
+def _sync_blocked_work_item(
+    provider: WorkItemProvider,
+    work_item_id: str,
+    *,
+    failure_class: str,
+    conversation_id: str | None,
+    outcome: str | None = None,
+) -> None:
+    """Record an execution failure without leaking the exception contents."""
+    try:
+        provider.transition(
+            work_item_id,
+            LifecycleState.BLOCKED,
+            expected_state=LifecycleState.IN_PROGRESS,
+        )
+        details = [
+            "<!-- aegis:execution-failure:v1 -->",
+            "## Aegis execution blocked",
+            f"- **Work item:** {work_item_id}",
+            f"- **Failure class:** {failure_class}",
+        ]
+        if conversation_id is not None:
+            details.append(f"- **OpenHands conversation:** {conversation_id}")
+        if outcome is not None:
+            details.append(f"- **Execution outcome:** {outcome}")
+        provider.comment(work_item_id, "\n".join(details))
+    except WorkItemLifecycleError as sync_error:
+        raise AegisOrchestratorError(
+            "Execution failed and Aegis could not synchronize the work item "
+            f"to blocked state: {sync_error}"
+        ) from sync_error
+
+
+def _sync_ready_to_in_progress(
+    provider: WorkItemProvider,
+    work_item_id: str,
+    task_branch: str,
+) -> None:
+    provider.attach_traceability(
+        work_item_id,
+        Traceability(branch=task_branch),
+    )
+    provider.transition(
+        work_item_id,
+        LifecycleState.IN_PROGRESS,
+        expected_state=LifecycleState.READY,
+    )
+
+
+def _sync_success_to_verification(
+    provider: WorkItemProvider,
+    work_item_id: str,
+    task_branch: str,
+    conversation_id: str,
+    evidence_ref: str | None,
+) -> None:
+    provider.attach_traceability(
+        work_item_id,
+        Traceability(
+            branch=task_branch,
+            conversation_id=conversation_id,
+            evidence_ref=evidence_ref,
+        ),
+    )
+    provider.transition(
+        work_item_id,
+        LifecycleState.VERIFICATION,
+        expected_state=LifecycleState.IN_PROGRESS,
+    )
+
+
 def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[str, Any]] = preflight,
                 execute_fn: Callable[[OpenHandsExecutionRequest], Any] | None = None,
                 run_command: GIT_RUNNER = subprocess.run) -> dict[str, Any]:
     """Run one managed project task and return verified execution evidence."""
     work_item = normalize_work_item_id(config.work_item_id)
     container_workspace = validate_container_workspace(config.container_workspace)
+    evidence_ref = _resolve_evidence_ref(config)
     if not config.task.strip():
         raise AegisOrchestratorError("task must not be empty.")
     if not config.base_branch.startswith("ai/") or config.base_branch in PROTECTED_BRANCHES:
         raise AegisOrchestratorError("base_branch must be a non-protected ai/* branch.")
     if config.max_iterations <= 0 or config.timeout_seconds <= 0 or config.poll_interval_seconds <= 0:
         raise AegisOrchestratorError("iteration and timing values must be greater than zero.")
+
     initial = inspect_git_state(config.project_path, run_command=run_command)
     if initial.dirty:
         raise AegisOrchestratorError("Target project must be clean before managed execution.")
+
+    provider = config.work_item_provider
+    current_work_item = None
+    if provider is not None:
+        current_work_item = provider.get(work_item)
+        if current_work_item.state != LifecycleState.READY:
+            raise AegisOrchestratorError(
+                "Managed execution requires the work item to be ready; "
+                f"got {current_work_item.state.value}."
+            )
+
     preflight_result = preflight_fn(
-        config.profile_config, config.profile_name,
+        config.profile_config,
+        config.profile_name,
         openhands_agent_server_url=config.agent_server_url,
         openhands_agent_server_api_key=config.session_api_key,
     )
@@ -252,11 +360,28 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
         raise AegisOrchestratorError("Verified OpenHands Agent Server version does not match the execution contract.")
     if server.get("conversation_runtime") != "local":
         raise AegisOrchestratorError("Managed execution requires OpenHands conversation_runtime=local.")
-    agent_settings, rendered_profile = _build_agent_settings(config.profile_config, config.profile_name)
+
+    agent_settings, rendered_profile = _build_agent_settings(
+        config.profile_config,
+        config.profile_name,
+    )
     if agent_settings["llm"].get("model") != f"openai/{config.expected_model}":
         raise AegisOrchestratorError("Rendered OpenHands model does not match the execution contract.")
-    task_branch = config.branch_name or build_task_branch_name(work_item, branch_kind=config.branch_kind)
-    task_state = create_task_branch(initial, base_branch=config.base_branch, task_branch=task_branch, run_command=run_command)
+
+    task_branch = config.branch_name or build_task_branch_name(
+        work_item,
+        branch_kind=config.branch_kind,
+    )
+    task_state = create_task_branch(
+        initial,
+        base_branch=config.base_branch,
+        task_branch=task_branch,
+        run_command=run_command,
+    )
+
+    if provider is not None:
+        _sync_ready_to_in_progress(provider, work_item, task_branch)
+
     request = OpenHandsExecutionRequest(
         server_url=config.agent_server_url,
         workspace=container_workspace,
@@ -270,34 +395,95 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
         workspace_root=DEFAULT_CONTAINER_WORKSPACE_ROOT,
         session_api_key=config.session_api_key,
     )
-    client = OpenHandsExecutionClient()
-    result = execute_fn(request) if execute_fn else client.execute(request)
-    if result.outcome != "finished":
-        raise AegisOrchestratorError(
-            f"OpenHands execution did not finish successfully: {result.outcome} ({result.execution_status}). "
-            f"Conversation: {result.conversation_id}"
+
+    try:
+        client = OpenHandsExecutionClient()
+        result = execute_fn(request) if execute_fn else client.execute(request)
+        if result.outcome != "finished":
+            raise AegisOrchestratorError(
+                f"OpenHands execution did not finish successfully: "
+                f"{result.outcome} ({result.execution_status}). "
+                f"Conversation: {result.conversation_id}"
+            )
+        final = _verify_post_execution(
+            task_state,
+            task_branch,
+            allow_no_change=config.allow_no_change,
+            run_command=run_command,
         )
-    final = _verify_post_execution(task_state, task_branch, allow_no_change=config.allow_no_change,
-                                   run_command=run_command)
+    except Exception as exc:
+        if provider is not None:
+            _sync_blocked_work_item(
+                provider,
+                work_item,
+                failure_class=type(exc).__name__,
+                conversation_id=getattr(exc, "conversation_id", None),
+                outcome=(
+                    result.outcome
+                    if "result" in locals() and getattr(result, "outcome", None) is not None
+                    else None
+                ),
+            )
+        raise
+
+    work_item_sync: dict[str, Any] | None = None
+    if provider is not None:
+        _sync_success_to_verification(
+            provider,
+            work_item,
+            task_branch,
+            result.conversation_id,
+            evidence_ref,
+        )
+        work_item_sync = {
+            "provider": current_work_item.provider,
+            "state_before_execution": current_work_item.state.value,
+            "state_after_execution": LifecycleState.VERIFICATION.value,
+            "verified": True,
+        }
+
     evidence: dict[str, Any] = {
-        "status": "verified", "work_item_id": work_item,
-        "branch": {"base": config.base_branch, "task": task_branch,
-                   "starting_head": task_state.head, "final_head": final.head,
-                   "head_unchanged": task_state.head == final.head},
+        "status": "verified",
+        "work_item_id": work_item,
+        "branch": {
+            "base": config.base_branch,
+            "task": task_branch,
+            "starting_head": task_state.head,
+            "final_head": final.head,
+            "head_unchanged": task_state.head == final.head,
+        },
         "profile": rendered_profile,
-        "runtime": {"ollama_version": preflight_result["ollama_version"],
-                    "model": preflight_result["model"], "openhands": dict(server)},
-        "execution": {"conversation_id": result.conversation_id,
-                       "status": result.execution_status, "outcome": result.outcome,
-                       "events": {"count": len(result.events)}},
-        "workspace": {"container_path": container_workspace, "host_project": str(task_state.root)},
-        "git": {"working_tree_changed": final.dirty, "status_lines": list(final.status_lines),
-                "diff_check": "passed"},
+        "runtime": {
+            "ollama_version": preflight_result["ollama_version"],
+            "model": preflight_result["model"],
+            "openhands": dict(server),
+        },
+        "execution": {
+            "conversation_id": result.conversation_id,
+            "status": result.execution_status,
+            "outcome": result.outcome,
+            "events": {"count": len(result.events)},
+        },
+        "workspace": {
+            "container_path": container_workspace,
+            "host_project": str(task_state.root),
+        },
+        "git": {
+            "working_tree_changed": final.dirty,
+            "status_lines": list(final.status_lines),
+            "diff_check": "passed",
+        },
     }
+    if work_item_sync is not None:
+        evidence["work_item"] = work_item_sync
+
     if config.evidence_path is not None:
         path = config.evidence_path.expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        path.write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         evidence["evidence_path"] = str(path)
     return evidence
 
@@ -324,8 +510,31 @@ def parse_args() -> OrchestratorConfig:
     parser.add_argument("--session-api-key-env", default="AEGIS_OPENHANDS_AGENT_SERVER_API_KEY")
     parser.add_argument("--allow-no-change", action="store_true")
     parser.add_argument("--evidence-path", type=Path)
+    parser.add_argument(
+        "--evidence-ref",
+        help="Durable relative reference attached to the work item evidence.",
+    )
+    parser.add_argument(
+        "--work-item-repository",
+        help="GitHub repository in owner/name form. Omit to disable work-item synchronization.",
+    )
+    parser.add_argument(
+        "--work-item-token-env",
+        default="GITHUB_TOKEN",
+        help="Environment variable containing the GitHub Issues token.",
+    )
     args = parser.parse_args()
     key = os.environ.get(args.session_api_key_env)
+    work_item_provider = None
+    if args.work_item_repository:
+        token = os.environ.get(args.work_item_token_env, "")
+        try:
+            work_item_provider = GitHubIssuesProvider(
+                args.work_item_repository,
+                token,
+            )
+        except WorkItemLifecycleError as exc:
+            parser.error(str(exc))
     return OrchestratorConfig(
         project_path=args.project, work_item_id=args.work_item_id, task=args.task,
         agent_server_url=args.agent_server_url, container_workspace=args.container_workspace,
@@ -334,7 +543,10 @@ def parse_args() -> OrchestratorConfig:
         expected_ollama_version=args.expected_ollama_version, expected_model=args.expected_model,
         expected_openhands_version=args.expected_openhands_version, max_iterations=args.max_iterations,
         timeout_seconds=args.timeout, poll_interval_seconds=args.poll_interval, session_api_key=key,
-        allow_no_change=args.allow_no_change, evidence_path=args.evidence_path,
+        allow_no_change=args.allow_no_change,
+        evidence_path=args.evidence_path,
+        evidence_ref=args.evidence_ref,
+        work_item_provider=work_item_provider,
     )
 
 

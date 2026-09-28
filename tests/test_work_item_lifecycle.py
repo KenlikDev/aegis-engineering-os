@@ -137,6 +137,17 @@ class WorkItemLifecycleTests(unittest.TestCase):
         self.assertEqual("github-issues", item.provider)
         self.assertEqual(ISSUE_URL, item.provider_url)
 
+    def test_github_get_closed_unlabeled_issue_as_done(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.state = "closed"
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+        item = provider.get("53")
+        self.assertEqual(LifecycleState.DONE, item.state)
+
     def test_github_transition_creates_and_verifies_status_label(self) -> None:
         transport = FakeGitHubTransport()
         provider = GitHubIssuesProvider(

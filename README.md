@@ -54,6 +54,8 @@ Example from the Aegis checkout:
 
 The coordinator never commits, pushes, switches branches, resets, rebases, or silently changes providers/models. A successful run leaves the task changes uncommitted on the generated `ai/feature/<work-item>-execution` branch for Aegis review and Git hygiene.
 
+For explicit work-item synchronization, provide `--work-item-repository OWNER/REPO`. The work item must already be `ready`; Aegis then records the task branch, moves it to `in_progress`, and after successful OpenHands execution plus Git verification moves it to `verification`. Execution failures after `in_progress` are recorded as `blocked`. Omit the option to use the coordinator without external work-item mutations.
+
 ## Repository structure
 
 - `00-constitution/` — non-negotiable operating rules.
