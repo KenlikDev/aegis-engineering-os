@@ -86,3 +86,16 @@ When used with managed OpenHands execution:
 7. on execution or post-execution boundary failure, transition `in_progress -> blocked` and record safe failure metadata.
 
 The runtime never advances automatically to `review`, `integration`, or `done`. Those states require the applicable quality gates and delivery workflow.
+
+## Quality verification
+
+The quality-gate runner consumes the target project's explicit `.aegis/quality-gates.json` contract. It executes the declared gates in order without a shell and records bounded redacted evidence.
+
+When a provider is configured and the work item is in `verification`:
+
+1. execute every declared gate;
+2. keep optional failures visible without treating them as required blockers;
+3. transition to `review` only when all required gates pass;
+4. transition to `blocked` when any required gate fails or times out.
+
+The runner does not infer project commands or automatically bypass missing tools, malformed manifests, or failed required gates.

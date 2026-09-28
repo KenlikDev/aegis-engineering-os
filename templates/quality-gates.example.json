@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "gates": [
+    {
+      "id": "unit-tests",
+      "description": "Replace this example with the project's required unit-test command.",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests"
+      ],
+      "working_directory": ".",
+      "timeout_seconds": 600,
+      "required": true,
+      "environment": {}
+    }
+  ]
+}
