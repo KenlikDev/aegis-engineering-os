@@ -18,8 +18,9 @@ The repository currently provides:
 - promotion synchronization;
 - integration merge;
 - integration delivery;
-- knowledge-gap creation.
+- knowledge-gap creation;
 - security review.
+
 ## Planned workflow areas
 
 The architecture also identifies these workflow areas for future dedicated skills:
@@ -28,7 +29,6 @@ The architecture also identifies these workflow areas for future dedicated skill
 - architecture planning;
 - refactoring;
 - testing;
-- security review;
 - CI remediation.
 
 A workflow must define entry conditions, required evidence, quality gates, and exit conditions.
