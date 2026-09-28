@@ -19,7 +19,7 @@ LOW = "low"
 SEVERITIES = {HIGH, MEDIUM, LOW}
 
 ACTION_RE = re.compile(
-    r"^\s*uses:\s*([^\s@]+)@([^\s#]+)",
+    r"^\s*(?:-\s*)?uses:\s*([^\s@]+)@([^\s#]+)",
     re.MULTILINE,
 )
 PINNED_REF_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -271,31 +271,39 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                     line=node.lineno,
                 )
 
-        for child in ast.walk(node):
-            if not isinstance(child, ast.Dict):
-                continue
-            for key, value in zip(child.keys, child.values):
-                if (
-                    isinstance(key, ast.Constant)
-                    and key.value == "force"
-                    and isinstance(value, ast.Constant)
-                    and value.value is True
-                ):
-                    _finding(
-                        findings,
-                        rule_id="git.force-update",
-                        severity=HIGH,
-                        path=path,
-                        root=root,
-                        message="Executable Git ref update requests force=True.",
-                        line=child.lineno,
-                    )
+    for dictionary in ast.walk(tree):
+        if not isinstance(dictionary, ast.Dict):
+            continue
+        for key, value in zip(dictionary.keys, dictionary.values):
+            if (
+                isinstance(key, ast.Constant)
+                and key.value == "force"
+                and isinstance(value, ast.Constant)
+                and value.value is True
+            ):
+                _finding(
+                    findings,
+                    rule_id="git.force-update",
+                    severity=HIGH,
+                    path=path,
+                    root=root,
+                    message="Executable Git ref update requests force=True.",
+                    line=dictionary.lineno,
+                )
 
     for node in ast.walk(tree):
         if not (
             isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"_request", "request"}
+            and (
+                (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr in {"_request", "request"}
+                )
+                or (
+                    isinstance(node.func, ast.Name)
+                    and node.func.id in {"_request", "request"}
+                )
+            )
         ):
             continue
 
