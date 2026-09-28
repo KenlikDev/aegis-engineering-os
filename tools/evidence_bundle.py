@@ -280,6 +280,14 @@ def write_evidence_bundle(
             "Evidence bundle output must remain inside the project root."
         ) from exc
 
+    member_descriptors = [
+        {"evidence_id": member.evidence_id, "path": member.path}
+        for member in bundle.members
+    ]
+    validated_members = _validate_members(root, member_descriptors)
+    if validated_members != bundle.members:
+        raise EvidenceBundleError("Evidence bundle members are not canonical.")
+
     member_paths = {str((root / member.path).resolve()) for member in bundle.members}
     if str(destination) in member_paths:
         raise EvidenceBundleError(
