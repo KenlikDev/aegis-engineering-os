@@ -184,8 +184,10 @@ def main() -> int:
         "tools/workflow_composition.py",
         "tools/implementation_readiness.py",
         "tools/testing.py",
+        "tools/version_verification.py",
         "templates/quality-gates.example.json",
         "templates/knowledge-candidate.example.json",
+        "templates/version-claims.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
