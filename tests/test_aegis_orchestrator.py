@@ -3,7 +3,7 @@ import sys
 import tempfile
 import types
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -353,12 +353,10 @@ Test fixture.
 
     def test_work_item_kind_must_match_branch_kind(self):
         config = self._config()
-        mismatched = aegis_orchestrator.OrchestratorConfig(
-            **{
-                **config.__dict__,
-                "work_item_kind": "refactoring",
-                "branch_kind": "feature",
-            }
+        mismatched = replace(
+            config,
+            work_item_kind="refactoring",
+            branch_kind="feature",
         )
         with self.assertRaisesRegex(
             aegis_orchestrator.AegisOrchestratorError,
