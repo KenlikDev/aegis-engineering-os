@@ -64,7 +64,7 @@ class WorkflowCatalogTests(unittest.TestCase):
         self.assertNotIn("- ci remediation;", planned)
         self.assertNotIn("- requirements clarification;", planned)
         self.assertNotIn("- architecture planning;", planned)
-        self.assertNotIn("- testing;", planned)
+        self.assertNotRegex(planned, r"(?m)^- testing(?:[.;]|$)")
 
 
 if __name__ == "__main__":
