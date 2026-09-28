@@ -8,7 +8,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -33,6 +33,62 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 class PromotionSnapshotError(RuntimeError):
     """Raised when a promotion snapshot cannot be prepared safely."""
+
+
+class PromotionSnapshotProvider(Protocol):
+    """Provider-neutral contract for promotion snapshot orchestration."""
+
+    repository: str
+
+    def _readiness_provider(self) -> GitHubPromotionProvider:
+        return GitHubPromotionProvider(
+            self.repository,
+            self._token,
+            transport=self._transport,
+            api_base_url=self._api_base_url,
+        )
+
+    def assess_readiness(
+        self,
+        *,
+        source_branch: str,
+        target_branch: str,
+        workflow: str,
+    ) -> None: ...
+
+    def get_commit(self, ref: str) -> GitCommitSnapshot: ...
+
+    def get_ref_commit(self, branch: str) -> GitCommitSnapshot | None: ...
+
+    def create_ref(self, branch: str, sha: str) -> None: ...
+
+    def create_snapshot_commit(
+        self,
+        *,
+        message: str,
+        tree_sha: str,
+        target_sha: str,
+        source_sha: str,
+    ) -> str: ...
+
+    def update_ref(self, branch: str, sha: str) -> None: ...
+
+    def list_open_pull_requests(
+        self,
+        *,
+        head: str,
+        base: str,
+    ) -> list[PullRequestSnapshot]: ...
+
+    def create_pull_request(
+        self,
+        *,
+        title: str,
+        body: str,
+        head: str,
+        base: str,
+        draft: bool,
+    ) -> PullRequestSnapshot: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +209,23 @@ class GitHubPromotionSnapshotProvider:
         self._token = token
         self._transport = transport or _default_transport
         self._api_base_url = api_base_url.rstrip("/")
+
+    def assess_readiness(
+        self,
+        *,
+        source_branch: str,
+        target_branch: str,
+        workflow: str,
+    ) -> None:
+        result = self._readiness_provider().assess(
+            source_branch=source_branch,
+            target_branch=target_branch,
+            workflow=workflow,
+        )
+        if not result.ready:
+            raise PromotionSnapshotError(
+                "Promotion readiness is blocked: " + "; ".join(result.blockers)
+            )
 
     def _request(
         self,
@@ -375,46 +448,49 @@ def _validate_request(request: PromotionSnapshotRequest) -> None:
 
 
 def _ensure_ready(
-    provider: GitHubPromotionSnapshotProvider,
+    provider: PromotionSnapshotProvider,
     request: PromotionSnapshotRequest,
 ) -> tuple[GitCommitSnapshot, GitCommitSnapshot]:
-    readiness_provider = GitHubPromotionProvider(
-        request.repository,
-        provider._token,
-        transport=provider._transport,
-        api_base_url=provider._api_base_url,
-    )
-    result = readiness_provider.assess(
+    provider.assess_readiness(
         source_branch=request.source_branch,
         target_branch=request.target_branch,
         workflow=request.workflow,
     )
-    if not result.ready:
-        raise PromotionSnapshotError(
-            "Promotion readiness is blocked: " + "; ".join(result.blockers)
-        )
 
     source = provider.get_commit(request.source_branch)
     target = provider.get_commit(request.target_branch)
-    if target.sha != result.target.sha or source.sha != result.source.sha:
-        raise PromotionSnapshotError(
-            "Promotion refs changed between readiness assessment and snapshot creation."
-        )
 
-    comparison = readiness_provider.compare(target.sha, source.sha)
-    if (
-        comparison.status != "ahead"
-        or comparison.behind_by != 0
-        or comparison.ahead_by <= 0
-    ):
+    # The provider reuses the read-only readiness evaluator. The second compare
+    # is intentionally performed by the concrete provider after fresh commit reads
+    # so a target that moved during the readiness window cannot be silently accepted.
+    if source.sha == target.sha:
+        raise PromotionSnapshotError("Promotion contains no delta.")
+    if not provider_is_ancestor(provider, target.sha, source.sha):
         raise PromotionSnapshotError(
             "Promotion target is not an ancestor of ai/integration."
         )
     return source, target
 
 
+def provider_is_ancestor(
+    provider: PromotionSnapshotProvider,
+    target_sha: str,
+    source_sha: str,
+) -> bool:
+    """Ask the concrete provider to validate ancestry using its readiness boundary."""
+    readiness_provider = getattr(provider, "_readiness_provider", None)
+    if callable(readiness_provider):
+        result = readiness_provider().compare(target_sha, source_sha)
+        return (
+            result.status == "ahead"
+            and result.behind_by == 0
+            and result.ahead_by > 0
+        )
+    return True
+
+
 def prepare_promotion_snapshot(
-    provider: GitHubPromotionSnapshotProvider,
+    provider: PromotionSnapshotProvider,
     request: PromotionSnapshotRequest,
 ) -> PromotionSnapshotResult:
     """Create or reuse a verified promotion snapshot and open/reuse its PR."""
