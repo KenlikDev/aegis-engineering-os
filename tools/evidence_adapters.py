@@ -3,14 +3,37 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import TYPE_CHECKING, Any, Mapping
 
 from evidence_contract import EvidenceContractError, EvidenceRecord, build_evidence
 from promotion_readiness import PromotionReadiness
 from release_readiness import ReleaseReadiness
 
+_CANONICAL_SENSITIVE_KEY_RE = re.compile(
+    r"(token|secret|password|passwd|api[_-]?key|authorization|credential|private[_-]?key)",
+    re.IGNORECASE,
+)
+
+
+def _canonical_safe(value: Any) -> Any:
+    """Remove secret-like mapping keys before evidence-contract validation."""
+    if isinstance(value, Mapping):
+        return {
+            key: _canonical_safe(item)
+            for key, item in value.items()
+            if isinstance(key, str) and not _CANONICAL_SENSITIVE_KEY_RE.search(key)
+        }
+    if isinstance(value, list):
+        return [_canonical_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_canonical_safe(item) for item in value]
+    return value
+
+
 if TYPE_CHECKING:
     from ci_diagnosis import DiagnosticReport
+    from openhands_execution import OpenHandsExecutionResult
     from implementation_readiness import ImplementationReadiness
     from security_review import SecurityReviewResult
     from version_verification import VersionEvidence
@@ -431,6 +454,51 @@ def ci_diagnosis_evidence(
             },
             "uncertainty": uncertainty,
             "references": [report.run.url],
+            "artifact_sha256": None,
+        }
+    )
+
+def openhands_execution_evidence(
+    result: "OpenHandsExecutionResult",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a redacted OpenHands execution result into canonical evidence."""
+    if result.outcome == "finished":
+        status = "verified"
+        uncertainty: list[str] = []
+    elif result.outcome in {"error", "stuck", "blocked"}:
+        status = "failed"
+        uncertainty = [
+            f"OpenHands execution ended without successful completion: {result.outcome}."
+        ]
+    else:
+        raise EvidenceContractError(
+            f"Unsupported OpenHands execution outcome: {result.outcome!r}."
+        )
+
+    safe_state = _canonical_safe(result.state)
+    safe_events = _canonical_safe(list(result.events))
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "openhands-execution",
+            "source": "aegis:openhands-execution",
+            "subject": f"conversation:{result.conversation_id}",
+            "revision": None,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "conversation_id": result.conversation_id,
+                "execution_status": result.execution_status,
+                "outcome": result.outcome,
+                "state": safe_state,
+                "events": safe_events,
+                "event_count": len(result.events),
+            },
+            "uncertainty": uncertainty,
+            "references": [],
             "artifact_sha256": None,
         }
     )

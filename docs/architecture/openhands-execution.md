@@ -52,6 +52,14 @@ By default the adapter allows only project paths below \`/projects\` and rejects
 
 Aegis must therefore establish the host-to-container project mapping separately. This adapter does not invent a mount mapping or access host files on behalf of OpenHands.
 
+## Canonical provenance
+
+The low-level `OpenHandsExecutionResult` can be adapted through `openhands_execution_evidence` in `tools/evidence_adapters.py`.
+
+The adapter is downstream of the existing execution redaction boundary. It does not execute requests, rerun conversations, inspect credentials, or mutate Git state. Finished maps to canonical `verified`; error, stuck, and blocked outcomes map to `failed` with explicit uncertainty.
+
+Canonical provenance removes secret-like mapping keys before shared evidence validation. This is an evidence-format safety measure and does not change the original execution result.
+
 ## Authentication and evidence
 
 When an Agent Server session API key is configured, it is sent as \`X-Session-API-Key\` on adapter requests. The key is not included in exceptions or returned execution evidence.

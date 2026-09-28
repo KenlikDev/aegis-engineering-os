@@ -91,6 +91,8 @@ Security review can now emit a canonical provenance record from its deterministi
 
 CI diagnosis can now emit canonical provenance from its read-only run/job/step evidence without changing diagnosis rules or CI state.
 
+OpenHands execution can now emit canonical provenance from its already-redacted terminal execution result without changing the execution boundary.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.

@@ -224,6 +224,14 @@ The canonical artifact preserves the workflow run head SHA as its revision and m
 See docs/architecture/ci-remediation.md for the evidence and safety contract.
 
 
+## OpenHands execution provenance
+
+The low-level OpenHands result can be adapted into canonical evidence through the `openhands_execution_evidence` adapter in `tools/evidence_adapters.py`. This is an additive record boundary; it does not execute OpenHands again.
+
+Finished execution is canonical `verified`. Error, stuck, and blocked outcomes are canonical `failed` with explicit uncertainty. The adapter uses only the already-redacted execution state and events and removes secret-like keys before canonical validation.
+
+See `docs/architecture/evidence-provenance.md` for the common provenance boundary.
+
 ## Evidence provenance
 
 Material state observations use a provider-neutral evidence envelope with explicit provenance:
