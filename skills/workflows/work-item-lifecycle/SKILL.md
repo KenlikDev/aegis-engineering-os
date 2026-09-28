@@ -47,6 +47,10 @@ Create subtasks only when they clarify ownership or dependencies.
 4. Add material decisions and blockers to the work item.
 5. Keep routine implementation details in Git rather than using issue comments as a code log.
 
+## Refactoring
+
+When a work item is explicitly classified as refactoring, use the refactoring workflow to establish a verified baseline before mutation and repeat the declared testing contract after changes. Preserve explicit behavior invariants and reclassify or escalate any material behavior change.
+
 ## Testing
 
 During the verification stage, run the read-only testing workflow against the project-declared quality-gate manifest. It must not infer test commands. Required gate failures remain blockers and optional gates remain visible without being promoted to required status.

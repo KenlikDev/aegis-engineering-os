@@ -22,6 +22,7 @@ CORE_WORKFLOW_DISPLAY_NAMES = {
     "requirements-clarification": "requirements clarification",
     "architecture-planning": "architecture planning",
     "testing": "testing",
+    "refactoring": "refactoring",
 }
 
 
@@ -49,6 +50,8 @@ class WorkflowCatalogTests(unittest.TestCase):
                     self.assertIn("- architecture planning;", implemented)
                 elif display_name == "testing":
                     self.assertIn("- testing;", implemented)
+                elif display_name == "refactoring":
+                    self.assertIn("- refactoring;", implemented)
                 else:
                     self.assertIn(f"- {display_name};", implemented)
 
@@ -65,6 +68,7 @@ class WorkflowCatalogTests(unittest.TestCase):
         self.assertNotIn("- requirements clarification;", planned)
         self.assertNotIn("- architecture planning;", planned)
         self.assertNotRegex(planned, r"(?m)^- testing(?:[.;]|$)")
+        self.assertNotRegex(planned, r"(?m)^- refactoring(?:[.;]|$)")
 
 
 if __name__ == "__main__":

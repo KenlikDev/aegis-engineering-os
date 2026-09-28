@@ -73,6 +73,10 @@ The executable boundaries are documented in:
 - docs/architecture/release.md.
 
 
+### Refactoring
+
+The refactoring workflow composes requirements clarification, applicable architecture planning, verified baseline testing, normal implementation, post-change testing, and independent review. It does not introduce a separate mutation or test runner.
+
 ### Testing
 
 The current testing execution boundary is `tools/testing.py`, which validates and delegates to the canonical `tools/quality_gates.py` runner. It never infers project test commands.
