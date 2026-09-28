@@ -9,6 +9,7 @@ import os
 import re
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
@@ -625,6 +626,11 @@ def main() -> int:
     parser.add_argument("--branch")
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     parser.add_argument("--log-limit", type=int, default=DEFAULT_LOG_LIMIT)
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=__import__("pathlib").Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     try:
@@ -635,7 +641,19 @@ def main() -> int:
         else:
             run = provider.latest_run(args.workflow, args.branch)
         report = diagnose(provider, run.run_id, log_limit=args.log_limit)
-    except (CIDiagnosisError, ValueError) as exc:
+
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import ci_diagnosis_evidence
+            from evidence_contract import write_evidence
+
+            write_evidence(
+                ci_diagnosis_evidence(
+                    report,
+                    observed_at=datetime.now(timezone.utc),
+                ),
+                args.canonical_evidence_output,
+            )
+    except (CIDiagnosisError, ValueError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
