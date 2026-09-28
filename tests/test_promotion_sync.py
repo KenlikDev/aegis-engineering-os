@@ -270,7 +270,11 @@ class PromotionSyncTests(unittest.TestCase):
                 target_branch="main",
             )
 
-        self.assertEqual(LifecycleState.INTEGRATION, work_items.item.state)
+        self.assertEqual(1, len(work_items.transitions))
+        self.assertEqual(
+            (LifecycleState.INTEGRATION, LifecycleState.DONE),
+            work_items.transitions[0],
+        )
 
     def test_open_pr_is_non_mutating(self):
         provider = FakePromotionProvider(state="open", merged=False)
