@@ -188,6 +188,7 @@ def main() -> int:
         "tools/evidence_contract.py",
         "tools/state_verification.py",
         "tools/evidence_adapters.py",
+        "tools/evidence_bundle.py",
         "tools/testing.py",
         "tools/version_verification.py",
         "templates/quality-gates.example.json",
@@ -195,6 +196,8 @@ def main() -> int:
         "templates/version-claims.example.json",
         "templates/state-evidence.example.json",
         "docs/architecture/evidence-provenance.md",
+        "docs/architecture/evidence-bundles.md",
+        "templates/evidence-bundle.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
