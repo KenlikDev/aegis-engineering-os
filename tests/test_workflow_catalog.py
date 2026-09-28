@@ -33,9 +33,15 @@ class WorkflowCatalogTests(unittest.TestCase):
 
         for skill_name, display_name in CORE_WORKFLOW_DISPLAY_NAMES.items():
             with self.subTest(skill=skill_name):
-                self.assertIn(f"- {display_name};", implemented) if not display_name.endswith("delivery") else self.assertIn(
-                    f"- {display_name}.", implemented
-                )
+                if display_name == "release preparation":
+                    self.assertIn(
+                        "- release preparation and release readiness;",
+                        implemented,
+                    )
+                elif display_name == "integration delivery":
+                    self.assertIn("- integration delivery.", implemented)
+                else:
+                    self.assertIn(f"- {display_name};", implemented)
 
     def test_catalog_keeps_planned_and_implemented_sections_distinct(self):
         catalog = CATALOG.read_text(encoding="utf-8")
