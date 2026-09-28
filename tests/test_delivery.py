@@ -124,24 +124,42 @@ def request() -> CreatePullRequestRequest:
 
 
 class DeliveryTests(unittest.TestCase):
-    def test_create_request_rejects_protected_target(self) -> None:
+    def test_create_rejects_protected_target(self) -> None:
+        provider = GitHubPullRequestProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=lambda *args: (_ for _ in ()).throw(
+                AssertionError("network must not be reached")
+            ),
+        )
         with self.assertRaises(DeliveryError):
-            CreatePullRequestRequest(
-                repository=REPOSITORY,
-                head="ai/feature/60-pull-request-lifecycle",
-                base="develop",
-                title="test",
-                body="",
+            provider.create(
+                CreatePullRequestRequest(
+                    repository=REPOSITORY,
+                    head="ai/feature/60-pull-request-lifecycle",
+                    base="develop",
+                    title="test",
+                    body="",
+                )
             )
 
-    def test_create_request_rejects_non_aegis_head(self) -> None:
+    def test_create_rejects_non_aegis_head(self) -> None:
+        provider = GitHubPullRequestProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=lambda *args: (_ for _ in ()).throw(
+                AssertionError("network must not be reached")
+            ),
+        )
         with self.assertRaises(DeliveryError):
-            CreatePullRequestRequest(
-                repository=REPOSITORY,
-                head="feature/local",
-                base="ai/integration",
-                title="test",
-                body="",
+            provider.create(
+                CreatePullRequestRequest(
+                    repository=REPOSITORY,
+                    head="feature/local",
+                    base="ai/integration",
+                    title="test",
+                    body="",
+                )
             )
 
     def test_create_requires_review_work_item(self) -> None:
