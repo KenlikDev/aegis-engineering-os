@@ -13,7 +13,9 @@ The repository currently provides:
 - bug fixing;
 - code review;
 - Aegis update validation;
-- release preparation;
+- release preparation and release readiness;
+- promotion synchronization;
+- integration merge;
 - integration delivery.
 
 ## Planned workflow areas
