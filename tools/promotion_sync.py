@@ -8,6 +8,8 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
@@ -415,6 +417,11 @@ def main() -> int:
     parser.add_argument("pull_request_number", type=int)
     parser.add_argument("target", choices=sorted(TARGETS))
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     try:
@@ -430,6 +437,24 @@ def main() -> int:
         )
     except (PromotionSyncError, WorkItemLifecycleError, ValueError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
+        return 1
+
+    try:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import promotion_sync_evidence
+            from evidence_contract import write_evidence
+
+            canonical = promotion_sync_evidence(
+                result,
+                repository=args.repository,
+                observed_at=datetime.now(timezone.utc),
+            )
+            write_evidence(
+                canonical,
+                args.canonical_evidence_output.expanduser().resolve(),
+            )
+    except (OSError, ValueError, PromotionSyncError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     print(json.dumps(result, indent=2, sort_keys=True))
