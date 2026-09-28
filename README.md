@@ -153,3 +153,16 @@ For a reviewed work item, use the composed delivery boundary:
 
 The controller creates or reuses the ai/integration task PR, requires successful validation for its exact head SHA, and then delegates the protected ai/integration merge. It never targets develop or main.
 
+
+
+## Knowledge-gap candidate registry
+
+When Aegis discovers a reusable knowledge gap, create a candidate record instead of modifying active skills:
+
+    python3 tools/knowledge_gap.py create --scope global --capability "Missing database rollback guidance" --problem "Aegis lacks verified rollback guidance." --proposed-change "Create candidate guidance after a focused scenario." --reference https://example.com/authoritative-source
+
+After a focused scenario passes, validate the candidate with explicit evidence:
+
+    python3 tools/knowledge_gap.py validate .aegis/knowledge/candidates/<candidate-id>.json --scenario "Run the documented rollback scenario" --evidence-ref https://ci.example.com/runs/123
+
+The candidate registry never edits the active skill registry. A validated candidate remains a candidate until a separate controlled promotion step accepts it as known-good or active.
