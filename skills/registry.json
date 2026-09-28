@@ -144,6 +144,12 @@
       "path": "skills/workflows/aegis-update-validation/SKILL.md",
       "domain": "workflow",
       "stability": "core"
+    },
+    {
+      "name": "release-preparation",
+      "path": "skills/workflows/release-preparation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
     }
   ]
 }

@@ -12,7 +12,8 @@ The repository currently provides:
 - feature implementation;
 - bug fixing;
 - code review;
-- Aegis update validation.
+- Aegis update validation;
+- release preparation.
 
 ## Planned workflow areas
 
@@ -24,7 +25,6 @@ The architecture also identifies these workflow areas for future dedicated skill
 - testing;
 - security review;
 - CI remediation;
-- release preparation;
 - knowledge-gap creation.
 
 A workflow must define entry conditions, required evidence, quality gates, and exit conditions.
