@@ -160,12 +160,16 @@ def record_version_evidence(
             )
         )
 
+    pending = payload.get("external_verification_pending", False)
+    if not isinstance(pending, bool):
+        raise VersionVerificationError(
+            "external_verification_pending must be boolean when provided."
+        )
+
     evidence = VersionEvidence(
         schema_version=SCHEMA_VERSION,
         claims=tuple(parsed),
-        external_verification_pending=bool(
-            payload.get("external_verification_pending", False)
-        ),
+        external_verification_pending=pending,
     )
 
     destination = Path(output_path).expanduser()
@@ -178,6 +182,19 @@ def record_version_evidence(
         raise VersionVerificationError(
             "Version evidence output must remain inside the project root."
         ) from exc
+    if destination == claim_file:
+        raise VersionVerificationError(
+            "Version evidence output must differ from the claims input file."
+        )
+    source_paths = {
+        _relative_source(root, claim["source"])[0]
+        for claim in claims
+        if isinstance(claim, dict) and isinstance(claim.get("source"), str)
+    }
+    if destination in source_paths:
+        raise VersionVerificationError(
+            "Version evidence output must not overwrite a referenced version source."
+        )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
