@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Any
 
 from evidence_contract import EvidenceContractError, write_evidence
+from evidence_bundle_requirements import (
+    EvidenceSetRequirementsError,
+    validate_evidence_set,
+)
 
 from architecture_planning import ArchitecturePlanningError, ArchitecturePlan, plan_architecture
 from workflow_composition import WorkflowComposition, WorkflowCompositionError, compose_workflow
@@ -23,6 +27,18 @@ from work_item_lifecycle import LifecycleState, WorkItemLifecycleError, WorkItem
 
 class ImplementationReadinessError(RuntimeError):
     """Raised when implementation-readiness evaluation cannot be completed safely."""
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceSetReadiness:
+    """Observed result of an explicitly supplied evidence-set readiness contract."""
+
+    status: str
+    bundle_id: str | None
+    requirements_ref: str
+    requirements_satisfied: int
+    requirements_total: int
+    detail: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +65,7 @@ class ImplementationReadiness:
     observations: tuple[ReadinessObservation, ...]
     blockers: tuple[str, ...]
     composition_steps: tuple[str, ...]
+    evidence_set: "EvidenceSetReadiness | None" = None
 
     @property
     def ready(self) -> bool:
@@ -117,6 +134,66 @@ def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[st
     )
 
 
+def _resolve_local_reference(
+    project: Path,
+    reference: str | Path,
+    label: str,
+) -> tuple[Path, str]:
+    """Resolve an explicit project-local evidence reference without remote access."""
+    value = str(reference).strip()
+    if not value:
+        raise ImplementationReadinessError(f"{label} must be a non-empty project-local path.")
+    if value.startswith("http://") or value.startswith("https://"):
+        raise ImplementationReadinessError(f"{label} must reference a local project file.")
+
+    candidate = Path(value).expanduser()
+    resolved = candidate.resolve() if candidate.is_absolute() else (project / candidate).resolve()
+    try:
+        relative = resolved.relative_to(project)
+    except ValueError as exc:
+        raise ImplementationReadinessError(
+            f"{label} must remain inside the project root."
+        ) from exc
+    if not resolved.is_file():
+        raise ImplementationReadinessError(
+            f"{label} does not reference an existing file: {resolved}"
+        )
+    return resolved, relative.as_posix()
+
+
+def _validate_evidence_set(
+    project: Path,
+    bundle_reference: str | Path,
+    requirements_reference: str | Path,
+) -> EvidenceSetReadiness:
+    """Validate an explicit evidence-set contract without inferring its requirements."""
+    bundle_path, _bundle_ref = _resolve_local_reference(project, bundle_reference, "evidence bundle")
+    requirements_path, requirements_ref = _resolve_local_reference(
+        project,
+        requirements_reference,
+        "evidence-set requirements",
+    )
+    try:
+        result = validate_evidence_set(project, bundle_path, requirements_path)
+    except EvidenceSetRequirementsError as exc:
+        return EvidenceSetReadiness(
+            status="blocked",
+            bundle_id=None,
+            requirements_ref=requirements_ref,
+            requirements_satisfied=0,
+            requirements_total=0,
+            detail=str(exc),
+        )
+    return EvidenceSetReadiness(
+        status=result.status,
+        bundle_id=result.bundle_id,
+        requirements_ref=requirements_ref,
+        requirements_satisfied=result.requirements_satisfied,
+        requirements_total=result.requirements_total,
+        detail="Explicit evidence-set requirements are satisfied.",
+    )
+
+
 def evaluate_readiness(
     work_item_path: str | Path,
     work_item_kind: str,
@@ -126,12 +203,19 @@ def evaluate_readiness(
     architecture_required: bool,
     work_item_provider: WorkItemProvider | None = None,
     work_item_id: str | None = None,
+    evidence_bundle_ref: str | Path | None = None,
+    evidence_set_requirements_ref: str | Path | None = None,
 ) -> ImplementationReadiness:
     """Evaluate implementation readiness without executing project commands."""
     document = Path(work_item_path).expanduser().resolve()
     if not document.is_file():
         raise ImplementationReadinessError(
             f"Work-item document does not exist: {document}"
+        )
+
+    if (evidence_bundle_ref is None) != (evidence_set_requirements_ref is None):
+        raise ImplementationReadinessError(
+            "evidence_bundle_ref and evidence_set_requirements_ref must be provided together."
         )
 
     kind = work_item_kind.strip()
@@ -273,6 +357,32 @@ def evaluate_readiness(
             )
         )
 
+    evidence_set: EvidenceSetReadiness | None = None
+    if evidence_bundle_ref is not None and evidence_set_requirements_ref is not None:
+        evidence_set = _validate_evidence_set(
+            project,
+            evidence_bundle_ref,
+            evidence_set_requirements_ref,
+        )
+        if evidence_set.status == "verified":
+            observations.append(
+                ReadinessObservation(
+                    "evidence-set",
+                    "passed",
+                    (
+                        "Explicit evidence-set requirements are satisfied: "
+                        f"{evidence_set.requirements_satisfied}/"
+                        f"{evidence_set.requirements_total} requirement(s) in bundle "
+                        f"{evidence_set.bundle_id}."
+                    ),
+                )
+            )
+        else:
+            observations.append(
+                ReadinessObservation("evidence-set", "blocked", evidence_set.detail)
+            )
+            blockers.append("Explicit evidence-set requirements are not satisfied.")
+
     lifecycle_state = _validate_lifecycle(
         work_item_provider,
         work_item_id if work_item_provider is not None else None,
@@ -298,6 +408,7 @@ def evaluate_readiness(
         observations=tuple(observations),
         blockers=tuple(blockers),
         composition_steps=tuple(step.name for step in composition.steps),
+        evidence_set=evidence_set,
     )
 
 
@@ -349,9 +460,26 @@ def main() -> int:
         help="Explicitly classify architecture planning as not required.",
     )
     parser.add_argument("--work-item-id")
+    parser.add_argument(
+        "--evidence-bundle",
+        type=Path,
+        help="Optional project-local canonical evidence bundle required by the readiness gate.",
+    )
+    parser.add_argument(
+        "--evidence-set-requirements",
+        type=Path,
+        help="Optional project-local explicit evidence-set requirements contract.",
+    )
     parser.add_argument("--work-item-repository")
     parser.add_argument("--work-item-token-env", default="GITHUB_TOKEN")
     args = parser.parse_args()
+
+    if (args.evidence_bundle is None) != (args.evidence_set_requirements is None):
+        print(
+            "ERROR: --evidence-bundle and --evidence-set-requirements must be provided together.",
+            file=sys.stderr,
+        )
+        return 1
 
     if bool(args.work_item_repository) != bool(args.work_item_id):
         print(
@@ -385,6 +513,8 @@ def main() -> int:
             architecture_required=args.architecture_required,
             work_item_provider=provider,
             work_item_id=args.work_item_id,
+            evidence_bundle_ref=args.evidence_bundle,
+            evidence_set_requirements_ref=args.evidence_set_requirements,
         )
 
         if args.evidence_output is not None:
@@ -400,13 +530,33 @@ def main() -> int:
                 output_path = project_root / output_path
             output_path = output_path.resolve()
 
+            evidence_bundle_path, _ = (
+                _resolve_local_reference(project_root, args.evidence_bundle, "evidence bundle")
+                if args.evidence_bundle is not None
+                else (None, None)
+            )
+            requirements_path, _ = (
+                _resolve_local_reference(
+                    project_root,
+                    args.evidence_set_requirements,
+                    "evidence-set requirements",
+                )
+                if args.evidence_set_requirements is not None
+                else (None, None)
+            )
+
             work_item_path = args.work_item.expanduser().resolve()
             version_evidence_path = Path(args.version_evidence_ref).expanduser()
             if not version_evidence_path.is_absolute():
                 version_evidence_path = project_root / version_evidence_path
             version_evidence_path = version_evidence_path.resolve()
 
-            if output_path in {work_item_path, version_evidence_path}:
+            protected_inputs = {work_item_path, version_evidence_path}
+            if evidence_bundle_path is not None:
+                protected_inputs.add(evidence_bundle_path)
+            if requirements_path is not None:
+                protected_inputs.add(requirements_path)
+            if output_path in protected_inputs:
                 raise ImplementationReadinessError(
                     "Canonical evidence output must not overwrite the work-item or version-evidence input."
                 )
