@@ -134,6 +134,7 @@ class MutationEvidence:
     state_after: str | None = None
     verified: bool = False
     reference: str | None = None
+    identifier: int | str | None = None
 
 
 class WorkItemProvider(Protocol):
