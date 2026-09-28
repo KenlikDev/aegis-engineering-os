@@ -217,7 +217,7 @@ Test fixture.
     def test_work_item_must_be_ready_before_execution(self) -> None:
         provider = InMemoryWorkItemProvider(
             {
-                "56": WorkItem(
+                "51": WorkItem(
                     id="51",
                     title="managed execution",
                     state=LifecycleState.PLANNED,
@@ -228,13 +228,13 @@ Test fixture.
         with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
             aegis_orchestrator.orchestrate(
                 self._config(
-                    work_item_id="56",
+                    work_item_id="51",
                     work_item_provider=provider,
                 ),
                 preflight_fn=self._preflight,
             )
         branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
-        self.assertNotIn("ai/feature/56-execution", branches)
+        self.assertNotIn("ai/feature/51-execution", branches)
 
     def test_success_synchronizes_work_item_to_verification(self) -> None:
         provider = self._ready_provider()
@@ -246,7 +246,7 @@ Test fixture.
                     "done\n", encoding="utf-8"
                 )
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -258,7 +258,7 @@ Test fixture.
             evidence = aegis_orchestrator.orchestrate(
                 self._config(
                     "Implement result.txt.",
-                    work_item_id="56",
+                    work_item_id="51",
                     work_item_provider=provider,
                 ),
                 preflight_fn=self._preflight,
@@ -266,13 +266,13 @@ Test fixture.
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        item = provider.get("56")
+        item = provider.get("51")
         self.assertEqual(LifecycleState.VERIFICATION, item.state)
         self.assertEqual("verification", evidence["work_item"]["state_after_execution"])
-        comments = provider.comments["56"]
+        comments = provider.comments["51"]
         self.assertEqual(2, len(comments))
-        self.assertIn("ai/feature/56-execution", comments[0])
-        self.assertIn("12345678-1234-5678-1234-567812345678", comments[1])
+        self.assertIn("ai/feature/51-execution", comments[0])
+        self.assertIn("12345178-1234-5178-1234-517812345178", comments[1])
         self.assertTrue(evidence["work_item"]["verified"])
 
     def test_execution_failure_blocks_work_item_without_leaking_error(self) -> None:
@@ -288,7 +288,7 @@ Test fixture.
             with self.assertRaises(RuntimeError):
                 aegis_orchestrator.orchestrate(
                     self._config(
-                        work_item_id="56",
+                        work_item_id="51",
                         work_item_provider=provider,
                     ),
                     preflight_fn=self._preflight,
@@ -296,8 +296,8 @@ Test fixture.
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        self.assertEqual(LifecycleState.BLOCKED, provider.get("56").state)
-        failure_comment = provider.comments["56"][-1]
+        self.assertEqual(LifecycleState.BLOCKED, provider.get("51").state)
+        failure_comment = provider.comments["51"][-1]
         self.assertIn("RuntimeError", failure_comment)
         self.assertNotIn("super-secret-provider-response", failure_comment)
 
@@ -314,7 +314,7 @@ Test fixture.
                     capture_output=True,
                 )
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -326,7 +326,7 @@ Test fixture.
             with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
                 aegis_orchestrator.orchestrate(
                     self._config(
-                        work_item_id="56",
+                        work_item_id="51",
                         work_item_provider=provider,
                     ),
                     preflight_fn=self._preflight,
@@ -334,8 +334,8 @@ Test fixture.
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        self.assertEqual(LifecycleState.BLOCKED, provider.get("56").state)
-        self.assertIn("AegisOrchestratorError", provider.comments["56"][-1])
+        self.assertEqual(LifecycleState.BLOCKED, provider.get("51").state)
+        self.assertIn("AegisOrchestratorError", provider.comments["51"][-1])
 
     def test_build_task_branch_name_preserves_work_item_identity(self) -> None:
         self.assertEqual(
@@ -431,7 +431,7 @@ Test fixture.
                     "changed\n", encoding="utf-8"
                 )
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -467,7 +467,7 @@ Test fixture.
         class NoChangeClient:
             def execute(self, request):
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -499,7 +499,7 @@ Test fixture.
                 self._git("add", "committed.txt")
                 self._git("commit", "-m", "bad: agent-side commit")
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
@@ -541,7 +541,7 @@ Test fixture.
                 )
                 (project / "changed.txt").write_text("bad\n", encoding="utf-8")
                 return types.SimpleNamespace(
-                    conversation_id="12345678-1234-5678-1234-567812345678",
+                    conversation_id="12345178-1234-5178-1234-517812345178",
                     execution_status="finished",
                     outcome="finished",
                     events=(),
