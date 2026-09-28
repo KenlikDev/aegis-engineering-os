@@ -370,8 +370,7 @@ Test fixture.
         self.assertNotIn("ai/feature/51-execution", branches)
 
     def test_readiness_failure_prevents_task_branch_creation(self):
-        config = self._config(
-        )
+        config = self._config()
         mismatched = replace(
             config,
             version_evidence_ref=self.project / "missing-version-evidence.txt",
