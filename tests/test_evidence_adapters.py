@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from evidence_adapters import (  # noqa: E402
     ci_diagnosis_evidence,
     implementation_readiness_evidence,
+    knowledge_gap_evidence,
     mutation_evidence,
     promotion_readiness_evidence,
     openhands_execution_evidence,
@@ -34,6 +35,11 @@ from implementation_readiness import (  # noqa: E402
 )
 from security_review import SecurityFinding, SecurityReviewResult  # noqa: E402
 from work_item_lifecycle import MutationEvidence  # noqa: E402
+from knowledge_gap import (  # noqa: E402
+    create_candidate,
+    reject_candidate,
+    validate_candidate,
+)
 from release_readiness import ChangelogSnapshot, ReleaseReadiness  # noqa: E402
 from version_verification import VersionClaim, VersionEvidence  # noqa: E402
 
@@ -286,6 +292,117 @@ class EvidenceAdapterTests(unittest.TestCase):
 
         with __import__("tempfile").TemporaryDirectory() as temp:
             path = __import__("pathlib").Path(temp) / "mutation-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
+
+
+    def test_knowledge_gap_candidate_is_pending(self):
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            record = create_candidate(
+                scope="global",
+                capability="safe knowledge activation",
+                problem="Candidate knowledge needs focused validation.",
+                proposed_change="Validate before considering promotion.",
+                references=["https://docs.example.test/knowledge"],
+                store_root=temp,
+                candidate_id="13000000-0000-4000-8000-000000000001",
+            )
+
+            canonical = knowledge_gap_evidence(
+                record,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+            self.assertEqual("pending", canonical.status)
+            self.assertEqual(
+                "candidate:13000000-0000-4000-8000-000000000001",
+                canonical.subject,
+            )
+            self.assertEqual(record.candidate.candidate_sha256, canonical.revision)
+            self.assertEqual("candidate", canonical.result["state"])
+            self.assertEqual(
+                record.candidate.candidate_sha256,
+                canonical.result["candidate"]["candidate_sha256"],
+            )
+            self.assertEqual(1, len(canonical.uncertainty))
+
+    def test_knowledge_gap_validated_is_verified(self):
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            record = create_candidate(
+                scope="project",
+                capability="verified deployment guidance",
+                problem="Deployment rollback guidance is missing.",
+                proposed_change="Create project guidance after a focused rollback test.",
+                references=["https://docs.example.test/deployment"],
+                store_root=temp,
+                candidate_id="13000000-0000-4000-8000-000000000002",
+            )
+            path = __import__("pathlib").Path(temp) / (
+                "13000000-0000-4000-8000-000000000002.json"
+            )
+            record = validate_candidate(
+                path,
+                scenario="Run one deterministic rollback scenario.",
+                evidence_refs=["https://ci.example.test/runs/130"],
+            )
+
+            canonical = knowledge_gap_evidence(
+                record,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+            self.assertEqual("verified", canonical.status)
+            self.assertEqual("validated", canonical.result["state"])
+            self.assertEqual(
+                "https://ci.example.test/runs/130",
+                canonical.result["validation"]["evidence_refs"][0],
+            )
+
+    def test_knowledge_gap_rejected_is_failed_and_non_active(self):
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            record = create_candidate(
+                scope="global",
+                capability="rejected candidate",
+                problem="The observed scenario is too narrow.",
+                proposed_change="Do not activate the proposed guidance.",
+                references=["https://docs.example.test/rejected"],
+                store_root=temp,
+                candidate_id="13000000-0000-4000-8000-000000000003",
+            )
+            path = __import__("pathlib").Path(temp) / (
+                "13000000-0000-4000-8000-000000000003.json"
+            )
+            record = reject_candidate(
+                path,
+                reason="The scenario does not generalize safely.",
+            )
+
+            canonical = knowledge_gap_evidence(
+                record,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+            self.assertEqual("failed", canonical.status)
+            self.assertEqual("rejected", canonical.result["state"])
+            self.assertEqual(1, len(canonical.uncertainty))
+            self.assertIn("must not be treated as active", canonical.uncertainty[0])
+
+    def test_knowledge_gap_evidence_round_trips(self):
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            record = create_candidate(
+                scope="global",
+                capability="knowledge provenance",
+                problem="Candidate evidence must preserve original provenance.",
+                proposed_change="Keep the candidate hash and validation state.",
+                references=["https://docs.example.test/provenance"],
+                store_root=temp,
+                candidate_id="13000000-0000-4000-8000-000000000004",
+            )
+            canonical = knowledge_gap_evidence(
+                record,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+            path = __import__("pathlib").Path(temp) / "knowledge-gap-evidence.json"
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
 
