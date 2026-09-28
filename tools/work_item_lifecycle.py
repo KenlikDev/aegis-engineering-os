@@ -505,7 +505,7 @@ class GitHubIssuesProvider:
         if target == LifecycleState.BLOCKED:
             labels.append(f"{RESUME_LABEL_PREFIX}{current.state.value}")
         payload: dict[str, Any] = {
-            "labels": sorted(status_labels),
+            "labels": sorted(labels),
             "state": "closed" if target == LifecycleState.DONE else "open",
         }
         if target == LifecycleState.DONE:
