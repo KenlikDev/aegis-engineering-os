@@ -20,9 +20,9 @@ class SecurityReviewTests(unittest.TestCase):
             workflow = root / ".github" / "workflows" / "safe.yml"
             workflow.parent.mkdir(parents=True)
             workflow.write_text(
-                "name: safe\\n"
-                "permissions:\\n"
-                "  contents: read\\n",
+                "name: safe\n"
+                "permissions:\n"
+                "  contents: read\n",
                 encoding="utf-8",
             )
             output = root / "security-evidence.json"
