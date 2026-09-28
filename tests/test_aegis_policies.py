@@ -220,7 +220,7 @@ class AegisPolicyTests(unittest.TestCase):
 
             tampered = self.run_tool(VERIFY_PROJECT, project)
             self.assertNotEqual(tampered.returncode, 0)
-            self.assertIn("managed AGENTS.md checksum mismatch", tampered.stderr)
+            self.assertIn("Managed AGENTS.md checksum mismatch", tampered.stderr)
 
     def test_bootstrap_refuses_modified_managed_agents(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
