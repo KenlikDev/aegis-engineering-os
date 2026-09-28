@@ -241,9 +241,7 @@ class EvidenceSetRequirementsTests(unittest.TestCase):
 
     def test_requirements_revalidate_member_identity(self):
         root, bundle, requirements, readiness, *_ = self._project()
-        evidence = read_and_validate_evidence(readiness)
-        replacement = dict(evidence.result)
-        replacement["state"] = "replacement"
+        read_and_validate_evidence(readiness)
         write_evidence(
             _evidence(
                 "implementation-readiness",
@@ -256,7 +254,7 @@ class EvidenceSetRequirementsTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             EvidenceSetRequirementsError,
-            "identity",
+            "ID mismatch",
         ):
             validate_evidence_set(root, bundle, requirements)
 
