@@ -140,7 +140,7 @@ class UnverifiedTraceabilityProvider(InMemoryWorkItemProvider):
         return MutationEvidence(
             provider="memory",
             operation="comment",
-            work_item_id=work_item_id,
+            reference="not-verified",
             verified=False,
         )
 
@@ -157,11 +157,8 @@ class UnverifiedTransitionProvider(InMemoryWorkItemProvider):
         return MutationEvidence(
             provider=current.provider,
             operation="transition",
-            work_item_id=work_item_id,
-            state_before=current.state.value,
-            state_after=target.value,
+            reference=current.provider_url or "not-verified",
             verified=False,
-            reference=current.provider_url,
         )
 
 
