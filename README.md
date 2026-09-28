@@ -176,3 +176,5 @@ Run the read-only repository security review before high-impact integration or p
     python3 tools/security_review.py /path/to/repository
 
 Exit code 0 means no high-severity findings were observed. Exit code 2 means blocking findings are present. The review never modifies the repository.
+
+See docs/architecture/security.md for the security-review architecture and safety boundary.
