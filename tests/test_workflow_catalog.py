@@ -10,6 +10,7 @@ CORE_WORKFLOW_DISPLAY_NAMES = {
     "project-discovery": "project discovery",
     "work-item-lifecycle": "work-item lifecycle",
     "workflow-composition": "workflow composition",
+    "implementation-readiness": "implementation readiness",
     "feature-implementation": "feature implementation",
     "bug-fix": "bug fixing",
     "code-review": "code review",
@@ -55,6 +56,8 @@ class WorkflowCatalogTests(unittest.TestCase):
                     self.assertIn("- refactoring;", implemented)
                 elif display_name == "workflow composition":
                     self.assertIn("- workflow composition;", implemented)
+                elif display_name == "implementation readiness":
+                    self.assertIn("- implementation readiness;", implemented)
                 else:
                     self.assertIn(f"- {display_name};", implemented)
 
@@ -73,6 +76,7 @@ class WorkflowCatalogTests(unittest.TestCase):
         self.assertNotRegex(planned, r"(?m)^- testing(?:[.;]|$)")
         self.assertNotRegex(planned, r"(?m)^- refactoring(?:[.;]|$)")
         self.assertNotRegex(planned, r"(?m)^- workflow composition(?:[.;]|$)")
+        self.assertNotRegex(planned, r"(?m)^- implementation readiness(?:[.;]|$)")
 
 
 if __name__ == "__main__":
