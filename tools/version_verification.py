@@ -93,7 +93,7 @@ def _sha256_and_text(path: Path) -> tuple[str, str]:
     return digest, content
 
 
-def _validate_claim_input(project: Path, raw: object) -> tuple[str, str, str, str]:
+def _validate_claim_input(project: Path, raw: object) -> tuple[str, str, str, str, str]:
     if not isinstance(raw, dict):
         raise VersionVerificationError("Every version claim must be an object.")
     component = _clean_text(raw.get("component"), "component")
