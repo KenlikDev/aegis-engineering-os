@@ -16,6 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from evidence_contract import EvidenceContractError
 
 GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_API_BASE_URL = "https://api.github.com"
@@ -654,7 +655,7 @@ def main() -> int:
                 ),
                 args.canonical_evidence_output,
             )
-    except (CIDiagnosisError, ValueError, OSError) as exc:
+    except (CIDiagnosisError, EvidenceContractError, ValueError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
