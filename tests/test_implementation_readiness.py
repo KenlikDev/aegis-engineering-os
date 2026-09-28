@@ -117,6 +117,19 @@ class ImplementationReadinessTests(unittest.TestCase):
         self.assertIn("version-verification", result.composition_steps)
         self.assertIn("passed", {item.status for item in result.observations})
 
+    def test_architecture_required_works_without_lifecycle_provider(self):
+        root, work_item, evidence, _ = self._fixture()
+        result = evaluate_readiness(
+            work_item,
+            "feature",
+            project_root=root,
+            version_evidence_ref=evidence,
+            architecture_required=True,
+            work_item_id="106",
+        )
+        self.assertTrue(result.ready)
+        self.assertEqual("passed", next(item.status for item in result.observations if item.check == "architecture"))
+
     def test_architecture_not_required_is_explicit_and_does_not_block(self):
         root, work_item, evidence, provider = self._fixture()
         result = evaluate_readiness(
