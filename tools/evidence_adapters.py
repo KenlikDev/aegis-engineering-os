@@ -154,7 +154,7 @@ def runtime_preflight_evidence(
                 if isinstance(agent_server.get("build_git_ref"), str)
                 else None
             ),
-            "credentials_configured": True,
+            "llm_auth_configured": True,
         }
 
     payload = {
