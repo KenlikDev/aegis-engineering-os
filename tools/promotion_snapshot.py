@@ -40,14 +40,6 @@ class PromotionSnapshotProvider(Protocol):
 
     repository: str
 
-    def _readiness_provider(self) -> GitHubPromotionProvider:
-        return GitHubPromotionProvider(
-            self.repository,
-            self._token,
-            transport=self._transport,
-            api_base_url=self._api_base_url,
-        )
-
     def assess_readiness(
         self,
         *,
@@ -211,6 +203,14 @@ class GitHubPromotionSnapshotProvider:
         self._token = token
         self._transport = transport or _default_transport
         self._api_base_url = api_base_url.rstrip("/")
+
+    def _readiness_provider(self) -> GitHubPromotionProvider:
+        return GitHubPromotionProvider(
+            self.repository,
+            self._token,
+            transport=self._transport,
+            api_base_url=self._api_base_url,
+        )
 
     def assess_readiness(
         self,
