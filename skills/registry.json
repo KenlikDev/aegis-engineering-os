@@ -150,6 +150,12 @@
       "path": "skills/workflows/release-preparation/SKILL.md",
       "domain": "workflow",
       "stability": "core"
+    },
+    {
+      "name": "promotion-synchronization",
+      "path": "skills/workflows/promotion-synchronization/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
     }
   ]
 }
