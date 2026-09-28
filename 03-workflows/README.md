@@ -18,6 +18,7 @@ The repository currently provides:
 - integration merge;
 - integration delivery.
 
+- knowledge-gap creation.
 ## Planned workflow areas
 
 The architecture also identifies these workflow areas for future dedicated skills:
