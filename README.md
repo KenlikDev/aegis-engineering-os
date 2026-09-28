@@ -193,3 +193,14 @@ Or inspect the latest run for a workflow and branch:
 Exit code 0 means the run was healthy or a deterministic diagnosis was produced. Exit code 2 means the failure is inconclusive. The tool never reruns, cancels, edits, approves, dispatches, or merges workflows.
 
 See docs/architecture/ci-remediation.md for the evidence and safety contract.
+
+
+## Requirements clarification
+
+Check a work item before planning without inventing missing decisions:
+
+    python3 tools/requirements_clarification.py path/to/work-item.md
+
+Exit code 0 means the required inputs are present. Exit code 2 means blocker-level clarification questions remain. The workflow is read-only and does not alter the work item.
+
+See docs/architecture/requirements.md for the decision-ownership contract.
