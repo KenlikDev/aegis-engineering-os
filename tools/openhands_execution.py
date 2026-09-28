@@ -76,7 +76,7 @@ class OpenHandsExecutionRequest:
     server_url: str
     workspace: str
     task: str
-    agent: Mapping[str, Any]
+    agent_settings: Mapping[str, Any]
     confirmation_policy: Mapping[str, Any]
     expected_agent_server_version: str = DEFAULT_OPENHANDS_VERSION
     max_iterations: int = 500
@@ -185,15 +185,21 @@ def _validate_workspace(workspace: str, workspace_root: str) -> None:
         ) from exc
 
 
-def _validate_agent(agent: Mapping[str, Any]) -> None:
-    if not isinstance(agent, Mapping):
-        raise ValueError("OpenHands agent configuration must be an object.")
-    if agent.get("kind") != "Agent":
+def _validate_agent_settings(agent_settings: Mapping[str, Any]) -> None:
+    if not isinstance(agent_settings, Mapping):
+        raise ValueError("OpenHands agent settings must be an object.")
+    if agent_settings.get("agent_kind") != "openhands":
         raise ValueError(
-            "The local Ollama execution adapter requires an OpenHands Agent payload."
+            "The local Ollama execution adapter requires the canonical "
+            "OpenHands agent-settings variant."
+        )
+    if agent_settings.get("tools") is not None:
+        raise ValueError(
+            "The local Ollama execution adapter must leave tools unset so "
+            "OpenHands can materialize its standard execution tool set."
         )
 
-    llm = agent.get("llm")
+    llm = agent_settings.get("llm")
     if not isinstance(llm, Mapping):
         raise ValueError(
             "OpenHands Agent payload must contain an LLM configuration."
@@ -218,7 +224,7 @@ def _validate_request(request: OpenHandsExecutionRequest) -> None:
     _validate_workspace(request.workspace, request.workspace_root)
     if not request.task.strip():
         raise ValueError("OpenHands task must not be empty.")
-    _validate_agent(request.agent)
+    _validate_agent_settings(request.agent_settings)
     if (
         not isinstance(request.confirmation_policy, Mapping)
         or not request.confirmation_policy.get("kind")
@@ -389,7 +395,7 @@ class OpenHandsExecutionClient:
         request: OpenHandsExecutionRequest,
     ) -> str:
         payload = {
-            "agent": dict(request.agent),
+            "agent_settings": dict(request.agent_settings),
             "initial_message": None,
             "max_iterations": request.max_iterations,
             "stuck_detection": request.stuck_detection,

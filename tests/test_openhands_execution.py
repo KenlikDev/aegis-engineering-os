@@ -26,13 +26,16 @@ def request_data() -> OpenHandsExecutionRequest:
         server_url=SERVER,
         workspace="/projects/demo",
         task="Implement the requested change.",
-        agent={
-            "kind": "Agent",
+        agent_settings={
+            "agent_kind": "openhands",
+            "agent": "CodeActAgent",
             "llm": {
                 "model": "openai/gemma4:31b",
                 "base_url": "http://host.docker.internal:11434/v1",
                 "api_key": "local-llm",
             },
+            "tools": None,
+            "enable_sub_agents": False,
         },
         confirmation_policy={
             "kind": "ConfirmRisky",
@@ -147,6 +150,9 @@ class OpenHandsExecutionTests(unittest.TestCase):
             {"working_dir": "/projects/demo"},
             create_payload["workspace"],
         )
+        self.assertEqual("openhands", create_payload["agent_settings"]["agent_kind"])
+        self.assertEqual("CodeActAgent", create_payload["agent_settings"]["agent"])
+        self.assertIsNone(create_payload["agent_settings"]["tools"])
         self.assertEqual(
             "ConfirmRisky",
             create_payload["confirmation_policy"]["kind"],
@@ -167,10 +173,10 @@ class OpenHandsExecutionTests(unittest.TestCase):
     def test_agent_api_key_is_redacted_from_returned_state(self) -> None:
         request = replace(
             request_data(),
-            agent={
-                **request_data().agent,
+            agent_settings={
+                **request_data().agent_settings,
                 "llm": {
-                    **request_data().agent["llm"],
+                    **request_data().agent_settings["llm"],
                     "api_key": "llm-secret-value",
                 },
             },
@@ -298,6 +304,28 @@ class OpenHandsExecutionTests(unittest.TestCase):
         with self.assertRaises(OpenHandsExecutionError):
             OpenHandsExecutionClient(transport).execute(request_data())
         self.assertFalse(any(call[0] == "POST" for call in transport.calls))
+
+    def test_non_canonical_agent_settings_are_rejected(self) -> None:
+        request = replace(
+            request_data(),
+            agent_settings={
+                **request_data().agent_settings,
+                "agent_kind": "llm",
+            },
+        )
+        with self.assertRaises(OpenHandsExecutionError):
+            OpenHandsExecutionClient(lambda *args: (200, {})).execute(request)
+
+    def test_explicit_tool_set_is_rejected(self) -> None:
+        request = replace(
+            request_data(),
+            agent_settings={
+                **request_data().agent_settings,
+                "tools": [{"name": "finish"}],
+            },
+        )
+        with self.assertRaises(OpenHandsExecutionError):
+            OpenHandsExecutionClient(lambda *args: (200, {})).execute(request)
 
     def test_workspace_escape_is_rejected(self) -> None:
         request = replace(
