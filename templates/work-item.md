@@ -40,6 +40,9 @@ Supporting roles:
 
 Record implementation constraints, affected components, and important assumptions.
 
+Version evidence reference:
+Architecture applicability: required | not-required
+
 ## Risks
 
 - ...
