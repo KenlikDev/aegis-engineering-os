@@ -90,6 +90,8 @@ Security review now has an explicit adapter as well. It preserves deterministic 
 
 CI diagnosis now has an explicit adapter as well. It preserves exact workflow-run provenance and maps inconclusive diagnosis to canonical `unknown` with explicit uncertainty.
 
+OpenHands execution now has an explicit adapter as well. It preserves the already-redacted conversation state and events; finished maps to canonical `verified`, while error/stuck/blocked map to `failed` with explicit uncertainty. Secret-like keys are removed before canonical validation.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
