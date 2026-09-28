@@ -105,6 +105,9 @@ def _require_text(value: str, field: str, maximum: int) -> str:
         raise KnowledgeGapError(f"{field} is too long.")
     if "\n" in value or "\r" in value:
         raise KnowledgeGapError(f"{field} must not contain newlines.")
+    for pattern in SECRET_VALUE_PATTERNS:
+        if pattern.search(value):
+            raise KnowledgeGapError(f"{field} contains a secret-like value.")
     return value
 
 
@@ -119,6 +122,9 @@ def _validate_candidate(candidate: KnowledgeGapCandidate) -> None:
     if not candidate.references:
         raise KnowledgeGapError("At least one provenance reference is required.")
     for reference in candidate.references:
+        for pattern in SECRET_VALUE_PATTERNS:
+            if pattern.search(reference):
+                raise KnowledgeGapError("Knowledge reference contains a secret-like value.")
         if not HTTPS_REFERENCE_RE.fullmatch(reference):
             raise KnowledgeGapError("Knowledge references must use HTTPS URLs.")
         if len(reference) > 1000:
