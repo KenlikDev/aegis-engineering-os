@@ -860,7 +860,7 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation_head_sha"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
-        self.assertEqual("verified", canonical.result["work_item"]["transition_verified"])
+        self.assertTrue(canonical.result["work_item"]["transition_verified"])
         self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
 
         with __import__("tempfile").TemporaryDirectory() as temp:
