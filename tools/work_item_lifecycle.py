@@ -392,6 +392,11 @@ class GitHubIssuesProvider:
             )
         )
         state = self._extract_state(list(labels))
+        has_status_label = any(
+            STATUS_LABEL_RE.fullmatch(label) for label in labels
+        )
+        if not has_status_label and data.get("state") == "closed":
+            state = LifecycleState.DONE
         resume_state = self._extract_resume_state(list(labels), state)
         if state == LifecycleState.DONE and data.get("state") != "closed":
             raise WorkItemLifecycleError("Aegis done state requires a closed GitHub issue.")
