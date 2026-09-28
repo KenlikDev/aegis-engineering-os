@@ -139,6 +139,8 @@ def main() -> int:
         "tools/render_openhands_profile.py",
         "tools/preflight_runtime.py",
         "tools/aegis_orchestrator.py",
+        "tools/quality_gates.py",
+        "templates/quality-gates.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
