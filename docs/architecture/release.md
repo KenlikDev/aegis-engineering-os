@@ -21,6 +21,8 @@ tools/release_readiness.py checks:
 
 The tool reports the exact observed SHA, validation evidence, version values, changelog state, and blockers.
 
+With `--evidence-output`, the same assessment can be persisted through the canonical evidence provenance adapter without changing the existing stdout schema.
+
 ## Provider boundary
 
 The orchestration contract is provider-neutral:
@@ -56,6 +58,8 @@ A blocked readiness result is an expected state, not an execution failure. The o
 - 1 — evaluation or configuration error.
 
 The result is JSON so it can be archived or consumed by a higher-level release workflow without exposing credentials.
+
+The optional canonical evidence artifact records the exact main revision and validation provenance. The observation timestamp is captured immediately before the provider assessment.
 
 ## Overall delivery lifecycle
 

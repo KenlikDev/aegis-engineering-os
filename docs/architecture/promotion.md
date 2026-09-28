@@ -22,6 +22,10 @@ Before any promotion write, Aegis verifies:
 
 A readiness result is evidence, not permission to merge.
 
+When requested with `--evidence-output`, the result is also adapted into the canonical provider-neutral provenance envelope. The specialized promotion-readiness JSON remains unchanged; the adapter preserves the exact source revision, target state, comparison, validation evidence type, blockers, and any uncertainty such as merged-pull-request CI fallback.
+
+The observation timestamp is captured immediately before the provider assessment and normalized to UTC by the evidence contract.
+
 ## Snapshot preparation
 
 tools/promotion_snapshot.py is the write boundary.

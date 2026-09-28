@@ -8,12 +8,15 @@ import base64
 import json
 import os
 import re
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from evidence_adapters import release_readiness_evidence
+from evidence_contract import write_evidence
 from promotion_readiness import (
     DEFAULT_API_BASE_URL,
     DEFAULT_WORKFLOW,
@@ -360,10 +363,12 @@ def main() -> int:
     parser.add_argument("repository")
     parser.add_argument("--target", default=DEFAULT_TARGET_BRANCH)
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
+    parser.add_argument("--evidence-output", type=os.path.abspath)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     args = parser.parse_args()
 
     try:
+        observed_at = datetime.now(timezone.utc)
         token = os.environ.get(args.token_env, "")
         provider = GitHubReleaseReadinessProvider(args.repository, token)
         result = assess_release_readiness(
@@ -374,6 +379,12 @@ def main() -> int:
     except (ReleaseReadinessError, ValueError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
+
+    if args.evidence_output:
+        write_evidence(
+            release_readiness_evidence(result, observed_at=observed_at),
+            args.evidence_output,
+        )
 
     print(json.dumps(_to_dict(result), indent=2, sort_keys=True))
     return 0 if result.ready else 2

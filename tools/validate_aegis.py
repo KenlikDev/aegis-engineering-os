@@ -187,6 +187,7 @@ def main() -> int:
         "tools/version_verification.py",
         "tools/evidence_contract.py",
         "tools/state_verification.py",
+        "tools/evidence_adapters.py",
         "tools/testing.py",
         "tools/version_verification.py",
         "templates/quality-gates.example.json",
