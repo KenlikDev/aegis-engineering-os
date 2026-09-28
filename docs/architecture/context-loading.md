@@ -14,6 +14,10 @@ Load:
 
 Before loading task-specific workflow skills for an implementation-oriented work item, establish its explicit kind and use the workflow-composition boundary to determine the ordered capabilities and conditional steps.
 
+## Implementation readiness
+
+The readiness gate is evaluated after workflow composition and before managed execution. Only after it passes should the orchestrator load or execute implementation-specific mutation workflows.
+
 ## Dynamic context
 
 Load only the roles, technology skills, workflows, and quality/security guidance relevant to the current task.
