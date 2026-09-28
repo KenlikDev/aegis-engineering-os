@@ -123,6 +123,45 @@ def request() -> CreatePullRequestRequest:
     )
 
 
+class UnverifiedCreateProvider(FakePullRequestProvider):
+    def create(self, request):
+        self.created.append(request)
+        return MutationEvidence(
+            provider="fake",
+            operation="create",
+            reference="not-a-number-url",
+            verified=False,
+            identifier=self.pull_request.number,
+        )
+
+
+class UnverifiedTraceabilityProvider(InMemoryWorkItemProvider):
+    def attach_traceability(self, work_item_id, traceability):
+        return MutationEvidence(
+            provider="memory",
+            operation="comment",
+            reference="not-verified",
+            verified=False,
+        )
+
+
+class UnverifiedTransitionProvider(InMemoryWorkItemProvider):
+    def transition(
+        self,
+        work_item_id,
+        target,
+        *,
+        expected_state=None,
+    ):
+        current = self.get(work_item_id)
+        return MutationEvidence(
+            provider=current.provider,
+            operation="transition",
+            reference=current.provider_url or "not-verified",
+            verified=False,
+        )
+
+
 class DeliveryTests(unittest.TestCase):
     def test_create_rejects_protected_target(self) -> None:
         provider = GitHubPullRequestProvider(
@@ -160,6 +199,74 @@ class DeliveryTests(unittest.TestCase):
                     title="test",
                     body="",
                 )
+            )
+
+    def test_create_rejects_unverified_pull_request_mutation(self) -> None:
+        work_items = review_item_provider()
+        pr_provider = UnverifiedCreateProvider(
+            PullRequest(
+                number=60,
+                title="test",
+                body="",
+                head=request().head,
+                base=request().base,
+                state="open",
+                merged=False,
+                draft=False,
+                mergeable=True,
+                mergeable_state="clean",
+                url=PR_URL,
+            )
+        )
+
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "creation mutation was not read-after-write verified",
+        ):
+            create_review_pull_request(
+                pr_provider,
+                work_items,
+                "60",
+                request(),
+            )
+
+    def test_create_rejects_unverified_traceability_mutation(self) -> None:
+        work_items = UnverifiedTraceabilityProvider(
+            {
+                "60": WorkItem(
+                    id="60",
+                    title="delivery",
+                    state=LifecycleState.REVIEW,
+                    provider="memory",
+                    provider_url=ISSUE_URL,
+                )
+            }
+        )
+        pr_provider = FakePullRequestProvider(
+            PullRequest(
+                number=60,
+                title="test",
+                body="",
+                head=request().head,
+                base=request().base,
+                state="open",
+                merged=False,
+                draft=False,
+                mergeable=True,
+                mergeable_state="clean",
+                url=PR_URL,
+            )
+        )
+
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "traceability mutation was not read-after-write verified",
+        ):
+            create_review_pull_request(
+                pr_provider,
+                work_items,
+                "60",
+                request(),
             )
 
     def test_create_requires_review_work_item(self) -> None:
@@ -375,6 +482,49 @@ class DeliveryTests(unittest.TestCase):
         )
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, work_items.get("60").state)
+
+    def test_sync_merge_rejects_unverified_transition_mutation(self) -> None:
+        work_items = UnverifiedTransitionProvider(
+            {
+                "60": WorkItem(
+                    id="60",
+                    title="delivery",
+                    state=LifecycleState.REVIEW,
+                    provider="memory",
+                    provider_url=ISSUE_URL,
+                )
+            }
+        )
+        pr_provider = FakePullRequestProvider(
+            PullRequest(
+                number=60,
+                title="test",
+                body="",
+                head=request().head,
+                base="ai/integration",
+                state="closed",
+                merged=True,
+                draft=False,
+                mergeable=True,
+                mergeable_state="clean",
+                url=PR_URL,
+            )
+        )
+
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "Lifecycle transition mutation was not read-after-write verified",
+        ):
+            sync_merged_pull_request(
+                pr_provider,
+                work_items,
+                "60",
+                60,
+                integration_branch="ai/integration",
+                expected_head=request().head,
+            )
+
+        self.assertEqual(LifecycleState.REVIEW, work_items.get("60").state)
 
     def test_sync_merge_rejects_wrong_head(self) -> None:
         work_items = review_item_provider()

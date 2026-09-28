@@ -384,6 +384,10 @@ def create_review_pull_request(
         )
 
     mutation = provider.create(request)
+    if not mutation.verified:
+        raise DeliveryError(
+            "Pull-request creation mutation was not read-after-write verified."
+        )
     if not isinstance(mutation.identifier, int) or mutation.identifier <= 0:
         raise DeliveryError(
             "Pull-request creation provider did not return a numeric pull-request identifier."
@@ -400,6 +404,10 @@ def create_review_pull_request(
             pull_request_url=pull_request.url,
         ),
     )
+    if not trace.verified:
+        raise DeliveryError(
+            "Pull-request traceability mutation was not read-after-write verified."
+        )
     return {
         "status": "verified",
         "operation": mutation.operation,
@@ -462,6 +470,10 @@ def sync_merged_pull_request(
         LifecycleState.INTEGRATION,
         expected_state=LifecycleState.REVIEW,
     )
+    if not mutation.verified:
+        raise DeliveryError(
+            "Lifecycle transition mutation was not read-after-write verified."
+        )
     return {
         "status": "verified",
         "work_item_id": work_item_id,
