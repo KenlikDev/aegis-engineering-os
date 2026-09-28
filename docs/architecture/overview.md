@@ -48,3 +48,27 @@ Defines user authority, Git and GitHub policy, version pinning, and offline beha
 ## Current maturity
 
 Version 0.1.0-alpha.1 is experimental and is expected to change after validation on real repositories.
+
+### Current executable delivery path
+
+The implemented engineering delivery path is:
+
+work item
+-> execution
+-> verification
+-> quality gates
+-> review
+-> integration delivery
+-> ai/integration
+-> promotion readiness
+-> promotion snapshot
+-> owner-controlled promotion
+-> main
+-> release readiness
+-> owner-controlled release publication
+
+The executable boundaries are documented in:
+- docs/architecture/integration-delivery.md;
+- docs/architecture/promotion.md;
+- docs/architecture/release.md.
+
