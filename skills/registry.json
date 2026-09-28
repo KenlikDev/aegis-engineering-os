@@ -162,6 +162,12 @@
       "path": "skills/workflows/integration-merge/SKILL.md",
       "domain": "workflow",
       "stability": "core"
+    },
+    {
+      "name": "integration-delivery",
+      "path": "skills/workflows/integration-delivery/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
     }
   ]
 }
