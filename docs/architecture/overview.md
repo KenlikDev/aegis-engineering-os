@@ -85,6 +85,8 @@ The evidence-bundle boundary composes already validated canonical evidence artif
 
 Implementation readiness can now emit its own canonical provenance record, allowing the readiness gate result to participate in later evidence composition without replacing its specialized contract.
 
+Testing can now emit a canonical provenance record from its existing redacted execution result, allowing verification evidence to participate in later evidence bundles.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.

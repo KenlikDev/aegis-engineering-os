@@ -18,6 +18,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add deterministic evidence bundles that compose validated provenance artifacts without changing their individual schemas;
 - add the version-verification provenance adapter while preserving source-pinned specialized evidence semantics;
 - add the implementation-readiness provenance adapter while preserving the existing readiness decision contract;
+- add the testing provenance adapter while preserving the existing quality-gate execution and lifecycle contract;
 - harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;

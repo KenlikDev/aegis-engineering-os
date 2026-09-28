@@ -356,6 +356,14 @@ Execute the explicit contract:
 
 With lifecycle synchronization, the work item must already be in `verification`; required gates passing advances it through the existing quality-gate contract to `review`, while required failures block it.
 
+To additionally persist the already-redacted testing result in the canonical provenance envelope:
+
+    python3 tools/testing.py /path/to/project \
+      --canonical-evidence-output /tmp/testing-evidence.json \
+      --revision <exact-project-revision>
+
+The canonical artifact records the explicit gate results without introducing another test runner.
+
 See docs/architecture/testing.md.
 
 

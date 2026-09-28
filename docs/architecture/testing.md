@@ -34,6 +34,12 @@ The testing boundary never advances work directly to `integration` or `done`.
 
 ## Evidence
 
+## Canonical provenance adapter
+
+The testing workflow can emit the existing result into the canonical evidence envelope with `--canonical-evidence-output`. An optional `--revision` records the exact project revision associated with the observed run.
+
+The adapter uses the already redacted testing result. It does not rerun commands, inspect credentials, infer additional pass/fail rules, or change lifecycle semantics.
+
 The result preserves:
 
 - gate order;

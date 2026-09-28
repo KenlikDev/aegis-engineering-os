@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +115,8 @@ def run_testing(
     work_item_provider: WorkItemProvider | None = None,
     work_item_id: str | None = None,
     evidence_path: str | Path | None = None,
+    canonical_evidence_path: str | Path | None = None,
+    revision: str | None = None,
     run_command: CommandRunner | None = None,
 ) -> dict[str, Any]:
     """Validate and execute the explicit testing contract."""
@@ -178,6 +181,28 @@ def run_testing(
         "required_gate_ids": list(plan.required_gate_ids),
         "gate_count": len(plan.gates),
     }
+
+    if canonical_evidence_path is not None:
+        from evidence_adapters import testing_evidence
+        from evidence_contract import write_evidence
+
+        canonical_path = Path(canonical_evidence_path).expanduser().resolve()
+        specialized_path = (
+            Path(evidence_path).expanduser().resolve()
+            if evidence_path is not None
+            else None
+        )
+        if specialized_path is not None and canonical_path == specialized_path:
+            raise TestingWorkflowError(
+                "Canonical evidence output must differ from the specialized testing evidence output."
+            )
+        canonical = testing_evidence(
+            output,
+            observed_at=datetime.now(timezone.utc),
+            revision=revision,
+        )
+        write_evidence(canonical, canonical_path)
+
     return output
 
 
@@ -197,6 +222,15 @@ def main() -> int:
         help="Project-local quality-gate manifest.",
     )
     parser.add_argument("--evidence-path", type=Path)
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
+    parser.add_argument(
+        "--revision",
+        help="Optional exact project revision associated with this testing observation.",
+    )
     parser.add_argument("--work-item-id")
     parser.add_argument("--work-item-repository")
     parser.add_argument("--work-item-token-env", default="GITHUB_TOKEN")
@@ -252,6 +286,8 @@ def main() -> int:
             work_item_provider=provider,
             work_item_id=args.work_item_id,
             evidence_path=args.evidence_path,
+            canonical_evidence_path=args.canonical_evidence_output,
+            revision=args.revision,
         )
     except (TestingWorkflowError, WorkItemLifecycleError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

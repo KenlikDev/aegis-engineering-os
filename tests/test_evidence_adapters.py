@@ -9,6 +9,7 @@ from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
     implementation_readiness_evidence,
     release_readiness_evidence,
+    testing_evidence,
     version_verification_evidence,
 )
 from evidence_contract import (  # noqa: E402
@@ -308,6 +309,99 @@ class EvidenceAdapterTests(unittest.TestCase):
             ["Requirements clarification still contains blocker-level questions."],
             canonical.result["blockers"],
         )
+
+
+    def test_testing_verified_result_is_preserved(self):
+        result = {
+            "status": "verified",
+            "project": "/tmp/project",
+            "manifest": "/tmp/project/.aegis/quality-gates.json",
+            "required_failures": [],
+            "gates": [
+                {
+                    "id": "unit-tests",
+                    "required": True,
+                    "status": "passed",
+                    "exit_code": 0,
+                    "timed_out": False,
+                    "duration_seconds": 1.234,
+                    "stdout": "passed\\n",
+                    "stderr": "",
+                }
+            ],
+            "work_item": None,
+            "testing_contract": {
+                "required_gate_ids": ["unit-tests"],
+                "gate_count": 1,
+            },
+        }
+
+        canonical = testing_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+            revision="d932c1f343cb38ceb6d6a28d4ef753d01a9f6e43",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual(
+            "d932c1f343cb38ceb6d6a28d4ef753d01a9f6e43",
+            canonical.revision,
+        )
+        self.assertEqual(["unit-tests"], canonical.result["testing_contract"]["required_gate_ids"])
+        self.assertEqual("passed", canonical.result["gates"][0]["status"])
+
+    def test_testing_failed_result_is_preserved(self):
+        result = {
+            "status": "failed",
+            "project": "/tmp/project",
+            "manifest": "/tmp/project/.aegis/quality-gates.json",
+            "required_failures": ["unit-tests"],
+            "gates": [
+                {
+                    "id": "unit-tests",
+                    "required": True,
+                    "status": "failed",
+                    "exit_code": 1,
+                    "timed_out": False,
+                    "duration_seconds": 0.1,
+                    "stdout": "",
+                    "stderr": "failed",
+                }
+            ],
+            "work_item": None,
+            "testing_contract": {
+                "required_gate_ids": ["unit-tests"],
+                "gate_count": 1,
+            },
+        }
+
+        canonical = testing_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("failed", canonical.status)
+        self.assertEqual(["unit-tests"], canonical.result["required_failures"])
+
+    def test_testing_evidence_round_trips(self):
+        result = {
+            "status": "verified",
+            "project": "/tmp/project",
+            "manifest": "/tmp/project/.aegis/quality-gates.json",
+            "required_failures": [],
+            "gates": [],
+            "work_item": None,
+            "testing_contract": {
+                "required_gate_ids": [],
+                "gate_count": 0,
+            },
+        }
+        canonical = testing_evidence(result, observed_at="2026-09-28T18:00:00Z")
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "testing-evidence.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
 
 
     def test_release_ready_result_is_verified(self):
