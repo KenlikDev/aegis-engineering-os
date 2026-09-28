@@ -13,6 +13,7 @@ The repository currently provides:
 - bug fixing;
 - code review;
 - security review;
+- ci remediation;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
@@ -27,7 +28,6 @@ The architecture also identifies these workflow areas for future dedicated skill
 - requirements clarification;
 - architecture planning;
 - refactoring;
-- testing;
-- CI remediation.
+- testing.
 
 A workflow must define entry conditions, required evidence, quality gates, and exit conditions.

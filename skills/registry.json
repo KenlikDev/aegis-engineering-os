@@ -146,6 +146,12 @@
       "stability": "core"
     },
     {
+      "name": "ci-remediation",
+      "path": "skills/workflows/ci-remediation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
       "name": "aegis-update-validation",
       "path": "skills/workflows/aegis-update-validation/SKILL.md",
       "domain": "workflow",

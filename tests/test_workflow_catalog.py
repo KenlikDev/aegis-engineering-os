@@ -17,6 +17,8 @@ CORE_WORKFLOW_DISPLAY_NAMES = {
     "promotion-synchronization": "promotion synchronization",
     "integration-merge": "integration merge",
     "integration-delivery": "integration delivery",
+    "security-review": "security review",
+    "ci-remediation": "ci remediation",
 }
 
 
@@ -52,7 +54,8 @@ class WorkflowCatalogTests(unittest.TestCase):
 
         self.assertIn("- integration delivery;", implemented)
         self.assertNotIn("- integration delivery.", planned)
-        self.assertIn("- CI remediation.", planned)
+        self.assertNotIn("- ci remediation;", planned)
+        self.assertIn("- requirements clarification;", planned)
 
 
 if __name__ == "__main__":

@@ -178,3 +178,18 @@ Run the read-only repository security review before high-impact integration or p
 Exit code 0 means no high-severity findings were observed. Exit code 2 means blocking findings are present. The review never modifies the repository.
 
 See docs/architecture/security.md for the security-review architecture and safety boundary.
+
+
+## CI remediation
+
+Diagnose a failed GitHub Actions run without changing CI state:
+
+    python3 tools/ci_diagnosis.py OWNER/REPO --run-id 123
+
+Or inspect the latest run for a workflow and branch:
+
+    python3 tools/ci_diagnosis.py OWNER/REPO --latest --workflow .github/workflows/validate.yml --branch ai/integration
+
+Exit code 0 means the run was healthy or a deterministic diagnosis was produced. Exit code 2 means the failure is inconclusive. The tool never reruns, cancels, edits, approves, dispatches, or merges workflows.
+
+See docs/architecture/ci-remediation.md for the evidence and safety contract.
