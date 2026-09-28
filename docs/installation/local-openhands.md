@@ -16,7 +16,7 @@ The validated local setup uses:
 - Ollama: `0.34.3`;
 - local model: `gemma4:31b`.
 
-The container image runs its `openhands` user as UID/GID `10001:10001`. Bind-mounted state directories therefore must be writable by that identity.
+The container image runs its `openhands` user as UID/GID `10001:10001`. Bind-mounted state directories therefore must be accessible to that identity. The live smoke-test harness grants ACL access only on the unique temporary workspace it creates; it does not recursively change permissions on the existing workspace root.
 
 Prepare the local directories:
 
@@ -69,7 +69,7 @@ Run the local Ollama and OpenHands Agent Server checks before claiming the runti
 
     python3 tools/preflight_runtime.py templates/ai-profiles.example.json development-local --agent-server-url http://127.0.0.1:8000
 
-The preflight is read-only. It verifies the exact configured model, Ollama runtime version, Agent Server liveness/readiness, local conversation runtime, reported component versions, and exposure of the exact model through the Agent Server OpenAI-compatible `/v1/models` surface.
+The preflight is read-only. It verifies the exact configured model, Ollama runtime version, Agent Server liveness/readiness, local conversation runtime, reported component versions, and the active OpenHands LLM settings exposed by `/api/settings`.
 
 When the Agent Server requires authentication, provide its session key through the `AEGIS_OPENHANDS_AGENT_SERVER_API_KEY` environment variable. The key is used only for the request and is not emitted in evidence.
 
@@ -93,7 +93,7 @@ The harness verifies the exact expected local runtime:
 - local conversation runtime;
 - selected model `gemma4:31b`.
 
-It creates one unique temporary directory directly under `$HOME/openhands_workspace`, maps it to `/projects/<name>`, asks OpenHands to create exactly `Aegis-Live-E2E.txt` with `AEGIS_LIVE_E2E_OK`, verifies the file from the host, emits machine-readable evidence, and then removes only the temporary directory it created.
+It creates one unique temporary directory directly under `$HOME/openhands_workspace`, grants the OpenHands container UID `10001` ACL access only to that directory, maps it to `/projects/<name>`, allows OpenHands Agent Server to initialize its required `.git` metadata, asks the agent to create exactly `Aegis-Live-E2E.txt` with `AEGIS_LIVE_E2E_OK`, rejects any other top-level workspace entries, verifies the file from the host, emits machine-readable evidence, and then removes only the temporary directory it created.
 
 The smoke test uses an explicit `NeverConfirm` policy only for this isolated temporary workspace. It does not grant general approval authority to Aegis and must not be reused as a general project-execution mechanism.
 

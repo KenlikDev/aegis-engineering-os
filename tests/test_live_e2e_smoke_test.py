@@ -3,16 +3,19 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from live_e2e_smoke_test import (  # noqa: E402
     EXPECTED_FILE_CONTENT,
+    DEFAULT_MODEL,
     EXPECTED_FILE_NAME,
     LiveE2EConfig,
     LiveE2EError,
     _cleanup_workspace,
+    _configure_workspace_permissions,
     _container_workspace,
     _event_summary,
     _task_text,
@@ -62,12 +65,55 @@ class LiveE2ESmokeTest(unittest.TestCase):
             evidence = _verify_workspace_artifact(workspace)
             self.assertTrue(evidence["content_verified"])
 
+            (workspace / ".git").mkdir()
+            evidence = _verify_workspace_artifact(workspace)
+            self.assertTrue(evidence["content_verified"])
+
             (workspace / "unexpected.txt").write_text(
                 "bad",
                 encoding="utf-8",
             )
             with self.assertRaises(LiveE2EError):
                 _verify_workspace_artifact(workspace)
+
+            (workspace / "unexpected.txt").unlink()
+            (workspace / ".git").rmdir()
+            (workspace / ".git").symlink_to(workspace)
+            with self.assertRaises(LiveE2EError):
+                _verify_workspace_artifact(workspace)
+
+    def test_workspace_acl_grants_container_and_host_access(self) -> None:
+        calls = []
+
+        def fake_run(command, **kwargs):  # noqa: ANN001
+            calls.append((command, kwargs))
+            return SimpleNamespace(returncode=0)
+
+        with tempfile.TemporaryDirectory() as root, patch(
+            "live_e2e_smoke_test.shutil.which",
+            return_value="/usr/bin/setfacl",
+        ), patch("live_e2e_smoke_test.os.getuid", return_value=1000):
+            _configure_workspace_permissions(
+                Path(root),
+                container_uid=10001,
+                run_command=fake_run,
+            )
+
+        self.assertEqual(2, len(calls))
+        self.assertEqual(
+            ["/usr/bin/setfacl", "-m", "u:10001:rwx", root],
+            calls[0][0],
+        )
+        self.assertEqual(
+            [
+                "/usr/bin/setfacl",
+                "-d",
+                "-m",
+                "u::rwx,g::---,m::rwx,o::---,u:10001:rwx,u:1000:rwx",
+                root,
+            ],
+            calls[1][0],
+        )
 
     def test_cleanup_removes_only_workspace_child(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -84,21 +130,22 @@ class LiveE2ESmokeTest(unittest.TestCase):
             self.assertEqual("removed", result["status"])
             self.assertFalse(workspace.exists())
 
-    def test_event_summary_contains_types_and_count(self) -> None:
+    def test_event_summary_uses_openhands_kind_and_legacy_type(self) -> None:
         result = _event_summary(
             (
-                {"id": "1", "type": "AgentStarted"},
-                {"id": "2", "type": "AgentStarted"},
+                {"id": "1", "kind": "AgentStarted"},
+                {"id": "2", "kind": "AgentStarted"},
                 {"id": "3", "type": "AgentFinished"},
+                {"id": "4", "kind": ""},
             )
         )
-        self.assertEqual(3, result["count"])
+        self.assertEqual(4, result["count"])
         self.assertEqual(
-            {"AgentStarted": 2, "AgentFinished": 1},
+            {"AgentStarted": 2, "AgentFinished": 1, "unknown": 1},
             result["type_counts"],
         )
         self.assertEqual("1", result["first_id"])
-        self.assertEqual("3", result["last_id"])
+        self.assertEqual("4", result["last_id"])
 
     def test_full_flow_verifies_and_cleans_isolated_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -126,7 +173,8 @@ class LiveE2ESmokeTest(unittest.TestCase):
             def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
                 return (
                     {
-                        "kind": "Agent",
+                        "agent_kind": "openhands",
+                        "agent": "CodeActAgent",
                         "llm": {
                             "model": "openai/gemma4:31b",
                             "base_url": (
@@ -134,6 +182,8 @@ class LiveE2ESmokeTest(unittest.TestCase):
                             ),
                             "api_key": "local-llm",
                         },
+                        "tools": None,
+                        "enable_sub_agents": False,
                     },
                     {
                         "provider": "ollama",
@@ -181,6 +231,7 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 agent_server_url="http://127.0.0.1:8000",
                 host_workspace_root=host_root,
                 openhands_container="openhands",
+                configure_workspace_permissions=False,
             )
             evidence = run_live_smoke_test(
                 config,
@@ -208,6 +259,15 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 captured["request"].confirmation_policy["kind"],
             )
             self.assertEqual(
+                f"openai/{DEFAULT_MODEL}",
+                captured["request"].agent_settings["llm"]["model"],
+            )
+            self.assertEqual(
+                "openhands",
+                captured["request"].agent_settings["agent_kind"],
+            )
+            self.assertIsNone(captured["request"].agent_settings["tools"])
+            self.assertEqual(
                 "10",
                 str(captured["request"].max_iterations),
             )
@@ -215,6 +275,104 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 "removed",
                 evidence["workspace"]["cleanup"]["status"],
             )
+            self.assertEqual([], list(host_root.iterdir()))
+
+    def test_model_mismatch_fails_closed_before_workspace_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            host_root = Path(root)
+
+            def fake_preflight(*args, **kwargs):  # noqa: ANN002, ANN003
+                return {
+                    "ollama_version": "0.34.3",
+                    "model": "different-model:latest",
+                    "openhands_agent_server": {
+                        "version": "1.49.5",
+                        "sdk_version": "1.49.5",
+                        "tools_version": "1.49.5",
+                        "workspace_version": "1.49.5",
+                        "conversation_runtime": "local",
+                    },
+                }
+
+            def fake_inspect(name):  # noqa: ANN001
+                return "ghcr.io/openhands/agent-canvas:1.23.0"
+
+            with self.assertRaises(LiveE2EError):
+                run_live_smoke_test(
+                    LiveE2EConfig(
+                        profile_config=ROOT / "profiles.json",
+                        profile_name="development-local",
+                        agent_server_url="http://127.0.0.1:8000",
+                        host_workspace_root=host_root,
+                        openhands_container="openhands",
+                        configure_workspace_permissions=False,
+                    ),
+                    preflight_fn=fake_preflight,
+                    inspect_image_fn=fake_inspect,
+                )
+
+            self.assertEqual([], list(host_root.iterdir()))
+
+    def test_rendered_model_mismatch_fails_closed_before_workspace_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            host_root = Path(root)
+
+            def fake_preflight(*args, **kwargs):  # noqa: ANN002, ANN003
+                return {
+                    "ollama_version": "0.34.3",
+                    "model": DEFAULT_MODEL,
+                    "openhands_agent_server": {
+                        "version": "1.49.5",
+                        "sdk_version": "1.49.5",
+                        "tools_version": "1.49.5",
+                        "workspace_version": "1.49.5",
+                        "conversation_runtime": "local",
+                    },
+                }
+
+            def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
+                return (
+                    {
+                        "agent_kind": "openhands",
+                        "agent": "CodeActAgent",
+                        "llm": {
+                            "model": "openai/different-model:latest",
+                            "base_url": "http://host.docker.internal:11434/v1",
+                            "api_key": "local-llm",
+                        },
+                        "tools": None,
+                        "enable_sub_agents": False,
+                    },
+                    {
+                        "provider": "ollama",
+                        "surface": "local",
+                        "connection_mode": "local",
+                        "integration": "openhands_llm_ollama",
+                        "openhands_agent_kind": "llm",
+                        "llm_model": "openai/different-model:latest",
+                        "llm_base_url": "http://host.docker.internal:11434/v1",
+                        "api_key_placeholder": "local-llm",
+                    },
+                )
+
+            def fake_inspect(name):  # noqa: ANN001
+                return "ghcr.io/openhands/agent-canvas:1.23.0"
+
+            with self.assertRaises(LiveE2EError):
+                run_live_smoke_test(
+                    LiveE2EConfig(
+                        profile_config=ROOT / "profiles.json",
+                        profile_name="development-local",
+                        agent_server_url="http://127.0.0.1:8000",
+                        host_workspace_root=host_root,
+                        openhands_container="openhands",
+                        configure_workspace_permissions=False,
+                    ),
+                    preflight_fn=fake_preflight,
+                    inspect_image_fn=fake_inspect,
+                    render_agent_fn=fake_render,
+                )
+
             self.assertEqual([], list(host_root.iterdir()))
 
     def test_failed_execution_still_cleans_workspace(self) -> None:
@@ -236,12 +394,15 @@ class LiveE2ESmokeTest(unittest.TestCase):
             def fake_render(*args, **kwargs):  # noqa: ANN002, ANN003
                 return (
                     {
-                        "kind": "Agent",
+                        "agent_kind": "openhands",
+                        "agent": "CodeActAgent",
                         "llm": {
                             "model": "openai/gemma4:31b",
                             "base_url": "http://host.docker.internal:11434/v1",
                             "api_key": "local-llm",
                         },
+                        "tools": None,
+                        "enable_sub_agents": False,
                     },
                     {
                         "provider": "ollama",
@@ -283,6 +444,7 @@ class LiveE2ESmokeTest(unittest.TestCase):
                 agent_server_url="http://127.0.0.1:8000",
                 host_workspace_root=host_root,
                 openhands_container="openhands",
+                configure_workspace_permissions=False,
             )
             with self.assertRaises(LiveE2EError):
                 run_live_smoke_test(

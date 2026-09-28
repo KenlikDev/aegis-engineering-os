@@ -26,8 +26,10 @@ from openhands_execution import OpenHandsExecutionClient, OpenHandsExecutionRequ
 from preflight_runtime import RuntimePreflightError, preflight
 
 DEFAULT_OLLAMA_VERSION = "0.34.3"
+DEFAULT_MODEL = "gemma4:31b"
 DEFAULT_OPENHANDS_AGENT_SERVER_VERSION = "1.49.5"
 DEFAULT_OPENHANDS_IMAGE = "ghcr.io/openhands/agent-canvas:1.23.0"
+DEFAULT_OPENHANDS_CONTAINER_UID = 10001
 DEFAULT_WORKSPACE_ROOT = Path.home() / "openhands_workspace"
 DEFAULT_MAX_ITERATIONS = 10
 DEFAULT_TIMEOUT_SECONDS = 900.0
@@ -50,12 +52,14 @@ class LiveE2EConfig:
     host_workspace_root: Path
     openhands_container: str
     expected_ollama_version: str = DEFAULT_OLLAMA_VERSION
+    expected_model: str = DEFAULT_MODEL
     expected_openhands_version: str = DEFAULT_OPENHANDS_AGENT_SERVER_VERSION
     expected_openhands_image: str = DEFAULT_OPENHANDS_IMAGE
     max_iterations: int = DEFAULT_MAX_ITERATIONS
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS
     agent_server_api_key: str | None = None
+    configure_workspace_permissions: bool = True
 
 
 def _validate_loopback_url(value: str) -> str:
@@ -107,7 +111,7 @@ def _inspect_container_image(
     return image
 
 
-def _render_local_ollama_agent(
+def _render_local_ollama_agent_settings(
     profile_config: Path,
     profile_name: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -136,16 +140,71 @@ def _render_local_ollama_agent(
             "Rendered local Ollama profile is missing required OpenHands LLM settings."
         )
 
-    agent = {
-        "kind": "Agent",
+    agent_settings = {
+        "agent_kind": "openhands",
+        "agent": "CodeActAgent",
         "llm": {
             "model": model,
             "base_url": base_url,
             "api_key": api_key,
         },
+        "tools": None,
+        "enable_sub_agents": False,
     }
-    return agent, rendered
+    return agent_settings, rendered
 
+
+def _configure_workspace_permissions(
+    workspace: Path,
+    container_uid: int = DEFAULT_OPENHANDS_CONTAINER_UID,
+    run_command: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> None:
+    """Grant only the temporary workspace to the OpenHands container UID.
+
+    The live Ubuntu runtime uses UID 10001 inside the Agent Canvas container.
+    A default ACL also grants the host user access to files created by the
+    container. No parent or sibling path is modified.
+    """
+    setfacl = shutil.which("setfacl")
+    if setfacl is None:
+        raise LiveE2EError(
+            "Live OpenHands verification requires the 'setfacl' command "
+            "(install the acl package)."
+        )
+
+    if container_uid <= 0:
+        raise LiveE2EError("OpenHands container UID must be greater than zero.")
+
+    host_uid = os.getuid()
+    access_entry = f"u:{container_uid}:rwx"
+    default_entries = [
+        "u::rwx",
+        "g::---",
+        "m::rwx",
+        "o::---",
+        access_entry,
+    ]
+    if host_uid != container_uid:
+        default_entries.append(f"u:{host_uid}:rwx")
+
+    try:
+        run_command(
+            [setfacl, "-m", access_entry, str(workspace)],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        run_command(
+            [setfacl, "-d", "-m", ",".join(default_entries), str(workspace)],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise LiveE2EError(
+            f"Unable to configure isolated workspace ACL for OpenHands UID "
+            f"{container_uid}."
+        ) from exc
 
 def _create_workspace(host_workspace_root: Path) -> Path:
     root = host_workspace_root.expanduser().resolve()
@@ -199,13 +258,23 @@ def _verify_workspace_artifact(workspace: Path) -> dict[str, Any]:
         )
 
     entries = sorted(workspace.iterdir(), key=lambda item: item.name)
-    if len(entries) != 1 or entries[0].name != EXPECTED_FILE_NAME:
+    entry_names = {entry.name for entry in entries}
+    allowed_names = {EXPECTED_FILE_NAME, ".git"}
+    if not entry_names.issubset(allowed_names) or EXPECTED_FILE_NAME not in entry_names:
         names = [entry.name for entry in entries]
         raise LiveE2EError(
             f"Live smoke test produced an unexpected workspace shape: {names!r}."
         )
 
-    artifact = entries[0]
+    git_metadata = workspace / ".git"
+    if git_metadata in entries and (
+        not git_metadata.is_dir() or git_metadata.is_symlink()
+    ):
+        raise LiveE2EError(
+            "OpenHands Git metadata entry is not a normal directory."
+        )
+
+    artifact = workspace / EXPECTED_FILE_NAME
     if not artifact.is_file() or artifact.is_symlink():
         raise LiveE2EError(
             "Expected live smoke-test artifact is not a normal file."
@@ -255,11 +324,14 @@ def _cleanup_workspace(
 def _event_summary(
     events: tuple[dict[str, Any], ...],
 ) -> dict[str, Any]:
-    types = Counter(
-        event.get("type", "unknown")
-        for event in events
-        if isinstance(event, Mapping)
-    )
+    types = Counter()
+    for event in events:
+        if not isinstance(event, Mapping):
+            continue
+        event_type = event.get("kind") or event.get("type") or "unknown"
+        if not isinstance(event_type, str) or not event_type:
+            event_type = "unknown"
+        types[event_type] += 1
     ids = [
         event.get("id")
         for event in events
@@ -280,7 +352,7 @@ def run_live_smoke_test(
     inspect_image_fn: Callable[[str], str] = _inspect_container_image,
     render_agent_fn: Callable[
         [Path, str], tuple[dict[str, Any], dict[str, Any]]
-    ] = _render_local_ollama_agent,
+    ] = _render_local_ollama_agent_settings,
 ) -> dict[str, Any]:
     """Execute and verify one isolated live task, then remove its workspace."""
 
@@ -295,6 +367,8 @@ def run_live_smoke_test(
         )
     if not config.expected_ollama_version.strip():
         raise LiveE2EError("expected_ollama_version must not be empty.")
+    if not config.expected_model.strip():
+        raise LiveE2EError("expected_model must not be empty.")
     if not config.expected_openhands_version.strip():
         raise LiveE2EError("expected_openhands_version must not be empty.")
     if not config.expected_openhands_image.strip():
@@ -319,6 +393,12 @@ def run_live_smoke_test(
             f"{config.expected_ollama_version!r}, got "
             f"{preflight_result.get('ollama_version')!r}."
         )
+    if preflight_result.get("model") != config.expected_model:
+        raise LiveE2EError(
+            f"Ollama model mismatch: expected "
+            f"{config.expected_model!r}, got "
+            f"{preflight_result.get('model')!r}."
+        )
 
     server_evidence = preflight_result.get("openhands_agent_server")
     if not isinstance(server_evidence, Mapping):
@@ -336,14 +416,23 @@ def run_live_smoke_test(
             "OpenHands Agent Server did not report conversation_runtime=local."
         )
 
-    agent, rendered_profile = render_agent_fn(
+    agent_settings, rendered_profile = render_agent_fn(
         profile_config,
         config.profile_name,
     )
+    expected_openai_model = f"openai/{config.expected_model}"
+    rendered_model = agent_settings.get("llm", {}).get("model")
+    if rendered_model != expected_openai_model:
+        raise LiveE2EError(
+            f"OpenHands model mismatch: expected "
+            f"{expected_openai_model!r}, got {rendered_model!r}."
+        )
     workspace: Path | None = None
     evidence: dict[str, Any] | None = None
     try:
         workspace = _create_workspace(config.host_workspace_root)
+        if config.configure_workspace_permissions:
+            _configure_workspace_permissions(workspace)
         container_workspace = _container_workspace(
             workspace,
             config.host_workspace_root,
@@ -353,7 +442,7 @@ def run_live_smoke_test(
             server_url=agent_server_url,
             workspace=container_workspace,
             task=_task_text(),
-            agent=agent,
+            agent_settings=agent_settings,
             confirmation_policy={"kind": "NeverConfirm"},
             expected_agent_server_version=config.expected_openhands_version,
             max_iterations=config.max_iterations,
@@ -467,6 +556,11 @@ def parse_args() -> LiveE2EConfig:
         default=DEFAULT_OLLAMA_VERSION,
     )
     parser.add_argument(
+        "--expected-model",
+        default=DEFAULT_MODEL,
+        help="Exact local Ollama model tag required for live verification.",
+    )
+    parser.add_argument(
         "--expected-openhands-version",
         default=DEFAULT_OPENHANDS_AGENT_SERVER_VERSION,
     )
@@ -512,6 +606,7 @@ def parse_args() -> LiveE2EConfig:
         host_workspace_root=args.host_workspace_root,
         openhands_container=args.openhands_container,
         expected_ollama_version=args.expected_ollama_version,
+        expected_model=args.expected_model,
         expected_openhands_version=args.expected_openhands_version,
         expected_openhands_image=args.expected_openhands_image,
         max_iterations=args.max_iterations,

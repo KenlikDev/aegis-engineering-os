@@ -153,37 +153,54 @@ def preflight(
             if openhands_agent_server_api_key
             else None
         )
-        openai_models = _request_json(
-            f"{agent_server_base_url}/v1/models",
+        settings = _request_json(
+            f"{agent_server_base_url}/api/settings",
             timeout,
             headers=server_headers,
         )
-        model_entries = openai_models.get("data")
-        if not isinstance(model_entries, list):
+        agent_settings = settings.get("agent_settings")
+        if not isinstance(agent_settings, dict):
             raise RuntimePreflightError(
-                "OpenHands Agent Server /v1/models response does not contain a data list."
+                "OpenHands Agent Server /api/settings response does not contain agent_settings."
+            )
+        if agent_settings.get("agent_kind") != "openhands":
+            raise RuntimePreflightError(
+                "OpenHands Agent Server /api/settings reports an unsupported agent kind."
             )
 
-        exposed_model_ids = sorted(
-            item.get("id")
-            for item in model_entries
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
-        )
-        accepted_model_ids = {model, f"openai/{model}"}
-        matching_model_ids = sorted(
-            model_id for model_id in exposed_model_ids if model_id in accepted_model_ids
-        )
-        if not matching_model_ids:
+        llm_settings = agent_settings.get("llm")
+        if not isinstance(llm_settings, dict):
             raise RuntimePreflightError(
-                f"Selected model {model!r} is not exposed by the OpenHands "
-                f"OpenAI-compatible /v1/models endpoint. "
-                f"Available models: {', '.join(exposed_model_ids) or '(none)'}."
+                "OpenHands Agent Server /api/settings response does not contain LLM settings."
             )
 
+        expected_llm_model = f"openai/{model}"
+        active_llm_model = llm_settings.get("model")
+        if active_llm_model != expected_llm_model:
+            raise RuntimePreflightError(
+                f"Selected model {model!r} is not the active OpenHands LLM model. "
+                f"Expected {expected_llm_model!r}, got {active_llm_model!r}."
+            )
+
+        expected_llm_base_url = _normalize_base_url(
+            f'{surface["docker_ollama_base_url"].rstrip("/")}/v1'
+        )
+        active_llm_base_url = llm_settings.get("base_url")
+        if active_llm_base_url != expected_llm_base_url:
+            raise RuntimePreflightError(
+                "OpenHands Agent Server LLM base URL does not match the "
+                "validated local Ollama Docker endpoint."
+            )
+
+        if settings.get("llm_api_key_is_set") is not True:
+            raise RuntimePreflightError(
+                "OpenHands Agent Server reports that the configured LLM API key is not set."
+            )
         result["openhands_agent_server"] = {
             "status": "verified",
-            "openai_compatible_model": matching_model_ids[0],
-            "openai_compatible_model_surface": "verified",
+            "active_llm_model": active_llm_model,
+            "llm_base_url": active_llm_base_url,
+            "llm_api_key_is_set": True,
             "base_url": agent_server_base_url,
             "version": server_info["version"],
             "sdk_version": server_info["sdk_version"],
