@@ -350,17 +350,18 @@ def validate_candidate(
         if not HTTPS_REFERENCE_RE.fullmatch(reference):
             raise KnowledgeGapError("Validation evidence references must use HTTPS URLs.")
     now = _now()
-    validation_payload = {
-        "outcome": "passed",
-        "scenario": scenario,
-        "evidence_refs": list(evidence_refs),
-        "recorded_at": now,
-    }
+    validation_payload = _redact(
+        {
+            "outcome": "passed",
+            "scenario": scenario,
+            "evidence_refs": list(evidence_refs),
+            "recorded_at": now,
+        }
+    )
     validation = {
         **validation_payload,
         "evidence_sha256": _hash(validation_payload),
     }
-    validation = _redact(validation)
     updated = KnowledgeGapRecord(
         schema_version=SCHEMA_VERSION,
         state="validated",
