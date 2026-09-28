@@ -40,7 +40,8 @@ class CompareSnapshot:
     ahead_by: int
     behind_by: int
     total_commits: int
-    changed_files: int
+    changed_files_reported: int
+    changed_files_complete: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,12 +201,14 @@ class GitHubPromotionProvider:
         files = data.get("files", [])
         if not isinstance(files, list):
             raise PromotionReadinessError("GitHub compare files response is malformed.")
+        changed_files_reported = len(files)
         return CompareSnapshot(
             status=data["status"],
             ahead_by=data["ahead_by"],
             behind_by=data["behind_by"],
             total_commits=data["total_commits"],
-            changed_files=len(files),
+            changed_files_reported=changed_files_reported,
+            changed_files_complete=changed_files_reported < 300,
         )
 
     def latest_successful_validation(
@@ -349,7 +352,8 @@ def _to_dict(result: PromotionReadiness) -> dict[str, Any]:
             "ahead_by": result.compare.ahead_by,
             "behind_by": result.compare.behind_by,
             "total_commits": result.compare.total_commits,
-            "changed_files": result.compare.changed_files,
+            "changed_files_reported": result.compare.changed_files_reported,
+            "changed_files_complete": result.compare.changed_files_complete,
         },
         "validation": (
             {
