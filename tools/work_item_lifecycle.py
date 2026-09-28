@@ -137,6 +137,20 @@ class MutationEvidence:
     identifier: int | str | None = None
 
 
+def require_verified_mutation(
+    mutation: MutationEvidence,
+    context: str,
+) -> MutationEvidence:
+    """Require explicit read-after-write verification for a material mutation."""
+    if not isinstance(context, str) or not context.strip():
+        raise WorkItemLifecycleError("Mutation verification context must not be empty.")
+    if not mutation.verified:
+        raise WorkItemLifecycleError(
+            f"{context} was not read-after-write verified."
+        )
+    return mutation
+
+
 class WorkItemProvider(Protocol):
     """Minimal provider-neutral work-item contract."""
 
