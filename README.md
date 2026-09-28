@@ -226,11 +226,9 @@ See docs/architecture/ci-remediation.md for the evidence and safety contract.
 
 ## OpenHands execution provenance
 
-The low-level OpenHands result can be converted into canonical evidence without running OpenHands again:
+The low-level OpenHands result can be adapted into canonical evidence through the `openhands_execution_evidence` adapter in `tools/evidence_adapters.py`. This is an additive record boundary; it does not execute OpenHands again.
 
-    python3 -c "from tools.evidence_adapters import openhands_execution_evidence"
-
-Finished execution is canonical `verified`. Error, stuck, and blocked outcomes are canonical `failed` with explicit uncertainty. The adapter uses only the already-redacted execution state and events.
+Finished execution is canonical `verified`. Error, stuck, and blocked outcomes are canonical `failed` with explicit uncertainty. The adapter uses only the already-redacted execution state and events and removes secret-like keys before canonical validation.
 
 See `docs/architecture/evidence-provenance.md` for the common provenance boundary.
 
