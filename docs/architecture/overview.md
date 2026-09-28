@@ -73,6 +73,10 @@ The executable boundaries are documented in:
 - docs/architecture/release.md.
 
 
+### Testing
+
+The current testing execution boundary is `tools/testing.py`, which validates and delegates to the canonical `tools/quality_gates.py` runner. It never infers project test commands.
+
 ### Architecture planning
 
 The current executable planning path is:
