@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -453,7 +454,7 @@ def main() -> int:
                 canonical,
                 args.canonical_evidence_output.expanduser().resolve(),
             )
-    except (OSError, ValueError, PromotionSyncError) as exc:
+    except (OSError, ValueError, PromotionSyncError, WorkItemLifecycleError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
