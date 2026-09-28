@@ -154,3 +154,12 @@ If OpenHands raises an execution error, returns a non-finished outcome, or viola
 If provider synchronization itself fails, Aegis does not guess the remote state or perform an automatic compensating transition. The operation fails and the repository/task branch remains available for diagnosis.
 
 For GitHub Issues, the lifecycle adapter maps a closed unlabeled issue to `done`, while open unlabeled issues remain `intake`. Explicit Aegis status labels remain authoritative when present.
+
+
+## Promotion readiness boundary
+
+The runtime layer ends before protected-branch promotion. \`tools/promotion_readiness.py\` is a read-only release gate that consumes current GitHub state and does not mutate any branch or pull request.
+
+A promotion is considered ready only when \`ai/integration\` is protected, the selected protected target (\`develop\` or \`main\`) is protected, the source is ahead of the target without being behind it, and the exact current source SHA has a successful \`Aegis Validation\` run.
+
+This evidence is intentionally separate from merge authorization. Human-controlled protected-branch delivery remains the final authority.
