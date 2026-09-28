@@ -289,6 +289,18 @@ Before managed execution, evaluate the explicit implementation-readiness contrac
 
 The gate fails closed when requirements are blocked, the structured version-evidence artifact is missing or invalid, required architecture planning is blocked, or the authoritative work item is not ready.
 
+Optionally persist the readiness result in the canonical provenance envelope:
+
+    python3 tools/implementation_readiness.py \
+      /path/to/project/work-item.md \
+      --project-root /path/to/project \
+      --kind feature \
+      --version-evidence-ref .aegis/version-evidence.json \
+      --architecture-not-required \
+      --evidence-output /tmp/implementation-readiness-evidence.json
+
+A ready result with pending external version compatibility remains canonical `pending`; blocked readiness is canonical `failed`.
+
 See docs/architecture/implementation-readiness.md.
 
 
