@@ -81,3 +81,5 @@ Quality-gate runs, CI diagnosis, security review, knowledge-gap records, and ver
 Promotion readiness and release readiness now have explicit adapters in `tools/evidence_adapters.py`. They preserve their specialized result schemas while optionally emitting the canonical provenance envelope.
 
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
+
+Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
