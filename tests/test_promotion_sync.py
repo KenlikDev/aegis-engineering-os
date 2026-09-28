@@ -34,7 +34,7 @@ class FakePromotionProvider:
         merged=True,
         protected=True,
         exact_merge=True,
-        target_sha=TARGET_SHA,
+        target_sha=MERGE_SHA,
         trace_verified=True,
         transition_verified=True,
         head="ai/1-main-promotion",
@@ -84,7 +84,13 @@ class FakePromotionProvider:
 
 
 class FakeWorkItemProvider:
-    def __init__(self, state=LifecycleState.INTEGRATION):
+    def __init__(
+        self,
+        state=LifecycleState.INTEGRATION,
+        *,
+        trace_verified=True,
+        transition_verified=True,
+    ):
         self.item = WorkItem(
             id="1",
             title="Promotion task",
@@ -94,6 +100,8 @@ class FakeWorkItemProvider:
         )
         self.traceability = []
         self.transitions = []
+        self.trace_verified = trace_verified
+        self.transition_verified = transition_verified
 
     def get(self, work_item_id):
         if work_item_id != "1":
@@ -130,7 +138,7 @@ class FakeWorkItemProvider:
             work_item_id=work_item_id,
             state_before=current.value,
             state_after=target.value,
-            verified=True,
+            verified=self.transition_verified,
         )
 
 
@@ -195,8 +203,8 @@ class PromotionSyncTests(unittest.TestCase):
         self.assertEqual([], work_items.transitions)
 
     def test_rejects_unverified_traceability_mutation(self):
-        provider = FakePromotionProvider(trace_verified=False)
-        work_items = FakeWorkItemProvider()
+        provider = FakePromotionProvider()
+        work_items = FakeWorkItemProvider(trace_verified=False)
 
         with self.assertRaisesRegex(
             PromotionSyncError,
@@ -213,8 +221,8 @@ class PromotionSyncTests(unittest.TestCase):
         self.assertEqual([], work_items.transitions)
 
     def test_rejects_unverified_transition_mutation(self):
-        provider = FakePromotionProvider(transition_verified=False)
-        work_items = FakeWorkItemProvider()
+        provider = FakePromotionProvider()
+        work_items = FakeWorkItemProvider(transition_verified=False)
 
         with self.assertRaisesRegex(
             PromotionSyncError,
