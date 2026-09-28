@@ -140,6 +140,30 @@ class ImplementationReadinessTests(unittest.TestCase):
         self.assertIn("version-verification", result.composition_steps)
         self.assertIn("passed", {item.status for item in result.observations})
 
+    def test_pending_external_version_check_remains_visible(self):
+        root, work_item, evidence, provider = self._fixture()
+        payload = json.loads(evidence.read_text(encoding="utf-8"))
+        payload["external_verification_pending"] = True
+        evidence.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = evaluate_readiness(
+            work_item,
+            "feature",
+            project_root=root,
+            version_evidence_ref=evidence,
+            architecture_required=False,
+            work_item_provider=provider,
+            work_item_id="106",
+        )
+        self.assertTrue(result.ready)
+        self.assertTrue(result.version_external_verification_pending)
+        version = next(
+            item for item in result.observations if item.check == "version-verification"
+        )
+        self.assertEqual("pending", version.status)
+
     def test_architecture_required_works_without_lifecycle_provider(self):
         root, work_item, evidence, _ = self._fixture()
         result = evaluate_readiness(
