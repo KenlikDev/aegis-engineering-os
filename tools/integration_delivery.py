@@ -134,6 +134,7 @@ def deliver_to_integration(
             "Prepared pull request is a draft and cannot enter autonomous integration."
         )
     if pull_request.merged:
+        validation = None
         merge_result = sync_integration_merge(
             merge_provider,
             work_item_provider,
@@ -141,7 +142,6 @@ def deliver_to_integration(
             pull_request_number,
             expected_head_sha=validation.head_sha,
         )
-        validation = None
     else:
         validation = validation_provider.latest_successful_validation(
             request.workflow,
