@@ -84,3 +84,17 @@ A work item is complete only when:
 - linked implementation artifacts are identifiable;
 - remaining risks and exceptions are recorded;
 - the work item is transitioned to its terminal state.
+
+## Executable lifecycle bridge
+
+The provider-neutral lifecycle is implemented by `tools/work_item_lifecycle.py`. The core transition model is deliberately independent of GitHub. The GitHub adapter persists the active lifecycle state through `aegis:status:<state>` labels and maps only `done` to GitHub's closed issue state.
+
+Blocked work preserves its previous active state in an `aegis:resume:<state>` label. A blocked item can therefore resume only at the recorded state; the adapter rejects ambiguous or stale resume metadata.
+
+The CLI exposes three controlled operations:
+
+    python3 tools/work_item_lifecycle.py transition OWNER/REPO 53 planned --expected-state intake
+    python3 tools/work_item_lifecycle.py comment OWNER/REPO 53 "Verification evidence recorded."
+    python3 tools/work_item_lifecycle.py trace OWNER/REPO 53 --branch ai/feature/53-work-item-lifecycle --pull-request-url https://github.com/OWNER/REPO/pull/53 --evidence-ref artifacts/aegis-execution.json --conversation-id 12345678-1234-5678-1234-567812345678
+
+Use `--dry-run` on transition before a provider mutation when inspecting an unfamiliar work item. Every mutation is followed by a fresh read to verify the resulting state or comment.
