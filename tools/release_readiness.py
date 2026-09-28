@@ -181,7 +181,7 @@ class GitHubReleaseReadinessProvider:
             "GET",
             (
                 f"{self._api_base_url}/repos/{self.repository}/contents/"
-                f"{quote(path, safe='')}?ref={quote(ref, safe='')}"
+                f"{quote(path, safe='/')}?ref={quote(ref, safe='')}"
             ),
             {
                 "Accept": "application/vnd.github+json",
