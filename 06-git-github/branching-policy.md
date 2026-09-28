@@ -86,3 +86,19 @@ Task pull requests are validated on opened, synchronized, and reopened events. T
 For a merge into ai/integration, the closed-PR path checks out the pull request's actual merge commit SHA. This is a second validation path for the resulting integration state, independent of whether the repository emits an observable push-triggered run.
 
 The workflow keeps contents: read and does not use pull_request_target. No credentials with write access are introduced for post-merge verification.
+
+## Autonomous integration merge
+
+The autonomous merge boundary is limited to task pull requests targeting ai/integration.
+
+Aegis may merge a non-draft Aegis task pull request into protected ai/integration only after:
+- the work item is in review;
+- the pull-request head is verified for the same work item;
+- the base is exactly ai/integration;
+- ai/integration remains protected;
+- mergeable_state is clean;
+- the exact current head SHA is supplied as the merge precondition;
+- the merge uses squash;
+- the resulting merged PR and merge commit are read back and verified.
+
+This boundary does not permit merges into develop or main. Those branches remain human-controlled promotion targets.
