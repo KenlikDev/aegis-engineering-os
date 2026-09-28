@@ -72,10 +72,10 @@ class OrchestratorConfig:
     task: str
     agent_server_url: str
     container_workspace: str
-    work_item_kind: str | None = None
-    work_item_document: Path | None = None
-    version_evidence_ref: str | None = None
-    architecture_required: bool | None = None
+    work_item_kind: str
+    work_item_document: Path
+    version_evidence_ref: str
+    architecture_required: bool
     profile_config: Path = DEFAULT_PROFILE_CONFIG
     profile_name: str = "development-local"
     base_branch: str = "ai/integration"
@@ -354,37 +354,24 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
                 f"got {current_work_item.state.value}."
             )
 
-    readiness: ImplementationReadiness | None = None
-    readiness_inputs = (
-        config.work_item_kind,
-        config.work_item_document,
-        config.version_evidence_ref,
-        config.architecture_required,
-    )
-    if provider is not None or any(value is not None for value in readiness_inputs):
-        if any(value is None for value in readiness_inputs):
-            raise AegisOrchestratorError(
-                "Implementation readiness requires explicit work-item kind, "
-                "work-item document, version evidence, and architecture applicability."
-            )
-        try:
-            readiness = evaluate_readiness(
-                config.work_item_document,
-                config.work_item_kind,
-                project_root=config.project_path,
-                version_evidence_ref=config.version_evidence_ref,
-                architecture_required=config.architecture_required,
-                work_item_provider=provider,
-                work_item_id=work_item,
-            )
-        except ImplementationReadinessError as exc:
-            raise AegisOrchestratorError(
-                f"Implementation readiness check failed: {exc}"
-            ) from exc
-        if not readiness.ready:
-            raise AegisOrchestratorError(
-                "Implementation readiness is blocked; managed execution must not start."
-            )
+    try:
+        readiness = evaluate_readiness(
+            config.work_item_document,
+            config.work_item_kind,
+            project_root=config.project_path,
+            version_evidence_ref=config.version_evidence_ref,
+            architecture_required=config.architecture_required,
+            work_item_provider=provider,
+            work_item_id=work_item,
+        )
+    except ImplementationReadinessError as exc:
+        raise AegisOrchestratorError(
+            f"Implementation readiness check failed: {exc}"
+        ) from exc
+    if not readiness.ready:
+        raise AegisOrchestratorError(
+            "Implementation readiness is blocked; managed execution must not start."
+        )
 
     preflight_result = preflight_fn(
         config.profile_config,
@@ -551,10 +538,10 @@ def parse_args() -> OrchestratorConfig:
     parser.add_argument("project", type=Path)
     parser.add_argument("work_item_id")
     parser.add_argument("task")
-    parser.add_argument("--work-item-kind")
-    parser.add_argument("--work-item-document", type=Path)
-    parser.add_argument("--version-evidence-ref")
-    architecture = parser.add_mutually_exclusive_group()
+    parser.add_argument("--work-item-kind", required=True)
+    parser.add_argument("--work-item-document", type=Path, required=True)
+    parser.add_argument("--version-evidence-ref", required=True)
+    architecture = parser.add_mutually_exclusive_group(required=True)
     architecture.add_argument("--architecture-required", action="store_true")
     architecture.add_argument("--architecture-not-required", action="store_true")
     parser.add_argument("--agent-server-url", required=True)
@@ -600,21 +587,8 @@ def parse_args() -> OrchestratorConfig:
             parser.error(str(exc))
     if args.architecture_required:
         architecture_required = True
-    elif args.architecture_not_required:
-        architecture_required = False
     else:
-        architecture_required = None
-
-    if args.work_item_repository and (
-        args.work_item_kind is None
-        or args.work_item_document is None
-        or args.version_evidence_ref is None
-        or architecture_required is None
-    ):
-        parser.error(
-            "managed execution requires --work-item-kind, --work-item-document, "
-            "--version-evidence-ref, and an architecture applicability flag"
-        )
+        architecture_required = False
 
     return OrchestratorConfig(
         project_path=args.project, work_item_id=args.work_item_id,
