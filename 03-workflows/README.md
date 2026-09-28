@@ -17,6 +17,7 @@ The repository currently provides:
 - requirements clarification;
 - architecture planning;
 - testing;
+- refactoring;
 - Aegis update validation;
 - release preparation and release readiness;
 - promotion synchronization;
