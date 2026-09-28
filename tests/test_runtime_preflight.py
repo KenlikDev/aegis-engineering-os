@@ -1,4 +1,6 @@
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -7,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import preflight_runtime  # noqa: E402
+from evidence_contract import read_and_validate_evidence  # noqa: E402
 
 
 class RuntimePreflightTests(unittest.TestCase):
@@ -39,6 +42,63 @@ class RuntimePreflightTests(unittest.TestCase):
         self.assertEqual("gemma4:31b", result["model"])
         self.assertEqual("0.12.0", result["ollama_version"])
         self.assertTrue(result["model_available"])
+
+    def test_cli_writes_canonical_runtime_preflight_evidence(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "runtime-preflight.json"
+            argv = [
+                "preflight_runtime.py",
+                str(self.profile_path),
+                "development-local",
+                "--canonical-evidence-output",
+                str(output),
+            ]
+            with (
+                patch.object(
+                    preflight_runtime,
+                    "_request_json",
+                    side_effect=lambda url, timeout, headers=None: responses[url],
+                ),
+                patch.object(sys, "argv", argv),
+            ):
+                self.assertEqual(0, preflight_runtime.main())
+
+            canonical = read_and_validate_evidence(output)
+            self.assertEqual("runtime-preflight", canonical.kind)
+            self.assertEqual("profile:development-local", canonical.subject)
+            self.assertEqual("gemma4:31b", canonical.result["model"])
+
+    def test_cli_refuses_to_overwrite_profile_with_canonical_evidence(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        argv = [
+            "preflight_runtime.py",
+            str(self.profile_path),
+            "development-local",
+            "--canonical-evidence-output",
+            str(self.profile_path),
+        ]
+        with (
+            patch.object(
+                preflight_runtime,
+                "_request_json",
+                side_effect=lambda url, timeout, headers=None: responses[url],
+            ),
+            patch.object(sys, "argv", argv),
+        ):
+            self.assertEqual(1, preflight_runtime.main())
 
     def test_preflight_rejects_missing_exact_model(self) -> None:
         responses = {
