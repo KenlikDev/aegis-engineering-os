@@ -200,6 +200,59 @@ def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
     return version, manifest, registry
 
 
+def inspect_agents_state(
+    agents_path: Path,
+    template_path: Path,
+    previous_state: dict | None,
+) -> tuple[bool, str | None]:
+    """Determine Aegis AGENTS ownership without claiming user-owned files."""
+    state_has_ownership = (
+        previous_state is not None
+        and "agents_managed" in previous_state
+    )
+    if state_has_ownership:
+        managed = previous_state["agents_managed"]
+        checksum = previous_state.get("agents_sha256")
+        if managed:
+            if not isinstance(checksum, str):
+                raise SystemExit("Managed AGENTS state must contain agents_sha256.")
+            if agents_path.is_symlink():
+                raise SystemExit(
+                    f"Refusing to manage symlinked AGENTS.md: {agents_path}"
+                )
+            if not agents_path.is_file():
+                raise SystemExit(
+                    f"Managed AGENTS.md is missing: {agents_path}"
+                )
+            actual = sha256_file(agents_path)
+            if actual != checksum:
+                raise SystemExit(
+                    "Refusing to modify customized managed AGENTS.md; "
+                    f"expected {checksum}, got {actual}."
+                )
+            return True, checksum
+
+        if checksum is not None:
+            raise SystemExit(
+                "Unmanaged AGENTS state must not contain agents_sha256."
+            )
+        return False, None
+
+    if not agents_path.exists() and not agents_path.is_symlink():
+        return False, None
+
+    if agents_path.is_symlink():
+        return False, None
+
+    if agents_path.is_file():
+        template_sha = sha256_file(template_path)
+        return sha256_file(agents_path) == template_sha, (
+            template_sha if sha256_file(agents_path) == template_sha else None
+        )
+
+    return False, None
+
+
 def load_previous_state(state_path: Path) -> dict | None:
     if not state_path.is_file():
         return None
@@ -231,6 +284,23 @@ def load_previous_state(state_path: Path) -> dict | None:
     for name in skills:
         if not SKILL_NAME_PATTERN.fullmatch(name):
             raise SystemExit(f"Invalid skill name in existing Aegis state: {name!r}")
+
+    agents_managed = state.get("agents_managed", False)
+    agents_sha256 = state.get("agents_sha256")
+    if not isinstance(agents_managed, bool):
+        raise SystemExit("Existing Aegis agents_managed must be boolean.")
+    if agents_managed:
+        if not isinstance(agents_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}",
+            agents_sha256,
+        ):
+            raise SystemExit(
+                "Existing managed AGENTS.md requires a lowercase SHA-256 agents_sha256."
+            )
+    elif agents_sha256 is not None:
+        raise SystemExit(
+            "Existing unmanaged AGENTS.md state must not contain agents_sha256."
+        )
 
     checksums = state.get("skill_checksums", {})
     if not isinstance(checksums, dict):
@@ -432,8 +502,14 @@ def main() -> int:
     state_root = project / ".aegis"
     state_path = state_root / "aegis-version.json"
     agents_path = project / "AGENTS.md"
+    agents_template_path = root / "templates" / "AGENTS.md"
 
     previous_state = load_previous_state(state_path)
+    agents_managed, agents_sha256 = inspect_agents_state(
+        agents_path,
+        agents_template_path,
+        previous_state,
+    )
     preflight_targets(
         target_root=target_root,
         selected_names=set(selected),
@@ -518,13 +594,17 @@ def main() -> int:
             ),
             "skills": skill_names,
             "skill_checksums": skill_checksums,
+            "agents_managed": agents_managed,
+            "agents_sha256": agents_sha256,
             "status": "active",
         }
         write_state_atomically(state_path, state)
 
-        if not agents_path.exists():
-            shutil.copy2(root / "templates" / "AGENTS.md", agents_path)
+        if not agents_path.exists() and not agents_path.is_symlink():
+            shutil.copy2(agents_template_path, agents_path)
             agents_created = True
+            agents_managed = True
+            agents_sha256 = sha256_file(agents_path)
             print(f"Installed {agents_path}")
         else:
             print(
