@@ -88,6 +88,8 @@ Testing now has an explicit adapter as well. It preserves the already-redacted q
 
 Security review now has an explicit adapter as well. It preserves deterministic findings and maps any high-severity finding to canonical `failed` without exposing credential material.
 
+CI diagnosis now has an explicit adapter as well. It preserves exact workflow-run provenance and maps inconclusive diagnosis to canonical `unknown` with explicit uncertainty.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
