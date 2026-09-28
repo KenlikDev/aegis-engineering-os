@@ -124,6 +124,24 @@ class EvidenceBundleTests(unittest.TestCase):
         with self.assertRaisesRegex(EvidenceBundleError, "identity hash"):
             read_and_validate_evidence_bundle(root, output)
 
+    def test_unsorted_members_are_rejected_on_read(self):
+        root, one, two = self._project()
+        bundle = build_evidence_bundle(root, "Readiness input set", [one, two])
+        output = root / ".aegis" / "bundle.json"
+        write_evidence_bundle(bundle, root, output)
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        payload["members"].reverse()
+        payload["bundle_id"] = "0" * 64
+        output.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(EvidenceBundleError, "sorted"):
+            read_and_validate_evidence_bundle(root, output)
+
+    def test_write_rejects_member_path_as_output(self):
+        root, one, two = self._project()
+        bundle = build_evidence_bundle(root, "Readiness input set", [one, two])
+        with self.assertRaisesRegex(EvidenceBundleError, "must not overwrite"):
+            write_evidence_bundle(bundle, root, one)
+
     def test_existing_evidence_remains_independently_valid(self):
         root, one, _ = self._project()
         self.assertEqual(
