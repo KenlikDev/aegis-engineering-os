@@ -33,7 +33,10 @@ class FakePromotionProvider:
         state="closed",
         merged=True,
         protected=True,
-        contains_merge=True,
+        exact_merge=True,
+        target_sha=TARGET_SHA,
+        trace_verified=True,
+        transition_verified=True,
         head="ai/1-main-promotion",
         base="main",
         merge_commit_sha=MERGE_SHA,
@@ -55,7 +58,10 @@ class FakePromotionProvider:
             sha=TARGET_SHA,
             protected=protected,
         )
-        self.contains_merge = contains_merge
+        self.exact_merge = exact_merge
+        self.target_sha = target_sha
+        self.trace_verified = trace_verified
+        self.transition_verified = transition_verified
         self.contains_calls = []
 
     def get_pull_request(self, number):
@@ -66,11 +72,15 @@ class FakePromotionProvider:
     def get_branch(self, branch):
         if branch != "main":
             raise AssertionError(f"Unexpected target: {branch}")
-        return self.target
+        return BranchSnapshot(
+            branch="main",
+            sha=self.target_sha,
+            protected=self.target.protected,
+        )
 
-    def target_contains_commit(self, target_branch, commit_sha):
+    def target_matches_commit(self, target_branch, commit_sha):
         self.contains_calls.append((target_branch, commit_sha))
-        return self.contains_merge
+        return self.exact_merge
 
 
 class FakeWorkItemProvider:
@@ -96,7 +106,7 @@ class FakeWorkItemProvider:
             provider="fake",
             operation="attach_traceability",
             work_item_id=work_item_id,
-            verified=True,
+            verified=self.trace_verified,
             reference=traceability.pull_request_url,
         )
 
@@ -148,6 +158,77 @@ class PromotionSyncTests(unittest.TestCase):
             [("main", MERGE_SHA)],
             provider.contains_calls,
         )
+
+    def test_rejects_non_identical_target_compare(self):
+        provider = FakePromotionProvider(exact_merge=False)
+        work_items = FakeWorkItemProvider()
+
+        with self.assertRaisesRegex(PromotionSyncError, "not exactly equal to main"):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual([], work_items.traceability)
+        self.assertEqual([], work_items.transitions)
+
+    def test_rejects_target_advanced_after_exact_compare(self):
+        provider = FakePromotionProvider(target_sha="4" * 40)
+        work_items = FakeWorkItemProvider()
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "advanced after exact merge verification",
+        ):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual([], work_items.traceability)
+        self.assertEqual([], work_items.transitions)
+
+    def test_rejects_unverified_traceability_mutation(self):
+        provider = FakePromotionProvider(trace_verified=False)
+        work_items = FakeWorkItemProvider()
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "traceability mutation was not read-after-write verified",
+        ):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual([], work_items.transitions)
+
+    def test_rejects_unverified_transition_mutation(self):
+        provider = FakePromotionProvider(transition_verified=False)
+        work_items = FakeWorkItemProvider()
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "lifecycle transition mutation was not read-after-write verified",
+        ):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual(LifecycleState.INTEGRATION, work_items.item.state)
 
     def test_open_pr_is_non_mutating(self):
         provider = FakePromotionProvider(state="open", merged=False)
@@ -236,7 +317,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(contains_merge=False)
         work_items = FakeWorkItemProvider()
 
-        with self.assertRaisesRegex(PromotionSyncError, "not contained in main"):
+        with self.assertRaisesRegex(PromotionSyncError, "not exactly equal to main"):
             sync_promotion_merge(
                 provider,
                 work_items,
