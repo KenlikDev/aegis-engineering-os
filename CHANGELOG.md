@@ -20,7 +20,8 @@ All notable changes to Aegis Engineering OS will be documented here.
 - validate source metadata before installation;
 - add regression coverage for bootstrap ownership and dirty-source rejection;
 - add the OpenHands Agent Server execution adapter contract with exact version gating, explicit task execution sequencing, and execution evidence collection;
-- add the managed project execution coordinator with work-item branch safety, runtime preflight reuse, OpenHands boundary prompts, and post-execution Git integrity checks.
+- add the managed project execution coordinator with work-item branch safety, runtime preflight reuse, OpenHands boundary prompts, and post-execution Git integrity checks;
+- add the executable provider-neutral work-item lifecycle bridge with GitHub Issues persistence, optimistic state checks, blocked-state resume metadata, traceability comments, and read-after-write verification.
 
 ## 0.1.0-alpha.1
 
