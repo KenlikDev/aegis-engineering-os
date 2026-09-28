@@ -50,6 +50,17 @@ class WorkflowCompositionTests(unittest.TestCase):
         with self.assertRaisesRegex(WorkflowCompositionError, "unregistered skills"):
             compose_workflow("feature", registry_path=path)
 
+    def test_common_sequence_verifies_versions_before_architecture(self):
+        steps = compose_workflow("feature").steps
+        names = [step.name for step in steps]
+        self.assertEqual(
+            ["work-item-lifecycle", "requirements-clarification", "project-discovery",
+             "version-verification", "architecture-planning"],
+            names[:5],
+        )
+        version_step = steps[3]
+        self.assertEqual("skill", version_step.kind)
+
     def test_each_supported_kind_has_expected_primary_workflow(self):
         expected = {
             "feature": "feature-implementation",
