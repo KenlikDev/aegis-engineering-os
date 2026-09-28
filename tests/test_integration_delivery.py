@@ -72,7 +72,7 @@ class FakePullRequestProvider:
         return MutationEvidence(
             provider="fake",
             operation="create",
-            work_item_id=request.work_item_id,
+            work_item_id=WORK_ITEM,
             reference=self.pull_request.url,
             verified=True,
         )
