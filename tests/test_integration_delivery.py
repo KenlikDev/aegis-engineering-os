@@ -235,6 +235,7 @@ class IntegrationDeliveryTests(unittest.TestCase):
             validation.calls,
         )
         self.assertEqual(MERGE, result["pull_request"]["merge_commit_sha"])
+        self.assertTrue(result["traceability_verified"])
 
     def test_blocks_without_exact_head_validation(self):
         pr, merge, validation, items = self.providers(validation=False)
