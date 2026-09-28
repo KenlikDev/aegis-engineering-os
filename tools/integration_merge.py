@@ -26,9 +26,6 @@ DEFAULT_API_BASE_URL = "https://api.github.com"
 INTEGRATION_BRANCH = "ai/integration"
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 WORK_ITEM_RE = re.compile(r"^[1-9][0-9]*$")
-TASK_BRANCH_RE = re.compile(
-    r"^ai/(feature|fix|refactor|chore)/[A-Za-z0-9._-]+$"
-)
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HTTPS_URL_RE = re.compile(r"^https://[^\s]+$")
 
@@ -300,21 +297,13 @@ def _validate_request(
     repository: str,
     work_item_id: str,
     pull_request_number: int,
-) -> str:
+) -> None:
     if not REPOSITORY_RE.fullmatch(repository):
         raise IntegrationMergeError("Repository must use owner/name format.")
     if not WORK_ITEM_RE.fullmatch(work_item_id):
         raise IntegrationMergeError("Work-item id must be a positive integer.")
     if pull_request_number <= 0:
         raise IntegrationMergeError("Pull-request number must be positive.")
-    expected_head = f"ai/feature/{work_item_id}-integration"
-    # Allow the established task branch kinds while requiring the work item prefix.
-    expected_pattern = re.compile(
-        rf"^ai/(feature|fix|refactor|chore)/{re.escape(work_item_id)}-[A-Za-z0-9._-]+$"
-    )
-    if not expected_pattern.fullmatch(expected_head):
-        raise IntegrationMergeError("Expected integration task branch is invalid.")
-    return expected_head
 
 
 def _validate_task_branch_for_work_item(branch: str, work_item_id: str) -> None:
