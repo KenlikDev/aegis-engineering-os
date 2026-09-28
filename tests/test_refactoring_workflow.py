@@ -22,7 +22,7 @@ class RefactoringWorkflowContractTests(unittest.TestCase):
         content = SKILL.read_text(encoding="utf-8")
         self.assertIn("Establish a verified baseline", content)
         self.assertIn("Re-run focused and broader declared quality gates", content)
-        self.assertIn("record any discovered behavior change as scope change", content)
+        self.assertIn("Record any discovered behavior change as scope change", content)
 
     def test_architecture_preserves_composed_boundaries(self):
         content = ARCHITECTURE.read_text(encoding="utf-8")
