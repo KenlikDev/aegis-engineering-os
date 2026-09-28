@@ -99,7 +99,7 @@ class EvidenceBundleTests(unittest.TestCase):
         outside = root.parent / "outside.json"
         outside.write_text(one.read_text(encoding="utf-8"), encoding="utf-8")
         self.addCleanup(lambda: outside.unlink(missing_ok=True))
-        with self.assertRaisesRegex(EvidenceBundleError, "project-relative"):
+        with self.assertRaisesRegex(EvidenceBundleError, "inside the project root"):
             build_evidence_bundle(root, "Readiness input set", [outside])
 
     def test_malformed_bundle_schema_is_rejected(self):
