@@ -252,9 +252,11 @@ class AegisOrchestratorTests(unittest.TestCase):
         try:
             with self.assertRaises(aegis_orchestrator.AegisOrchestratorError):
                 aegis_orchestrator.orchestrate(
-                    self._config(),
+                    self._config(
+                        work_item_id="56",
+                        work_item_provider=provider,
+                    ),
                     preflight_fn=self._preflight,
-                    work_item_provider=provider,
                 )
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
