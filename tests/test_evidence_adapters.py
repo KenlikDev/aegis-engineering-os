@@ -14,6 +14,7 @@ from evidence_adapters import (  # noqa: E402
     knowledge_gap_evidence,
     mutation_evidence,
     promotion_readiness_evidence,
+    promotion_sync_evidence,
     openhands_execution_evidence,
     release_readiness_evidence,
     runtime_preflight_evidence,
@@ -67,6 +68,108 @@ TARGET_SHA = "2222222222222222222222222222222222222222"
 
 
 class EvidenceAdapterTests(unittest.TestCase):
+    def test_promotion_sync_verified_result_preserves_target_revision(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "158",
+            "target_branch": "main",
+            "pull_request": {
+                "number": 158,
+                "url": "https://github.com/KenlikDev/aegis-engineering-os/pull/158",
+                "head": "ai/158-main-promotion",
+                "base": "main",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "target": {
+                "branch": "main",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "traceability_verified": True,
+            "work_item": {
+                "state_after": "done",
+                "transition_verified": True,
+            },
+        }
+
+        canonical = promotion_sync_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("promotion-sync", canonical.kind)
+        self.assertEqual("promotion:158->main", canonical.subject)
+        self.assertEqual(TARGET_SHA, canonical.revision)
+        self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "promotion-sync.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
+
+    def test_promotion_sync_not_merged_remains_unknown(self):
+        result = {
+            "status": "not-merged",
+            "work_item_id": "158",
+            "target_branch": "develop",
+            "pull_request": {
+                "number": 158,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/158",
+                "head": "ai/158-develop-promotion",
+                "base": "develop",
+                "merged": False,
+                "state": "open",
+            },
+        }
+
+        canonical = promotion_sync_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("unknown", canonical.status)
+        self.assertIsNone(canonical.revision)
+        self.assertEqual(1, len(canonical.uncertainty))
+
+    def test_promotion_sync_rejects_target_revision_mismatch(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "158",
+            "target_branch": "main",
+            "pull_request": {
+                "number": 158,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/158",
+                "head": "ai/158-main-promotion",
+                "base": "main",
+                "merged": True,
+                "merge_commit_sha": SOURCE_SHA,
+            },
+            "target": {
+                "branch": "main",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "traceability_verified": True,
+            "work_item": {
+                "state_after": "done",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "does not match the protected target SHA",
+        ):
+            promotion_sync_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
     def test_integration_delivery_verified_result_preserves_exact_chain(self):
         result = {
             "status": "verified",
