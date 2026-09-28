@@ -29,6 +29,5 @@ The repository currently provides:
 The architecture also identifies these workflow areas for future dedicated skills:
 
 - refactoring;
-- testing.
 
 A workflow must define entry conditions, required evidence, quality gates, and exit conditions.
