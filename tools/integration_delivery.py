@@ -249,7 +249,6 @@ def main() -> int:
     try:
         if args.canonical_evidence_output is not None:
             from evidence_adapters import integration_delivery_evidence
-            from evidence_contract import write_evidence
 
             canonical = integration_delivery_evidence(
                 result,
@@ -260,7 +259,7 @@ def main() -> int:
                 canonical,
                 args.canonical_evidence_output.expanduser().resolve(),
             )
-    except (ValueError, IntegrationDeliveryError) as exc:
+    except (EvidenceContractError, OSError, ValueError, IntegrationDeliveryError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
 
