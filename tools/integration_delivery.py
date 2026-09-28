@@ -140,7 +140,6 @@ def deliver_to_integration(
             work_item_provider,
             request.work_item_id,
             pull_request_number,
-            expected_head_sha=validation.head_sha,
         )
     else:
         validation = validation_provider.latest_successful_validation(
@@ -162,6 +161,7 @@ def deliver_to_integration(
             work_item_provider,
             request.work_item_id,
             pull_request_number,
+            expected_head_sha=validation.head_sha,
         )
 
     return {
