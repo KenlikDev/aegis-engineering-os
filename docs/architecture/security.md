@@ -28,6 +28,14 @@ High findings block the review. Medium findings are visible but do not block the
 
 The review reads repository files only. It never changes code or configuration, creates issues, changes branches, modifies GitHub permissions, or prints matched credential values.
 
+## Canonical provenance
+
+The read-only review can emit its existing result into the canonical evidence envelope with `--canonical-evidence-output`. The adapter preserves finding rule IDs, severity, repository-relative paths, line numbers, messages, and the deterministic summary.
+
+A review with any high-severity finding is canonical `failed`. A review without high-severity findings is canonical `verified`, while medium and low findings remain explicitly present in the result.
+
+This output is additive and does not alter security-review findings or exit-code semantics.
+
 ## Lifecycle position
 
 implementation
