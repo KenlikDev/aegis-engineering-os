@@ -291,35 +291,37 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                         line=child.lineno,
                     )
 
-    protected_literals: list[ast.Constant] = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and node.value in PROTECTED_REF_VALUES
-    ]
-    write_calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in {"_request", "request"}
-        and any(
-            isinstance(argument, ast.Constant)
-            and argument.value in {"POST", "PUT", "PATCH"}
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"_request", "request"}
+        ):
+            continue
+
+        method_constants = {
+            argument.value
             for argument in node.args
-        )
-    ]
-    if protected_literals and write_calls:
-        _finding(
-            findings,
-            rule_id="git.protected-direct-write",
-            severity=HIGH,
-            path=path,
-            root=root,
-            message="Executable tooling contains hardcoded protected refs alongside a write request.",
-            line=protected_literals[0].lineno,
-        )
+            if isinstance(argument, ast.Constant)
+            and argument.value in {"POST", "PUT", "PATCH"}
+        }
+        path_constants = {
+            argument.value
+            for argument in node.args
+            if isinstance(argument, ast.Constant)
+            and isinstance(argument.value, str)
+        }
+        protected_paths = path_constants & PROTECTED_REF_VALUES
+        if method_constants and protected_paths:
+            _finding(
+                findings,
+                rule_id="git.protected-direct-write",
+                severity=HIGH,
+                path=path,
+                root=root,
+                message="Executable tooling directly writes to a hardcoded protected ref.",
+                line=node.lineno,
+            )
 
 
 def _review_secrets(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
