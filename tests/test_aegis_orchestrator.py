@@ -429,7 +429,7 @@ Test fixture.
         finally:
             aegis_orchestrator.OpenHandsExecutionClient = original
 
-        self.assertEqual(LifecycleState.IN_PROGRESS, provider.get("51").state)
+        self.assertEqual(LifecycleState.VERIFICATION, provider.get("51").state)
 
     def test_work_item_must_be_ready_before_execution(self) -> None:
         provider = InMemoryWorkItemProvider(
