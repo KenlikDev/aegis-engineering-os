@@ -44,7 +44,21 @@ When required, the existing read-only architecture planner must return no blocke
 
 When not required, the gate records that explicit classification. It does not derive the decision from file layout or heuristics.
 
-### Lifecycle
+### Canonical provenance adapter
+
+The readiness result can be emitted as canonical evidence without changing the specialized readiness JSON:
+
+    python3 tools/implementation_readiness.py \
+      /path/to/project/work-item.md \
+      --project-root /path/to/project \
+      --kind feature \
+      --version-evidence-ref .aegis/version-evidence.json \
+      --architecture-not-required \
+      --evidence-output /tmp/implementation-readiness-evidence.json
+
+The adapter preserves all readiness observations, blockers, composition steps, lifecycle state, architecture applicability, and version-evidence metadata. A blocked result is `failed`. A ready result with external version verification still pending is `pending`; it is never silently promoted to `verified`.
+
+## Lifecycle
 
 When an authoritative provider is supplied, the work item must be exactly ready.
 
