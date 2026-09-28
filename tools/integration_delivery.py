@@ -193,6 +193,7 @@ def deliver_to_integration(
             else None
         ),
         "integration": merge_result.get("integration"),
+        "traceability_verified": merge_result.get("traceability_verified"),
         "work_item": merge_result.get("work_item"),
     }
 
