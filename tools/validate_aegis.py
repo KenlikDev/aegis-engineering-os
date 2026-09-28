@@ -118,6 +118,7 @@ def main() -> int:
         "skills/workflows/promotion-synchronization/SKILL.md",
         "skills/workflows/integration-merge/SKILL.md",
         "skills/workflows/integration-delivery/SKILL.md",
+        "skills/workflows/knowledge-gap-creation/SKILL.md",
         "skills/integrations/github-issues/SKILL.md",
         "skills/integrations/jira/SKILL.md",
         "skills/integrations/confluence/SKILL.md",
@@ -156,7 +157,9 @@ def main() -> int:
         "tools/promotion_sync.py",
         "tools/integration_merge.py",
         "tools/integration_delivery.py",
+        "tools/knowledge_gap.py",
         "templates/quality-gates.example.json",
+        "templates/knowledge-candidate.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
