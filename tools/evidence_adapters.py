@@ -211,3 +211,61 @@ def version_verification_evidence(
         }
     )
 
+def implementation_readiness_evidence(
+    result: "ImplementationReadiness",
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert implementation readiness into canonical evidence without changing its gate semantics."""
+    if result.ready:
+        status = "pending" if result.version_external_verification_pending else "verified"
+    else:
+        status = "failed"
+
+    uncertainty: list[str] = []
+    if result.version_external_verification_pending:
+        uncertainty.append(
+            "External compatibility verification remains pending in implementation readiness."
+        )
+
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "implementation-readiness",
+            "source": "aegis:implementation-readiness",
+            "subject": (
+                f"work-item:{result.work_item_id}"
+                if result.work_item_id is not None
+                else "work-item:unspecified"
+            ),
+            "revision": None,
+            "observed_at": _timestamp(observed_at),
+            "status": status,
+            "result": {
+                "work_item_path": result.work_item_path,
+                "work_item_id": result.work_item_id,
+                "work_item_kind": result.work_item_kind,
+                "lifecycle_state": result.lifecycle_state,
+                "requirements_status": result.requirements_status,
+                "architecture_required": result.architecture_required,
+                "version_evidence_ref": result.version_evidence_ref,
+                "version_external_verification_pending": (
+                    result.version_external_verification_pending
+                ),
+                "observations": [
+                    {
+                        "check": observation.check,
+                        "status": observation.status,
+                        "detail": observation.detail,
+                    }
+                    for observation in result.observations
+                ],
+                "blockers": list(result.blockers),
+                "composition_steps": list(result.composition_steps),
+            },
+            "uncertainty": uncertainty,
+            "references": [],
+            "artifact_sha256": None,
+        }
+    )
+
