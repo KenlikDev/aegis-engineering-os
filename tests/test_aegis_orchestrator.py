@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+from version_verification import record_version_evidence  # noqa: E402
 from work_item_lifecycle import (  # noqa: E402
     InMemoryWorkItemProvider,
     LifecycleState,
@@ -83,7 +85,14 @@ class AegisOrchestratorTests(unittest.TestCase):
         self._git("config", "user.name", "Aegis Test")
         (self.project / "README.md").write_text("test\n", encoding="utf-8")
         self._write_readiness_document("51")
-        self._git("add", "README.md", "work-item.md", "version-evidence.txt")
+        self._git(
+            "add",
+            "README.md",
+            "work-item.md",
+            "version-claims.json",
+            "version-source.txt",
+            ".aegis/version-evidence.json",
+        )
         self._git("commit", "-m", "test: initialize repository")
 
     def _write_readiness_document(self, work_item_id: str) -> None:
@@ -149,10 +158,31 @@ Test fixture.
 - [ ] Acceptance criteria satisfied
 """
         (self.project / "work-item.md").write_text(document, encoding="utf-8")
-        (self.project / "version-evidence.txt").write_text(
+        claims = self.project / "version-claims.json"
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "version-source.txt",
+                        }
+                    ],
+                    "external_verification_pending": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (self.project / "version-source.txt").write_text(
             "Python 3.13 toolchain evidence.\n",
             encoding="utf-8",
         )
+        evidence = self.project / ".aegis" / "version-evidence.json"
+        evidence.parent.mkdir()
+        record_version_evidence(self.project, claims, evidence)
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -177,7 +207,7 @@ Test fixture.
             work_item_id=work_item_id,
             work_item_kind="feature",
             work_item_document=self.project / "work-item.md",
-            version_evidence_ref=self.project / "version-evidence.txt",
+            version_evidence_ref=self.project / ".aegis" / "version-evidence.json",
             architecture_required=False,
             work_item_provider=work_item_provider,
             task=task,
