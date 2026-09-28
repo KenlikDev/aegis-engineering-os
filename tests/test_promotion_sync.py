@@ -322,7 +322,7 @@ class PromotionSyncTests(unittest.TestCase):
             )
 
     def test_rejects_merge_commit_not_present_in_target(self):
-        provider = FakePromotionProvider(contains_merge=False)
+        provider = FakePromotionProvider(exact_merge=False)
         work_items = FakeWorkItemProvider()
 
         with self.assertRaisesRegex(PromotionSyncError, "not exactly equal to main"):
