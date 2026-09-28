@@ -11,6 +11,7 @@ from implementation_readiness import (  # noqa: E402
     ImplementationReadinessError,
     evaluate_readiness,
 )
+from version_verification import record_version_evidence  # noqa: E402
 from work_item_lifecycle import InMemoryWorkItemProvider, LifecycleState, WorkItem  # noqa: E402
 
 
@@ -84,8 +85,30 @@ class ImplementationReadinessTests(unittest.TestCase):
         root = Path(project.name)
         work_item = root / "work-item.md"
         work_item.write_text(WORK_ITEM, encoding="utf-8")
-        evidence = root / "version-evidence.txt"
-        evidence.write_text("Python 3.13; project toolchain verified.\n", encoding="utf-8")
+        claims = root / "version-claims.json"
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "version-source.txt",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (root / "version-source.txt").write_text(
+            "Python 3.13 toolchain evidence.\n",
+            encoding="utf-8",
+        )
+        evidence = root / ".aegis" / "version-evidence.json"
+        evidence.parent.mkdir()
+        record_version_evidence(root, claims, evidence)
         provider = InMemoryWorkItemProvider(
             {
                 "106": WorkItem(
@@ -116,6 +139,30 @@ class ImplementationReadinessTests(unittest.TestCase):
         self.assertIn("refactoring", result.composition_steps)
         self.assertIn("version-verification", result.composition_steps)
         self.assertIn("passed", {item.status for item in result.observations})
+
+    def test_pending_external_version_check_remains_visible(self):
+        root, work_item, evidence, provider = self._fixture()
+        payload = json.loads(evidence.read_text(encoding="utf-8"))
+        payload["external_verification_pending"] = True
+        evidence.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = evaluate_readiness(
+            work_item,
+            "feature",
+            project_root=root,
+            version_evidence_ref=evidence,
+            architecture_required=False,
+            work_item_provider=provider,
+            work_item_id="106",
+        )
+        self.assertTrue(result.ready)
+        self.assertTrue(result.version_external_verification_pending)
+        version = next(
+            item for item in result.observations if item.check == "version-verification"
+        )
+        self.assertEqual("pending", version.status)
 
     def test_architecture_required_works_without_lifecycle_provider(self):
         root, work_item, evidence, _ = self._fixture()
@@ -168,7 +215,7 @@ class ImplementationReadinessTests(unittest.TestCase):
     def test_empty_local_version_evidence_is_rejected(self):
         root, work_item, evidence, provider = self._fixture()
         evidence.write_text("", encoding="utf-8")
-        with self.assertRaisesRegex(ImplementationReadinessError, "empty"):
+        with self.assertRaisesRegex(ImplementationReadinessError, "JSON"):
             evaluate_readiness(
                 work_item,
                 "feature",
@@ -195,22 +242,33 @@ class ImplementationReadinessTests(unittest.TestCase):
                 work_item_id="106",
             )
 
+    def test_legacy_text_version_evidence_is_rejected(self):
+        root, work_item, _, provider = self._fixture()
+        legacy = root / "legacy-version.txt"
+        legacy.write_text("Python 3.13", encoding="utf-8")
+        with self.assertRaisesRegex(ImplementationReadinessError, "JSON"):
+            evaluate_readiness(
+                work_item,
+                "feature",
+                project_root=root,
+                version_evidence_ref=legacy,
+                architecture_required=False,
+                work_item_provider=provider,
+                work_item_id="106",
+            )
+
     def test_external_version_reference_is_not_verified(self):
         root, work_item, _, provider = self._fixture()
-        result = evaluate_readiness(
-            work_item,
-            "feature",
-            project_root=root,
-            version_evidence_ref="https://example.invalid/toolchain.txt",
-            architecture_required=False,
-            work_item_provider=provider,
-            work_item_id="106",
-        )
-        self.assertFalse(result.ready)
-        version = next(
-            item for item in result.observations if item.check == "version-verification"
-        )
-        self.assertEqual("blocked", version.status)
+        with self.assertRaisesRegex(ImplementationReadinessError, "local schema-validated"):
+            evaluate_readiness(
+                work_item,
+                "feature",
+                project_root=root,
+                version_evidence_ref="https://example.invalid/toolchain.txt",
+                architecture_required=False,
+                work_item_provider=provider,
+                work_item_id="106",
+            )
 
     def test_work_item_document_id_must_match_provider_id(self):
         root, work_item, evidence, provider = self._fixture()

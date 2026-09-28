@@ -75,6 +75,10 @@ The executable boundaries are documented in:
 - docs/architecture/release.md.
 
 
+### Version verification
+
+The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
+
 ### Implementation readiness
 
 The implementation-readiness boundary validates that the explicitly classified work item has sufficient requirements, toolchain, architecture, composition, and lifecycle evidence before managed execution. It is fail-closed and read-only. The managed orchestrator must pass this gate before creating its task branch or invoking OpenHands.

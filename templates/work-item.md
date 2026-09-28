@@ -40,7 +40,7 @@ Supporting roles:
 
 Record implementation constraints, affected components, and important assumptions.
 
-Version evidence reference:
+Version evidence reference: .aegis/version-evidence.json
 Architecture applicability: required | not-required
 
 ## Risks

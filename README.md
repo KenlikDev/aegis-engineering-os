@@ -47,7 +47,7 @@ Example from the Aegis checkout:
       "Implement the requested change." \\
       --work-item-kind feature \\
       --work-item-document /path/to/project/work-item.md \\
-      --version-evidence-ref version-evidence.txt \\
+      --version-evidence-ref .aegis/version-evidence.json \\
       --architecture-not-required \\
       --agent-server-url http://127.0.0.1:8000 \\
       --container-workspace /projects/my-project \\
@@ -199,6 +199,25 @@ Exit code 0 means the run was healthy or a deterministic diagnosis was produced.
 See docs/architecture/ci-remediation.md for the evidence and safety contract.
 
 
+## Version verification evidence
+
+After project discovery, record explicit version claims and pin their authoritative sources:
+
+    python3 tools/version_verification.py record \
+      /path/to/project \
+      templates/version-claims.example.json
+
+Validate the resulting evidence before implementation readiness:
+
+    python3 tools/version_verification.py validate \
+      /path/to/project \
+      /path/to/project/.aegis/version-evidence.json
+
+The tool never chooses versions or upgrades dependencies. It verifies explicit claims, source containment, source SHA-256, and the presence of each claimed version string.
+
+See docs/architecture/version-verification.md.
+
+
 ## Implementation readiness
 
 Before managed execution, evaluate the explicit implementation-readiness contract:
@@ -210,7 +229,7 @@ Before managed execution, evaluate the explicit implementation-readiness contrac
       --version-evidence-ref version-evidence.txt \\
       --architecture-not-required
 
-The gate fails closed when requirements are blocked, local version evidence is missing or unreadable, required architecture planning is blocked, or the authoritative work item is not ready. External version URLs remain references only and do not establish readiness.
+The gate fails closed when requirements are blocked, the structured version-evidence artifact is missing or invalid, required architecture planning is blocked, or the authoritative work item is not ready.
 
 See docs/architecture/implementation-readiness.md.
 

@@ -18,6 +18,7 @@ Prevent the agent from implementing against a newer or imaginary API than the pr
 5. Check CI and container versions when relevant.
 6. Compare the intended implementation with authoritative documentation for the exact versions.
 7. Record the baseline when the project does not already expose one.
+8. Validate the resulting source-pinned evidence before implementation readiness.
 
 ## Source-of-truth priority
 
@@ -43,6 +44,18 @@ Prefer:
 ## Offline mode
 
 When external verification is unavailable, use repository source-of-truth files and local cached documentation. Mark external verification as pending. Do not claim current external compatibility without evidence.
+
+## Executable evidence contract
+
+Use `tools/version_verification.py record` after project discovery to turn explicit version claims into SHA-pinned evidence:
+
+    python3 tools/version_verification.py record /path/to/project /path/to/version-claims.json
+
+Validate an existing evidence artifact before implementation:
+
+    python3 tools/version_verification.py validate /path/to/project .aegis/version-evidence.json
+
+The tool never chooses a version. Claims must identify the component, exact version, scope, and authoritative source file. Source hashes and claimed version strings are independently rechecked during validation.
 
 ## Required result
 

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "external_verification_pending": true,
+  "claims": [
+    {
+      "component": "language-runtime",
+      "version": "3.x.y",
+      "scope": "runtime",
+      "source": "path/to/authoritative-version-source"
+    }
+  ]
+}
