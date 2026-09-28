@@ -58,6 +58,132 @@ def _repository_reference(repository: str) -> str:
     return f"https://github.com/{repository}"
 
 
+def runtime_preflight_evidence(
+    result: Mapping[str, Any],
+    *,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert a successful local runtime preflight into canonical provenance."""
+    if result.get("status") != "verified":
+        raise EvidenceContractError(
+            "Runtime preflight evidence requires a successful verified preflight result."
+        )
+
+    profile_name = result.get("profile_name")
+    provider = result.get("provider")
+    surface = result.get("surface")
+    integration = result.get("integration")
+    connection_mode = result.get("connection_mode")
+    model = result.get("model")
+    ollama_base_url = result.get("ollama_base_url")
+    ollama_version = result.get("ollama_version")
+
+    required_strings = {
+        "profile_name": profile_name,
+        "provider": provider,
+        "surface": surface,
+        "integration": integration,
+        "connection_mode": connection_mode,
+        "model": model,
+        "ollama_base_url": ollama_base_url,
+        "ollama_version": ollama_version,
+    }
+    for field, value in required_strings.items():
+        if not isinstance(value, str) or not value.strip():
+            raise EvidenceContractError(
+                f"Runtime preflight {field} must be a non-empty string."
+            )
+
+    if result.get("model_available") is not True:
+        raise EvidenceContractError(
+            "Runtime preflight canonical evidence requires an exact installed model."
+        )
+
+    agent_server = result.get("openhands_agent_server")
+    if agent_server is not None and not isinstance(agent_server, Mapping):
+        raise EvidenceContractError(
+            "Runtime preflight OpenHands Agent Server result is malformed."
+        )
+
+    agent_payload: dict[str, Any] | None = None
+    revision: str | None = None
+    if agent_server is not None:
+        server_status = agent_server.get("status")
+        if server_status != "verified":
+            raise EvidenceContractError(
+                "Runtime preflight Agent Server result must be verified when present."
+            )
+        agent_fields = {
+            "active_llm_model": agent_server.get("active_llm_model"),
+            "llm_base_url": agent_server.get("llm_base_url"),
+            "base_url": agent_server.get("base_url"),
+            "version": agent_server.get("version"),
+            "sdk_version": agent_server.get("sdk_version"),
+            "tools_version": agent_server.get("tools_version"),
+            "workspace_version": agent_server.get("workspace_version"),
+            "conversation_runtime": agent_server.get("conversation_runtime"),
+        }
+        for field, value in agent_fields.items():
+            if not isinstance(value, str) or not value.strip():
+                raise EvidenceContractError(
+                    f"Runtime preflight Agent Server {field} must be a non-empty string."
+                )
+
+        credentials_configured = agent_server.get("llm_api_key_is_set")
+        if credentials_configured is not True:
+            raise EvidenceContractError(
+                "Runtime preflight Agent Server credentials state must be true."
+            )
+
+        build_sha = agent_server.get("build_git_sha")
+        if isinstance(build_sha, str) and re.fullmatch(r"[0-9a-f]{40}", build_sha):
+            revision = build_sha
+
+        agent_payload = {
+            "active_llm_model": agent_fields["active_llm_model"],
+            "llm_base_url": agent_fields["llm_base_url"],
+            "base_url": agent_fields["base_url"],
+            "version": agent_fields["version"],
+            "sdk_version": agent_fields["sdk_version"],
+            "tools_version": agent_fields["tools_version"],
+            "workspace_version": agent_fields["workspace_version"],
+            "conversation_runtime": agent_fields["conversation_runtime"],
+            "build_git_sha": build_sha if isinstance(build_sha, str) else None,
+            "build_git_ref": (
+                agent_server.get("build_git_ref")
+                if isinstance(agent_server.get("build_git_ref"), str)
+                else None
+            ),
+            "llm_auth_configured": True,
+        }
+
+    payload = {
+        "schema_version": 1,
+        "kind": "runtime-preflight",
+        "source": "aegis:runtime-preflight",
+        "subject": f"profile:{profile_name}",
+        "revision": revision,
+        "observed_at": _timestamp(observed_at),
+        "status": "verified",
+        "result": {
+            "profile_name": profile_name,
+            "provider": provider,
+            "surface": surface,
+            "integration": integration,
+            "connection_mode": connection_mode,
+            "model": model,
+            "ollama_base_url": ollama_base_url,
+            "ollama_version": ollama_version,
+            "model_available": result.get("model_available") is True,
+            "openhands_agent_server": agent_payload,
+        },
+        "uncertainty": [],
+        "references": [],
+        "artifact_sha256": None,
+    }
+    return build_evidence(payload)
+
+
 def promotion_readiness_evidence(
     result: PromotionReadiness,
     *,

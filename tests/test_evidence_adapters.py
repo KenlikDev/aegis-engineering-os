@@ -15,6 +15,7 @@ from evidence_adapters import (  # noqa: E402
     promotion_readiness_evidence,
     openhands_execution_evidence,
     release_readiness_evidence,
+    runtime_preflight_evidence,
     requirements_clarification_evidence,
     security_review_evidence,
     testing_evidence,
@@ -22,6 +23,7 @@ from evidence_adapters import (  # noqa: E402
     workflow_composition_evidence,
 )
 from evidence_contract import (  # noqa: E402
+    EvidenceContractError,
     read_and_validate_evidence,
     write_evidence,
 )
@@ -64,6 +66,95 @@ TARGET_SHA = "2222222222222222222222222222222222222222"
 
 
 class EvidenceAdapterTests(unittest.TestCase):
+    def test_runtime_preflight_without_agent_server_is_verified(self):
+        result = {
+            "status": "verified",
+            "profile_name": "development-local",
+            "provider": "ollama",
+            "surface": "local",
+            "integration": "openhands_llm_ollama",
+            "connection_mode": "local",
+            "model": "gemma4:31b",
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_version": "0.12.0",
+            "model_available": True,
+        }
+
+        canonical = runtime_preflight_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual("runtime-preflight", canonical.kind)
+        self.assertEqual("profile:development-local", canonical.subject)
+        self.assertIsNone(canonical.revision)
+        self.assertEqual("gemma4:31b", canonical.result["model"])
+        self.assertIsNone(canonical.result["openhands_agent_server"])
+
+    def test_runtime_preflight_preserves_agent_server_identity_without_secret(self):
+        result = {
+            "status": "verified",
+            "profile_name": "development-local",
+            "provider": "ollama",
+            "surface": "local",
+            "integration": "openhands_llm_ollama",
+            "connection_mode": "local",
+            "model": "gemma4:31b",
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_version": "0.12.0",
+            "model_available": True,
+            "openhands_agent_server": {
+                "status": "verified",
+                "active_llm_model": "openai/gemma4:31b",
+                "llm_base_url": "http://host.docker.internal:11434/v1",
+                "base_url": "http://127.0.0.1:9000",
+                "version": "1.49.5",
+                "sdk_version": "1.2.3",
+                "tools_version": "1.2.4",
+                "workspace_version": "1.2.5",
+                "conversation_runtime": "local",
+                "build_git_sha": "a" * 40,
+                "build_git_ref": "main",
+                "llm_api_key_is_set": True,
+            },
+        }
+
+        canonical = runtime_preflight_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("a" * 40, canonical.revision)
+        self.assertEqual(True, canonical.result["openhands_agent_server"]["llm_auth_configured"])
+        self.assertNotIn("llm_api_key_is_set", str(canonical.result))
+        self.assertNotIn("secret", str(canonical.result).lower())
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "runtime-preflight.json"
+            write_evidence(canonical, path)
+            self.assertEqual(canonical, read_and_validate_evidence(path))
+
+    def test_runtime_preflight_rejects_unavailable_model(self):
+        result = {
+            "status": "verified",
+            "profile_name": "development-local",
+            "provider": "ollama",
+            "surface": "local",
+            "integration": "openhands_llm_ollama",
+            "connection_mode": "local",
+            "model": "gemma4:31b",
+            "ollama_base_url": "http://127.0.0.1:11434",
+            "ollama_version": "0.12.0",
+            "model_available": False,
+        }
+
+        with self.assertRaisesRegex(EvidenceContractError, "exact installed model"):
+            runtime_preflight_evidence(
+                result,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
     def test_promotion_ready_result_is_verified(self):
         result = PromotionReadiness(
             repository=REPOSITORY,

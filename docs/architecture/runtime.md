@@ -31,7 +31,7 @@ For the local Ollama path, Aegis performs a read-only preflight before execution
 3. Verify the Ollama version endpoint.
 4. List locally available models.
 5. Require an exact match for the selected model tag.
-6. Emit machine-readable evidence containing the provider, surface, integration, connection mode, model, endpoint, runtime version, and availability result.
+6. Emit machine-readable evidence containing the selected profile, provider, surface, integration, connection mode, model, endpoint, runtime version, and exact availability result.
 
 Run:
 

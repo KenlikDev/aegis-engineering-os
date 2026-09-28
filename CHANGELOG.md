@@ -4,6 +4,7 @@ All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
 
+- add canonical provenance for local runtime preflight observations with optional exact Agent Server build revision and secret-free credential presence;
 - enforce read-after-write verification for pull-request delivery and review-to-integration lifecycle mutations;
 - add canonical integration-merge provenance and fail-closed verification for traceability and lifecycle mutations;
 - harden autonomous integration merge to require exact validation head evidence and exact post-merge `ai/integration` identity;

@@ -98,6 +98,8 @@ Knowledge-gap records now have an explicit adapter as well. It preserves candida
 
 Requirements clarification, workflow composition, and architecture planning now have explicit adapters as well. They preserve their specialized planning information and map only their existing gate state into canonical status.
 
+Local runtime preflight now has an explicit adapter as well. It preserves the selected profile, exact model tag, Ollama runtime version, optional OpenHands Agent Server identity, and a boolean credential-presence observation without recording credential values. A valid explicitly reported Agent Server build Git SHA becomes the canonical revision; absent or malformed build identity remains unknown rather than being inferred.
+
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 The integration-merge adapter preserves the exact validation head SHA when the merge caller supplied it, the merged pull-request identity, the merge commit SHA, the post-merge `ai/integration` SHA/protection state, and read-after-write verification flags. A `not-merged` result remains canonical `unknown` with explicit uncertainty. The adapter does not create merge authorization or validation evidence.
