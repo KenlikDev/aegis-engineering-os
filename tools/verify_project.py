@@ -76,6 +76,16 @@ def main() -> int:
             f"Unsupported Aegis state schema: {state['schema_version']!r}"
         )
 
+    agents_managed = state.get("agents_managed", False)
+    agents_sha256 = state.get("agents_sha256")
+    if not isinstance(agents_managed, bool):
+        return fail("Aegis agents_managed must be boolean.")
+    if agents_managed:
+        if not isinstance(agents_sha256, str) or not SHA256_PATTERN.fullmatch(agents_sha256):
+            return fail("Managed AGENTS.md requires a lowercase SHA-256 agents_sha256.")
+    elif agents_sha256 is not None:
+        return fail("Unmanaged AGENTS.md state must not contain agents_sha256.")
+
     if not isinstance(state["source_repository"], str) or not state["source_repository"]:
         return fail("Aegis source_repository must be a non-empty string.")
     if not isinstance(state["aegis_version"], str) or not state["aegis_version"]:
@@ -132,6 +142,19 @@ def main() -> int:
             return fail(
                 f"Aegis skill checksum mismatch for {name}: "
                 f"expected {checksum}, got {actual}"
+            )
+
+    if agents_managed:
+        agents_path = project / "AGENTS.md"
+        if agents_path.is_symlink():
+            return fail("Managed AGENTS.md must not be a symbolic link.")
+        if not agents_path.is_file():
+            return fail(f"Managed AGENTS.md is missing: {agents_path}")
+        actual_agents_sha256 = sha256_file(agents_path)
+        if actual_agents_sha256 != agents_sha256:
+            return fail(
+                "Managed AGENTS.md checksum mismatch: "
+                f"expected {agents_sha256}, got {actual_agents_sha256}"
             )
 
     print(

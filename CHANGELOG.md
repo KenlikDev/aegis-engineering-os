@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- verify integrity of Aegis-managed AGENTS.md without claiming user-owned instruction files;
 - harden runtime preflight redirects, managed bootstrap symlinks, and evidence output symlink boundaries;
 - preserve already-merged integration delivery provenance without inventing a fresh validation run;
 
