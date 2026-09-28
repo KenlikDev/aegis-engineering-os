@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime, timezone
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -206,6 +208,11 @@ def main() -> int:
     parser.add_argument("--body", default="")
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     args = parser.parse_args()
 
     try:
@@ -236,6 +243,24 @@ def main() -> int:
         WorkItemLifecycleError,
         ValueError,
     ) as exc:
+        print(f"ERROR: {exc}", file=os.sys.stderr)
+        return 1
+
+    try:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import integration_delivery_evidence
+            from evidence_contract import write_evidence
+
+            canonical = integration_delivery_evidence(
+                result,
+                repository=args.repository,
+                observed_at=datetime.now(timezone.utc),
+            )
+            write_evidence(
+                canonical,
+                args.canonical_evidence_output.expanduser().resolve(),
+            )
+    except (ValueError, IntegrationDeliveryError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
 
