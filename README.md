@@ -352,6 +352,18 @@ Build the deterministic workflow sequence for an explicitly classified work item
 
 The composition layer validates every referenced capability against skills/registry.json, preserves conditional steps explicitly, and never infers the work-item kind from free-form text.
 
+To additionally require an explicit canonical evidence set before managed implementation, both inputs must be supplied:
+
+    python3 tools/implementation_readiness.py /path/to/project/work-item.md \
+      --project-root /path/to/project \
+      --kind feature \
+      --version-evidence-ref .aegis/version-evidence.json \
+      --architecture-not-required \
+      --evidence-bundle .aegis/readiness-bundle.json \
+      --evidence-set-requirements .aegis/readiness-requirements.json
+
+The requirements document is the explicit source of evidence-set completeness. It may bind selectors to exact evidence revisions. The readiness gate records satisfaction or blocks on malformed/unsatisfied requirements; it does not infer selectors from free-form text or bundle purpose.
+
 To additionally persist an explicit composition as canonical evidence:
 
     python3 tools/workflow_composition.py --kind refactoring \

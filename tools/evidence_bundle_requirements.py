@@ -22,7 +22,9 @@ from evidence_contract import (
 
 
 SCHEMA_VERSION = 1
-REQUIREMENT_KEYS = frozenset({"kind", "status", "subject", "source"})
+REQUIREMENT_REQUIRED_KEYS = frozenset({"kind", "status", "subject", "source"})
+REQUIREMENT_OPTIONAL_KEYS = frozenset({"revision"})
+REQUIREMENT_KEYS = REQUIREMENT_REQUIRED_KEYS | REQUIREMENT_OPTIONAL_KEYS
 REQUIREMENTS_KEYS = frozenset({"schema_version", "requirements", "allow_extra_members"})
 MAX_REQUIREMENTS = 64
 MAX_SELECTOR_LENGTH = 4096
@@ -40,6 +42,7 @@ class EvidenceSelector:
     status: str | None = None
     subject: str | None = None
     source: str | None = None
+    revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +88,11 @@ def _clean_selector_text(value: object, field: str) -> str:
 
 
 def _parse_requirement(value: object, index: int) -> EvidenceSelector:
-    if not isinstance(value, Mapping) or set(value) != REQUIREMENT_KEYS:
+    if (
+        not isinstance(value, Mapping)
+        or not REQUIREMENT_REQUIRED_KEYS.issubset(set(value))
+        or not set(value).issubset(REQUIREMENT_KEYS)
+    ):
         raise EvidenceSetRequirementsError(
             f"Evidence requirement {index} has an invalid schema."
         )
@@ -111,11 +118,16 @@ def _parse_requirement(value: object, index: int) -> EvidenceSelector:
     if source is not None:
         source = _clean_selector_text(source, f"Evidence requirement {index} source")
 
+    revision = value.get("revision")
+    if revision is not None:
+        revision = _clean_selector_text(revision, f"Evidence requirement {index} revision")
+
     return EvidenceSelector(
         kind=kind,
         status=status,
         subject=subject,
         source=source,
+        revision=revision,
     )
 
 
@@ -196,6 +208,7 @@ def _matches(selector: EvidenceSelector, evidence: EvidenceRecord) -> bool:
         and (selector.status is None or evidence.status == selector.status)
         and (selector.subject is None or evidence.subject == selector.subject)
         and (selector.source is None or evidence.source == selector.source)
+        and (selector.revision is None or evidence.revision == selector.revision)
     )
 
 
@@ -242,6 +255,7 @@ def validate_evidence_set(
             "status": selector.status,
             "subject": selector.subject,
             "source": selector.source,
+            "revision": selector.revision,
         }
         for index, selector in enumerate(requirements.requirements)
     ]

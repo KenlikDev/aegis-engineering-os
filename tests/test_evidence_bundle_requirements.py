@@ -17,14 +17,20 @@ from evidence_bundle_requirements import (
 from evidence_contract import build_evidence, read_and_validate_evidence, write_evidence
 
 
-def _evidence(kind: str, status: str, subject: str, source: str):
+def _evidence(
+    kind: str,
+    status: str,
+    subject: str,
+    source: str,
+    revision: str = "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+):
     return build_evidence(
         {
             "schema_version": 1,
             "kind": kind,
             "source": source,
             "subject": subject,
-            "revision": "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+            "revision": revision,
             "observed_at": "2026-09-28T18:00:00Z",
             "status": status,
             "result": {"state": subject},
@@ -159,6 +165,37 @@ class EvidenceSetRequirementsTests(unittest.TestCase):
         requirements.write_text(json.dumps(payload), encoding="utf-8")
 
         result = validate_evidence_set(root, overlap_bundle, requirements)
+        self.assertEqual(2, result.requirements_satisfied)
+
+    def test_revision_selector_matches_exact_evidence_revision(self):
+        root, bundle, requirements, *_ = self._project()
+        payload = json.loads(requirements.read_text(encoding="utf-8"))
+        payload["requirements"] = [
+            {
+                "kind": "testing",
+                "status": "verified",
+                "subject": "project-testing",
+                "source": "aegis:testing",
+                "revision": "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+            }
+        ]
+        requirements.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = validate_evidence_set(root, bundle, requirements)
+        self.assertEqual("verified", result.status)
+        self.assertEqual(1, result.requirements_satisfied)
+
+        payload["requirements"][0]["revision"] = "a" * 40
+        requirements.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(
+            EvidenceSetRequirementsError,
+            "requirements are not satisfied",
+        ):
+            validate_evidence_set(root, bundle, requirements)
+
+    def test_requirements_without_revision_remain_backward_compatible(self):
+        root, bundle, requirements, *_ = self._project()
+        result = validate_evidence_set(root, bundle, requirements)
         self.assertEqual(2, result.requirements_satisfied)
 
     def test_missing_requirement_fails_closed(self):

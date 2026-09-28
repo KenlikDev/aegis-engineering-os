@@ -18,7 +18,9 @@ Required:
 Optional:
 
 - authoritative work-item provider;
-- work-item ID.
+- work-item ID;
+- optional explicit canonical evidence bundle;
+- optional explicit evidence-set requirements contract.
 
 The readiness gate is provider-neutral. The provider is used only to verify that an authoritative work item is in ready.
 
@@ -44,6 +46,14 @@ When required, the existing read-only architecture planner must return no blocke
 
 When not required, the gate records that explicit classification. It does not derive the decision from file layout or heuristics.
 
+### Explicit evidence-set requirements
+
+When both `--evidence-bundle` and `--evidence-set-requirements` are supplied, implementation readiness validates the canonical bundle and then evaluates the bundle against the supplied machine-readable requirements. The requirements consumer uses deterministic one-member-per-selector matching and can optionally require an exact evidence `revision`.
+
+A satisfied evidence set contributes a `passed` readiness observation and preserves the bundle ID and requirement counts. A malformed or unsatisfied evidence-set contract contributes a `blocked` observation and a readiness blocker. It does not change the other readiness checks and does not become authorization by itself.
+
+The readiness gate never derives requirements from the work-item document, bundle purpose, free-form evidence text, or workflow composition. Omitting the evidence-set inputs preserves the existing readiness contract; supplying only one of them is rejected.
+
 ### Canonical provenance adapter
 
 The readiness result can be emitted as canonical evidence without changing the specialized readiness JSON:
@@ -54,9 +64,11 @@ The readiness result can be emitted as canonical evidence without changing the s
       --kind feature \
       --version-evidence-ref .aegis/version-evidence.json \
       --architecture-not-required \
+      --evidence-bundle .aegis/readiness-bundle.json \
+      --evidence-set-requirements .aegis/readiness-requirements.json \
       --evidence-output /tmp/implementation-readiness-evidence.json
 
-The adapter preserves all readiness observations, blockers, composition steps, lifecycle state, architecture applicability, and version-evidence metadata. A blocked result is `failed`. A ready result with external version verification still pending is `pending`; it is never silently promoted to `verified`.
+The adapter preserves all readiness observations, blockers, composition steps, lifecycle state, architecture applicability, version-evidence metadata, and explicit evidence-set provenance. A blocked result is `failed`. A ready result with external version verification still pending is `pending`; it is never silently promoted to `verified`.
 
 ## Lifecycle
 
