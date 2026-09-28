@@ -231,7 +231,7 @@ class ImplementationReadinessTests(unittest.TestCase):
         outside = root.parent / "version-evidence.txt"
         outside.write_text("external", encoding="utf-8")
         self.addCleanup(lambda: outside.unlink(missing_ok=True))
-        with self.assertRaisesRegex(ImplementationReadinessError, "local schema-validated"):
+        with self.assertRaisesRegex(ImplementationReadinessError, "inside the project root"):
             evaluate_readiness(
                 work_item,
                 "feature",
@@ -246,7 +246,7 @@ class ImplementationReadinessTests(unittest.TestCase):
         root, work_item, _, provider = self._fixture()
         legacy = root / "legacy-version.txt"
         legacy.write_text("Python 3.13", encoding="utf-8")
-        with self.assertRaisesRegex(ImplementationReadinessError, "schema"):
+        with self.assertRaisesRegex(ImplementationReadinessError, "JSON"):
             evaluate_readiness(
                 work_item,
                 "feature",
