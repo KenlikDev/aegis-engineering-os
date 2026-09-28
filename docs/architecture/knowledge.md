@@ -31,6 +31,20 @@ A candidate can move from candidate to validated only when:
 
 Validation evidence is sanitized before storage. Secret-like values are rejected in the original candidate and redacted from validation evidence. The stored validation payload has its own SHA-256 hash so later edits fail closed.
 
+## Canonical provenance
+
+Knowledge-gap records can be adapted into canonical evidence through the `knowledge_gap_evidence` adapter.
+
+The adapter preserves candidate identity, scope, capability, problem, proposed change, original candidate SHA-256, validation metadata, redacted validation evidence, and lifecycle transitions.
+
+Canonical status mapping is explicit:
+
+- candidate -> `pending`;
+- validated -> `verified`;
+- rejected -> `failed` with explicit uncertainty that the candidate must not be treated as active knowledge.
+
+This mapping describes the recorded knowledge-gap lifecycle. It does not authorize activation or alter the candidate registry.
+
 ## Rejection
 
 A candidate or validated record may be rejected with an explicit reason.
