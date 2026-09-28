@@ -7,6 +7,8 @@ import argparse
 import json
 import os
 import re
+from datetime import datetime, timezone
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
@@ -425,11 +427,21 @@ def sync_integration_merge(
             evidence_ref=f"{pull_request.url}/commits/{merge_commit_sha}",
         ),
     )
+    if not trace.verified:
+        raise IntegrationMergeError(
+            "Traceability mutation was not read-after-write verified."
+        )
+
     mutation = work_item_provider.transition(
         work_item_id,
         LifecycleState.INTEGRATION,
         expected_state=LifecycleState.REVIEW,
     )
+    if not mutation.verified:
+        raise IntegrationMergeError(
+            "Lifecycle transition mutation was not read-after-write verified."
+        )
+
     final_item = work_item_provider.get(work_item_id)
     if final_item.state != LifecycleState.INTEGRATION:
         raise IntegrationMergeError(
@@ -439,6 +451,7 @@ def sync_integration_merge(
     return {
         "status": "verified",
         "work_item_id": work_item_id,
+        "validation_head_sha": expected_head_sha,
         "pull_request": {
             "number": pull_request.number,
             "url": pull_request.url,
@@ -476,6 +489,11 @@ def main() -> int:
     parser.add_argument("work_item_id")
     parser.add_argument("pull_request_number", type=int)
     parser.add_argument("--expected-head-sha", default=None)
+    parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     args = parser.parse_args()
 
@@ -493,6 +511,20 @@ def main() -> int:
     except (IntegrationMergeError, WorkItemLifecycleError, ValueError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
+
+    if args.canonical_evidence_output is not None:
+        from evidence_adapters import integration_merge_evidence
+        from evidence_contract import write_evidence
+
+        canonical = integration_merge_evidence(
+            result,
+            repository=args.repository,
+            observed_at=datetime.now(timezone.utc),
+        )
+        write_evidence(
+            canonical,
+            Path(args.canonical_evidence_output).expanduser().resolve(),
+        )
 
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0

@@ -100,6 +100,8 @@ Requirements clarification, workflow composition, and architecture planning now 
 
 The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
+The integration-merge adapter preserves the exact validation head SHA when the merge caller supplied it, the merged pull-request identity, the merge commit SHA, the post-merge `ai/integration` SHA/protection state, and read-after-write verification flags. A `not-merged` result remains canonical `unknown` with explicit uncertainty. The adapter does not create merge authorization or validation evidence.
+
 Canonical evidence artifacts may be composed by the separate evidence-bundle boundary. Bundling preserves member identity and does not infer decision completeness.
 
 A separate evidence-set requirements consumer can validate whether an explicitly declared selector set is satisfied by a bundle. This is deliberately downstream of bundle integrity validation and does not define which evidence a product or engineering gate should require; those requirements must be supplied explicitly by the owning gate or workflow. Implementation readiness can consume this contract explicitly when the caller supplies both a bundle and a requirements document; readiness does not derive selectors from work-item text, bundle purpose, or evidence contents.

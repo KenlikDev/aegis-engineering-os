@@ -197,6 +197,73 @@ def release_readiness_evidence(
         }
     )
 
+def integration_merge_evidence(
+    result: Mapping[str, Any],
+    *,
+    repository: str,
+    observed_at: datetime | str,
+) -> EvidenceRecord:
+    """Convert an integration-merge result into canonical provenance evidence."""
+    status = result.get("status")
+    if status == "verified":
+        canonical_status = "verified"
+        uncertainty: list[str] = []
+    elif status == "not-merged":
+        canonical_status = "unknown"
+        uncertainty = ["The integration pull request was not merged."]
+    else:
+        raise EvidenceContractError(
+            f"Unsupported integration merge status: {status!r}."
+        )
+
+    work_item_id = result.get("work_item_id")
+    if not isinstance(work_item_id, str) or not work_item_id:
+        raise EvidenceContractError("Integration merge work_item_id is required.")
+
+    pull_request = result.get("pull_request")
+    integration = result.get("integration")
+    work_item = result.get("work_item")
+    if not isinstance(pull_request, Mapping):
+        raise EvidenceContractError("Integration merge pull_request result is malformed.")
+    if not isinstance(integration, Mapping):
+        raise EvidenceContractError("Integration merge integration result is malformed.")
+    if not isinstance(work_item, Mapping):
+        raise EvidenceContractError("Integration merge work_item result is malformed.")
+
+    revision = integration.get("sha") if canonical_status == "verified" else None
+    if revision is not None and (
+        not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)
+    ):
+        raise EvidenceContractError(
+            "Integration merge integration SHA must be a 40-character hexadecimal revision."
+        )
+
+    pull_request_url = pull_request.get("url")
+    if not isinstance(pull_request_url, str) or not pull_request_url.startswith(
+        "https://"
+    ):
+        raise EvidenceContractError(
+            "Integration merge pull-request URL must be HTTPS."
+        )
+
+    safe_result = _canonical_safe(dict(result))
+    return build_evidence(
+        {
+            "schema_version": 1,
+            "kind": "integration-merge",
+            "source": f"github:{repository}",
+            "subject": f"work-item:{work_item_id}",
+            "revision": revision,
+            "observed_at": _timestamp(observed_at),
+            "status": canonical_status,
+            "result": safe_result,
+            "uncertainty": uncertainty,
+            "references": [pull_request_url, _repository_reference(repository)],
+            "artifact_sha256": None,
+        }
+    )
+
+
 def version_verification_evidence(
     evidence: VersionEvidence,
     *,

@@ -79,9 +79,14 @@ PR is draft, not clean, or targets the wrong branch:
 - report the condition.
 
 Successful verified merge:
+- verify traceability mutation evidence;
+- verify lifecycle transition mutation evidence;
 - attach traceability;
 - advance review -> integration;
-- verify the resulting work-item state.
+- verify the resulting work-item state;
+- optionally emit canonical `integration-merge` evidence with `--canonical-evidence-output`.
+
+An integration result is not reported as `verified` when either provider mutation is marked unverified. Canonicalization preserves the exact merge revision and any explicit validated head SHA; it does not create validation or authorization.
 
 ## Lifecycle position
 
