@@ -163,6 +163,7 @@ class FakeGitHubTransport:
             REPOSITORY,
             "test-token",
             transport=transport,
+            api_base_url="https://api.github.test",
         )
 
         self.assertFalse(provider.target_matches_commit("main", MERGE_SHA))
