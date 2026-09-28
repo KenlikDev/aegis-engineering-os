@@ -14,9 +14,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from evidence_adapters import promotion_readiness_evidence
-from evidence_contract import write_evidence
-
 GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_API_BASE_URL = "https://api.github.com"
 DEFAULT_SOURCE_BRANCH = "ai/integration"
@@ -572,6 +569,9 @@ def main() -> int:
         return 1
 
     if args.evidence_output:
+        from evidence_adapters import promotion_readiness_evidence
+        from evidence_contract import write_evidence
+
         write_evidence(
             promotion_readiness_evidence(result, observed_at=observed_at),
             args.evidence_output,

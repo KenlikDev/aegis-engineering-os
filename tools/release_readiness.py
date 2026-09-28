@@ -15,8 +15,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from evidence_adapters import release_readiness_evidence
-from evidence_contract import write_evidence
 from promotion_readiness import (
     DEFAULT_API_BASE_URL,
     DEFAULT_WORKFLOW,
@@ -381,6 +379,9 @@ def main() -> int:
         return 1
 
     if args.evidence_output:
+        from evidence_adapters import release_readiness_evidence
+        from evidence_contract import write_evidence
+
         write_evidence(
             release_readiness_evidence(result, observed_at=observed_at),
             args.evidence_output,
