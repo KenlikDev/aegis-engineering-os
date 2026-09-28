@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import subprocess
+import json
 from pathlib import Path
 import sys
 
@@ -97,6 +99,31 @@ What outcome is required?
 
 
 class RequirementsClarificationTests(unittest.TestCase):
+    def test_cli_can_emit_canonical_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work_item = Path(directory) / "work-item.md"
+            output = Path(directory) / "requirements-evidence.json"
+            work_item.write_text(VALID, encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "tools" / "requirements_clarification.py"),
+                    str(work_item),
+                    "--canonical-evidence-output",
+                    str(output),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn('"status": "ready"', completed.stdout)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("requirements-clarification", payload["kind"])
+            self.assertEqual("verified", payload["status"])
+            self.assertTrue(payload["result"]["ready"])
+
     def test_complete_work_item_is_ready(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "work-item.md"
