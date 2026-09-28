@@ -215,7 +215,7 @@ class ImplementationReadinessTests(unittest.TestCase):
     def test_empty_local_version_evidence_is_rejected(self):
         root, work_item, evidence, provider = self._fixture()
         evidence.write_text("", encoding="utf-8")
-        with self.assertRaisesRegex(ImplementationReadinessError, "schema"):
+        with self.assertRaisesRegex(ImplementationReadinessError, "JSON"):
             evaluate_readiness(
                 work_item,
                 "feature",
