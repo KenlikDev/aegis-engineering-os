@@ -87,6 +87,8 @@ Implementation readiness can now emit its own canonical provenance record, allow
 
 Testing can now emit a canonical provenance record from its existing redacted execution result, allowing verification evidence to participate in later evidence bundles.
 
+Security review can now emit a canonical provenance record from its deterministic findings without changing the security gate itself.
+
 ### Version verification
 
 The version-verification capability records explicit project version claims as source-pinned evidence and validates them before implementation readiness. It never selects or upgrades versions.
