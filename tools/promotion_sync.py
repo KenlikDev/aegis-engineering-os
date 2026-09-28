@@ -63,7 +63,7 @@ class PromotionSyncProvider(Protocol):
 
     def get_branch(self, branch: str) -> BranchSnapshot: ...
 
-    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool: ...
+    def target_matches_commit(self, target_branch: str, commit_sha: str) -> bool: ...
 
 
 JsonTransport = Callable[
@@ -232,21 +232,26 @@ class GitHubPromotionSyncProvider:
             protected=protected,
         )
 
-    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool:
+    def target_matches_commit(self, target_branch: str, commit_sha: str) -> bool:
         self._sha(commit_sha, "Promotion merge commit SHA")
         status, data = self._request(
             "GET",
-            f"/repos/{self.repository}/compare/{commit_sha}...{quote(target_branch, safe='')}",
+            f"/repos/{self.repository}/compare/{quote(target_branch, safe='')}...{commit_sha}",
         )
         if status != 200 or not isinstance(data, Mapping):
             raise PromotionSyncError(
                 f"Unable to verify merge commit ancestry in {target_branch!r}; HTTP {status}."
             )
         compare_status = data.get("status")
+        ahead_by = data.get("ahead_by")
         behind_by = data.get("behind_by")
-        if not isinstance(compare_status, str) or not isinstance(behind_by, int):
+        if (
+            not isinstance(compare_status, str)
+            or not isinstance(ahead_by, int)
+            or not isinstance(behind_by, int)
+        ):
             raise PromotionSyncError("GitHub commit comparison response is malformed.")
-        return compare_status in {"ahead", "identical"} and behind_by == 0
+        return compare_status == "identical" and ahead_by == 0 and behind_by == 0
 
 
 def _validate_inputs(
@@ -325,12 +330,23 @@ def sync_promotion_merge(
     if pull_request.merge_commit_sha is None:
         raise PromotionSyncError("Merged promotion pull request has no merge commit SHA.")
 
-    if not provider.target_contains_commit(
+    if not provider.target_matches_commit(
         target_branch,
         pull_request.merge_commit_sha,
     ):
         raise PromotionSyncError(
-            f"Promotion merge commit {pull_request.merge_commit_sha} is not contained in {target_branch}."
+            f"Promotion merge commit {pull_request.merge_commit_sha} is not exactly equal to {target_branch}."
+        )
+
+    verified_target = provider.get_branch(target_branch)
+    if verified_target.sha != pull_request.merge_commit_sha:
+        raise PromotionSyncError(
+            f"Protected target {target_branch} advanced after exact merge verification: "
+            f"observed {verified_target.sha}, expected {pull_request.merge_commit_sha}."
+        )
+    if not verified_target.protected:
+        raise PromotionSyncError(
+            f"Promotion target {target_branch} lost protected status during synchronization."
         )
 
     evidence_ref = (
@@ -343,11 +359,21 @@ def sync_promotion_merge(
             evidence_ref=evidence_ref,
         ),
     )
+    if not trace.verified:
+        raise PromotionSyncError(
+            "Promotion traceability mutation was not read-after-write verified."
+        )
+
     mutation = work_item_provider.transition(
         work_item_id,
         LifecycleState.DONE,
         expected_state=LifecycleState.INTEGRATION,
     )
+    if not mutation.verified:
+        raise PromotionSyncError(
+            "Promotion lifecycle transition mutation was not read-after-write verified."
+        )
+
     final_item = work_item_provider.get(work_item_id)
     if final_item.state != LifecycleState.DONE:
         raise PromotionSyncError(
@@ -369,8 +395,8 @@ def sync_promotion_merge(
         },
         "target": {
             "branch": target.branch,
-            "sha": target.sha,
-            "protected": target.protected,
+            "sha": verified_target.sha,
+            "protected": verified_target.protected,
         },
         "traceability_verified": trace.verified,
         "work_item": {

@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from promotion_readiness import BranchSnapshot
 from promotion_sync import (
+    GitHubPromotionSyncProvider,
     PromotionPullRequest,
     PromotionSyncError,
     sync_promotion_merge,
@@ -33,7 +34,10 @@ class FakePromotionProvider:
         state="closed",
         merged=True,
         protected=True,
-        contains_merge=True,
+        exact_merge=True,
+        target_sha=MERGE_SHA,
+        trace_verified=True,
+        transition_verified=True,
         head="ai/1-main-promotion",
         base="main",
         merge_commit_sha=MERGE_SHA,
@@ -55,7 +59,10 @@ class FakePromotionProvider:
             sha=TARGET_SHA,
             protected=protected,
         )
-        self.contains_merge = contains_merge
+        self.exact_merge = exact_merge
+        self.target_sha = target_sha
+        self.trace_verified = trace_verified
+        self.transition_verified = transition_verified
         self.contains_calls = []
 
     def get_pull_request(self, number):
@@ -66,15 +73,25 @@ class FakePromotionProvider:
     def get_branch(self, branch):
         if branch != "main":
             raise AssertionError(f"Unexpected target: {branch}")
-        return self.target
+        return BranchSnapshot(
+            branch="main",
+            sha=self.target_sha,
+            protected=self.target.protected,
+        )
 
-    def target_contains_commit(self, target_branch, commit_sha):
+    def target_matches_commit(self, target_branch, commit_sha):
         self.contains_calls.append((target_branch, commit_sha))
-        return self.contains_merge
+        return self.exact_merge
 
 
 class FakeWorkItemProvider:
-    def __init__(self, state=LifecycleState.INTEGRATION):
+    def __init__(
+        self,
+        state=LifecycleState.INTEGRATION,
+        *,
+        trace_verified=True,
+        transition_verified=True,
+    ):
         self.item = WorkItem(
             id="1",
             title="Promotion task",
@@ -84,6 +101,8 @@ class FakeWorkItemProvider:
         )
         self.traceability = []
         self.transitions = []
+        self.trace_verified = trace_verified
+        self.transition_verified = transition_verified
 
     def get(self, work_item_id):
         if work_item_id != "1":
@@ -96,7 +115,7 @@ class FakeWorkItemProvider:
             provider="fake",
             operation="attach_traceability",
             work_item_id=work_item_id,
-            verified=True,
+            verified=self.trace_verified,
             reference=traceability.pull_request_url,
         )
 
@@ -120,8 +139,41 @@ class FakeWorkItemProvider:
             work_item_id=work_item_id,
             state_before=current.value,
             state_after=target.value,
-            verified=True,
+            verified=self.transition_verified,
         )
+
+
+class FakeGitHubTransport:
+    def __init__(self):
+        self.url = None
+        self.status = "ahead"
+
+    def __call__(self, method, url, headers, payload):
+        self.url = url
+        return 200, {
+            "status": self.status,
+            "ahead_by": 1 if self.status == "ahead" else 0,
+            "behind_by": 0,
+        }
+
+
+    def test_github_provider_requires_identical_compare(self):
+        transport = FakeGitHubTransport()
+        provider = GitHubPromotionSyncProvider(
+            REPOSITORY,
+            "test-token",
+            transport=transport,
+            api_base_url="https://api.github.test",
+        )
+
+        self.assertFalse(provider.target_matches_commit("main", MERGE_SHA))
+        self.assertEqual(
+            f"/repos/{REPOSITORY}/compare/main...{MERGE_SHA}",
+            transport.url.removeprefix("https://api.github.test"),
+        )
+
+        transport.status = "identical"
+        self.assertTrue(provider.target_matches_commit("main", MERGE_SHA))
 
 
 class PromotionSyncTests(unittest.TestCase):
@@ -147,6 +199,81 @@ class PromotionSyncTests(unittest.TestCase):
         self.assertEqual(
             [("main", MERGE_SHA)],
             provider.contains_calls,
+        )
+
+    def test_rejects_non_identical_target_compare(self):
+        provider = FakePromotionProvider(exact_merge=False)
+        work_items = FakeWorkItemProvider()
+
+        with self.assertRaisesRegex(PromotionSyncError, "not exactly equal to main"):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual([], work_items.traceability)
+        self.assertEqual([], work_items.transitions)
+
+    def test_rejects_target_advanced_after_exact_compare(self):
+        provider = FakePromotionProvider(target_sha="4" * 40)
+        work_items = FakeWorkItemProvider()
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "advanced after exact merge verification",
+        ):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual([], work_items.traceability)
+        self.assertEqual([], work_items.transitions)
+
+    def test_rejects_unverified_traceability_mutation(self):
+        provider = FakePromotionProvider()
+        work_items = FakeWorkItemProvider(trace_verified=False)
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "traceability mutation was not read-after-write verified",
+        ):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual([], work_items.transitions)
+
+    def test_rejects_unverified_transition_mutation(self):
+        provider = FakePromotionProvider()
+        work_items = FakeWorkItemProvider(transition_verified=False)
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "lifecycle transition mutation was not read-after-write verified",
+        ):
+            sync_promotion_merge(
+                provider,
+                work_items,
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+        self.assertEqual(1, len(work_items.transitions))
+        self.assertEqual(
+            (LifecycleState.INTEGRATION, LifecycleState.DONE),
+            work_items.transitions[0],
         )
 
     def test_open_pr_is_non_mutating(self):
@@ -233,10 +360,10 @@ class PromotionSyncTests(unittest.TestCase):
             )
 
     def test_rejects_merge_commit_not_present_in_target(self):
-        provider = FakePromotionProvider(contains_merge=False)
+        provider = FakePromotionProvider(exact_merge=False)
         work_items = FakeWorkItemProvider()
 
-        with self.assertRaisesRegex(PromotionSyncError, "not contained in main"):
+        with self.assertRaisesRegex(PromotionSyncError, "not exactly equal to main"):
             sync_promotion_merge(
                 provider,
                 work_items,
