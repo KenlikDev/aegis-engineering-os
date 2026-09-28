@@ -89,6 +89,8 @@ class AegisPolicyTests(unittest.TestCase):
 
             self.assertEqual(first_state["schema_version"], 2)
             self.assertEqual(first_state["source_worktree_clean"], True)
+            self.assertTrue(first_state["agents_managed"])
+            self.assertRegex(first_state["agents_sha256"], r"^[0-9a-f]{64}$")
             self.assertEqual(first_state["preset"], "all")
             self.assertEqual(first_state["integrations"], ["confluence", "jira"])
             self.assertEqual(
@@ -198,6 +200,93 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("customized aegis skill", result.stderr.lower())
             self.assertEqual(state_path.read_text(encoding="utf-8"), original_state)
+
+    def test_project_verifier_detects_managed_agents_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            bootstrap = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            verified = self.run_tool(VERIFY_PROJECT, project)
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+
+            agents = project / "AGENTS.md"
+            agents.write_text(
+                agents.read_text(encoding="utf-8") + "\n# Tampered\n",
+                encoding="utf-8",
+            )
+
+            tampered = self.run_tool(VERIFY_PROJECT, project)
+            self.assertNotEqual(tampered.returncode, 0)
+            self.assertIn("managed AGENTS.md checksum mismatch", tampered.stderr)
+
+    def test_bootstrap_refuses_modified_managed_agents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            first = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(first.returncode, 0, first.stderr)
+
+            agents = project / "AGENTS.md"
+            agents.write_text(
+                agents.read_text(encoding="utf-8") + "\n# Project mutation\n",
+                encoding="utf-8",
+            )
+            original = agents.read_text(encoding="utf-8")
+
+            second = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertNotEqual(second.returncode, 0)
+            self.assertIn("customized managed AGENTS.md", second.stderr)
+            self.assertEqual(original, agents.read_text(encoding="utf-8"))
+
+    def test_user_owned_agents_is_not_claimed_as_aegis_managed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+            agents = project / "AGENTS.md"
+            agents.write_text(
+                "Project-owned instructions\n",
+                encoding="utf-8",
+            )
+
+            first = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(first.returncode, 0, first.stderr)
+
+            state = json.loads(
+                (project / ".aegis" / "aegis-version.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(state["agents_managed"])
+            self.assertIsNone(state["agents_sha256"])
+            self.assertEqual(
+                "Project-owned instructions\n",
+                agents.read_text(encoding="utf-8"),
+            )
+
+    def test_symlinked_managed_agents_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            first = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(first.returncode, 0, first.stderr)
+
+            state_path = project / ".aegis" / "aegis-version.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertTrue(state["agents_managed"])
+
+            external = Path(tmp) / "external-agents.md"
+            external.write_text("external\n", encoding="utf-8")
+            agents = project / "AGENTS.md"
+            agents.unlink()
+            agents.symlink_to(external)
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlinked AGENTS.md", result.stderr)
+            self.assertEqual("external\n", external.read_text(encoding="utf-8"))
 
     def test_dirty_aegis_source_is_rejected_before_project_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
