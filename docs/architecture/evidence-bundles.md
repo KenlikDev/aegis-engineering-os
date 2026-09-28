@@ -43,6 +43,25 @@ Validate the bundle and all its members:
 
 The bundle tool never contacts external providers and never changes the systems represented by the evidence.
 
+## Explicit evidence-set requirements
+
+Bundle integrity and evidence-set completeness are intentionally separate concerns.
+
+`tools/evidence_bundle_requirements.py` validates a canonical bundle against a machine-readable requirements document. The requirements document explicitly supplies the selectors; the tool never derives them from the bundle purpose or free-form text.
+
+Each selector requires an exact `kind` and may additionally require exact `status`, `subject`, and `source`. Every selector must match a distinct bundle member. The bundle and each referenced evidence artifact are fully revalidated before the result is accepted.
+
+Extra members are allowed by default and may be rejected with `allow_extra_members: false`.
+
+Example:
+
+    python3 tools/evidence_bundle_requirements.py \
+      /path/to/project \
+      /path/to/project/.aegis/evidence-bundle.json \
+      /path/to/project/templates/evidence-set-requirements.example.json
+
+This consumer reports only evidence-set satisfaction. It does not infer a business decision and does not change any evidence artifact.
+
 ## Relationship to provenance
 
 Canonical evidence records remain the source of truth for individual observations.

@@ -279,6 +279,15 @@ Bundles do not infer completeness, upgrade evidence status, contact providers, o
 
 See docs/architecture/evidence-bundles.md.
 
+To validate a bundle against an explicit evidence-set contract:
+
+    python3 tools/evidence_bundle_requirements.py \
+      /path/to/project \
+      /path/to/project/.aegis/evidence-bundle.json \
+      /path/to/project/evidence-set-requirements.json
+
+The requirements document explicitly declares the required `kind` values and optional exact `status`, `subject`, and `source` selectors. The consumer never infers requirements from bundle purpose or free-form text.
+
 
 ## Version verification evidence
 
