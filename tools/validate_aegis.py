@@ -141,6 +141,7 @@ def main() -> int:
         "tools/aegis_orchestrator.py",
         "tools/quality_gates.py",
         "tools/delivery.py",
+        "tools/promotion_readiness.py",
         "templates/quality-gates.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
