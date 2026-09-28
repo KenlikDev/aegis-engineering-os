@@ -73,6 +73,10 @@ The executable boundaries are documented in:
 - docs/architecture/release.md.
 
 
+### Implementation readiness
+
+The implementation-readiness boundary validates that the explicitly classified work item has sufficient requirements, toolchain, architecture, composition, and lifecycle evidence before managed execution. It is fail-closed and read-only.
+
 ### Workflow composition
 
 The workflow-composition boundary converts an explicit work-item kind into a deterministic ordered capability set and validates every referenced skill against the registry. It does not infer task kind or execute workflows.
