@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "requirements": [
+    {
+      "kind": "implementation-readiness",
+      "status": "verified",
+      "subject": "work-item:123",
+      "source": "aegis:implementation-readiness"
+    },
+    {
+      "kind": "testing",
+      "status": "verified",
+      "subject": "project-testing",
+      "source": "aegis:testing"
+    }
+  ],
+  "allow_extra_members": true
+}
