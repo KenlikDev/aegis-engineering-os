@@ -199,6 +199,24 @@ Exit code 0 means the run was healthy or a deterministic diagnosis was produced.
 See docs/architecture/ci-remediation.md for the evidence and safety contract.
 
 
+## Evidence provenance
+
+Material state observations use a provider-neutral evidence envelope with explicit provenance:
+
+    python3 tools/state_verification.py record \
+      /path/to/state-input.json \
+      /path/to/state-evidence.json
+
+Validate an existing evidence artifact before relying on it:
+
+    python3 tools/state_verification.py validate \
+      /path/to/state-evidence.json
+
+The contract records the evidence kind, source, subject, revision, observation time, result, uncertainty, references, optional artifact hash, and a canonical self-hash. Recording and validation never mutate the observed system.
+
+See docs/architecture/evidence-provenance.md and docs/governance/state-verification.md.
+
+
 ## Version verification evidence
 
 After project discovery, record explicit version claims and pin their authoritative sources:
@@ -226,7 +244,7 @@ Before managed execution, evaluate the explicit implementation-readiness contrac
       /path/to/project/work-item.md \\
       --project-root /path/to/project \\
       --kind feature \\
-      --version-evidence-ref version-evidence.txt \\
+      --version-evidence-ref .aegis/version-evidence.json \\
       --architecture-not-required
 
 The gate fails closed when requirements are blocked, the structured version-evidence artifact is missing or invalid, required architecture planning is blocked, or the authoritative work item is not ready.
