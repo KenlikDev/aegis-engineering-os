@@ -54,6 +54,8 @@ Version 0.1.0-alpha.1 is experimental and is expected to change after validation
 The implemented engineering delivery path is:
 
 work item
+-> workflow composition
+-> implementation readiness
 -> execution
 -> verification
 -> quality gates
@@ -75,7 +77,7 @@ The executable boundaries are documented in:
 
 ### Implementation readiness
 
-The implementation-readiness boundary validates that the explicitly classified work item has sufficient requirements, toolchain, architecture, composition, and lifecycle evidence before managed execution. It is fail-closed and read-only.
+The implementation-readiness boundary validates that the explicitly classified work item has sufficient requirements, toolchain, architecture, composition, and lifecycle evidence before managed execution. It is fail-closed and read-only. The managed orchestrator must pass this gate before creating its task branch or invoking OpenHands.
 
 ### Workflow composition
 
