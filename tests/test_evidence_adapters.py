@@ -33,6 +33,7 @@ from ci_diagnosis import (  # noqa: E402
 from promotion_readiness import BranchSnapshot, CompareSnapshot, PromotionReadiness, ValidationRun  # noqa: E402
 from openhands_execution import OpenHandsExecutionResult  # noqa: E402
 from implementation_readiness import (  # noqa: E402
+    EvidenceSetReadiness,
     ImplementationReadiness,
     ReadinessObservation,
 )
@@ -858,6 +859,39 @@ class EvidenceAdapterTests(unittest.TestCase):
             canonical.result["composition_steps"],
         )
         self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
+
+    def test_implementation_readiness_evidence_set_is_preserved(self):
+        result = ImplementationReadiness(
+            work_item_path="/tmp/work-item.md",
+            work_item_id="138",
+            work_item_kind="feature",
+            lifecycle_state="ready",
+            requirements_status="ready",
+            architecture_required=False,
+            version_evidence_ref=".aegis/version-evidence.json",
+            version_external_verification_pending=False,
+            observations=(),
+            blockers=(),
+            composition_steps=("feature-implementation",),
+            evidence_set=EvidenceSetReadiness(
+                status="verified",
+                bundle_id="a" * 64,
+                requirements_ref=".aegis/readiness-requirements.json",
+                requirements_satisfied=2,
+                requirements_total=2,
+                detail="Explicit evidence-set requirements are satisfied.",
+            ),
+        )
+
+        canonical = implementation_readiness_evidence(
+            result,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.result["evidence_set"]["status"])
+        self.assertEqual("a" * 64, canonical.result["evidence_set"]["bundle_id"])
+        self.assertEqual(2, canonical.result["evidence_set"]["requirements_satisfied"])
+        self.assertEqual(2, canonical.result["evidence_set"]["requirements_total"])
 
     def test_implementation_readiness_pending_version_remains_pending(self):
         result = ImplementationReadiness(
