@@ -558,7 +558,7 @@ def main() -> int:
                 protected_inputs.add(requirements_path)
             if output_path in protected_inputs:
                 raise ImplementationReadinessError(
-                    "Canonical evidence output must not overwrite the work-item or version-evidence input."
+                    "Canonical evidence output must not overwrite any readiness input artifact."
                 )
 
             write_evidence(
