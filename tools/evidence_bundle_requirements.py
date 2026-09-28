@@ -235,36 +235,53 @@ def validate_evidence_set(
     requirements = load_requirements(requirements_path)
     members = _load_bundle_members(project, bundle)
 
-    used_member_ids: set[str] = set()
-    matched: list[Mapping[str, Any]] = []
-    missing: list[Mapping[str, Any]] = []
-
-    for index, selector in enumerate(requirements.requirements):
-        match = next(
-            (
-                (member, evidence)
-                for member, evidence in members
-                if member.evidence_id not in used_member_ids
-                and _matches(selector, evidence)
-            ),
-            None,
-        )
-        selector_output = {
+    selector_outputs = [
+        {
             "index": index,
             "kind": selector.kind,
             "status": selector.status,
             "subject": selector.subject,
             "source": selector.source,
         }
-        if match is None:
-            missing.append(selector_output)
-            continue
+        for index, selector in enumerate(requirements.requirements)
+    ]
 
-        member, evidence = match
-        used_member_ids.add(member.evidence_id)
+    # Use augmenting-path matching so overlapping selectors cannot consume a
+    # member needed by a more specific requirement and cause a false failure.
+    requirement_matches: list[int | None] = [None] * len(requirements.requirements)
+    member_matches: list[int | None] = [None] * len(members)
+
+    def assign(requirement_index: int, seen_members: set[int]) -> bool:
+        selector = requirements.requirements[requirement_index]
+        for member_index, (_, evidence) in enumerate(members):
+            if member_index in seen_members or not _matches(selector, evidence):
+                continue
+            seen_members.add(member_index)
+            previous = member_matches[member_index]
+            if previous is None or assign(previous, seen_members):
+                member_matches[member_index] = requirement_index
+                requirement_matches[requirement_index] = member_index
+                return True
+        return False
+
+    for requirement_index in range(len(requirements.requirements)):
+        assign(requirement_index, set())
+
+    missing = [
+        selector_outputs[index]
+        for index, member_index in enumerate(requirement_matches)
+        if member_index is None
+    ]
+    matched = []
+    used_member_indices: set[int] = set()
+    for requirement_index, member_index in enumerate(requirement_matches):
+        if member_index is None:
+            continue
+        member, evidence = members[member_index]
+        used_member_indices.add(member_index)
         matched.append(
             {
-                **selector_output,
+                **selector_outputs[requirement_index],
                 "evidence_id": evidence.evidence_id,
                 "path": member.path,
             }
@@ -279,8 +296,8 @@ def validate_evidence_set(
             "subject": evidence.subject,
             "source": evidence.source,
         }
-        for member, evidence in members
-        if member.evidence_id not in used_member_ids
+        for member_index, (member, evidence) in enumerate(members)
+        if member_index not in used_member_indices
     ]
 
     if missing:
