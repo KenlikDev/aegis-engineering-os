@@ -9,6 +9,7 @@ from evidence_adapters import (  # noqa: E402
     ci_diagnosis_evidence,
     promotion_readiness_evidence,
     implementation_readiness_evidence,
+    openhands_execution_evidence,
     release_readiness_evidence,
     security_review_evidence,
     testing_evidence,
