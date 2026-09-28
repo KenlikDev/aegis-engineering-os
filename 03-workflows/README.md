@@ -19,7 +19,6 @@ The repository currently provides:
 - integration merge;
 - integration delivery;
 - knowledge-gap creation;
-- security review.
 
 ## Planned workflow areas
 
