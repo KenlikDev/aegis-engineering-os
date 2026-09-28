@@ -25,7 +25,7 @@ The gate verifies:
 
 1. requirements clarification has no blocker-level questions;
 2. the explicit work-item kind maps to a registry-validated workflow composition;
-3. the version-evidence reference is valid and locally readable when it names a project-local file;
+3. the version-evidence reference points to a non-empty project-local UTF-8 file; external URLs are recorded but do not pass readiness without independent verification;
 4. architecture planning passes when architecture impact is explicitly classified as required;
 5. lifecycle state is exactly ready when a provider is supplied.
 
