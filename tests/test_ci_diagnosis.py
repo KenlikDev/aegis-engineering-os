@@ -120,18 +120,16 @@ class CIDiagnosisTests(unittest.TestCase):
 
     def test_successful_run_is_healthy_and_does_not_read_logs(self):
         run = WorkflowRunSnapshot(
-            **{**RUN.__dict__ if hasattr(RUN, "__dict__") else {
-                "repository": RUN.repository,
-                "run_id": RUN.run_id,
-                "name": RUN.name,
-                "workflow_path": RUN.workflow_path,
-                "event": RUN.event,
-                "status": "completed",
-                "conclusion": "success",
-                "head_branch": RUN.head_branch,
-                "head_sha": RUN.head_sha,
-                "url": RUN.url,
-            }}
+            repository=RUN.repository,
+            run_id=RUN.run_id,
+            name=RUN.name,
+            workflow_path=RUN.workflow_path,
+            event=RUN.event,
+            status="completed",
+            conclusion="success",
+            head_branch=RUN.head_branch,
+            head_sha=RUN.head_sha,
+            url=RUN.url,
         )
         provider = FakeProvider(
             run=run,
