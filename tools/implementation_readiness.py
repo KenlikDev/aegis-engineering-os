@@ -276,7 +276,10 @@ def evaluate_readiness(
             )
         )
 
-    lifecycle_state = _validate_lifecycle(work_item_provider, work_item_id)
+    lifecycle_state = _validate_lifecycle(
+        work_item_provider,
+        work_item_id if work_item_provider is not None else None,
+    )
     if lifecycle_state is not None:
         observations.append(
             ReadinessObservation(
