@@ -228,6 +228,11 @@ class ImplementationReadinessTests(unittest.TestCase):
             bundle_payload["bundle_id"],
             payload["result"]["evidence_set"]["bundle_id"],
         )
+        canonical_record = read_and_validate_evidence(canonical)
+        self.assertEqual(
+            payload["result"]["evidence_set"]["bundle_id"],
+            canonical_record.result["evidence_set"]["bundle_id"],
+        )
 
     def test_explicit_evidence_set_is_a_readiness_prerequisite(self):
         root, work_item, evidence, provider = self._fixture()
@@ -325,6 +330,38 @@ class ImplementationReadinessTests(unittest.TestCase):
 
         self.assertEqual(1, completed.returncode)
         self.assertIn("must not overwrite", completed.stderr)
+
+    def test_cli_refuses_to_overwrite_evidence_set_inputs(self):
+        root, work_item, evidence, _ = self._fixture()
+        bundle, requirements = self._evidence_set(root)
+
+        for protected in (bundle, requirements):
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "tools" / "implementation_readiness.py"),
+                    str(work_item),
+                    "--project-root",
+                    str(root),
+                    "--kind",
+                    "feature",
+                    "--version-evidence-ref",
+                    str(evidence),
+                    "--architecture-not-required",
+                    "--evidence-bundle",
+                    str(bundle),
+                    "--evidence-set-requirements",
+                    str(requirements),
+                    "--evidence-output",
+                    str(protected),
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(1, completed.returncode)
+            self.assertIn("must not overwrite", completed.stderr)
+
 
     def test_ready_with_explicit_architecture_plan(self):
         root, work_item, evidence, provider = self._fixture()
