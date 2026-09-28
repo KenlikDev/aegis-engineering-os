@@ -15,7 +15,6 @@ from typing import Any, Callable, Mapping
 
 from openhands_execution import (
     OpenHandsExecutionClient,
-    OpenHandsExecutionError,
     OpenHandsExecutionRequest,
 )
 from preflight_runtime import RuntimePreflightError, preflight
@@ -437,7 +436,7 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
             evidence_ref,
         )
         work_item_sync = {
-            "provider": result_provider := current_work_item.provider,
+            "provider": current_work_item.provider,
             "state_before_execution": current_work_item.state.value,
             "state_after_execution": LifecycleState.VERIFICATION.value,
             "verified": True,
