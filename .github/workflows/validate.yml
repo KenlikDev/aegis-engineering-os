@@ -41,7 +41,7 @@ jobs:
         with:
           persist-credentials: false
           ref: >-
-            \${{ github.event.action == 'closed' &&
+            ${{ github.event.action == 'closed' &&
             github.event.pull_request.merged == true &&
             github.event.pull_request.merge_commit_sha || github.sha }}
 
