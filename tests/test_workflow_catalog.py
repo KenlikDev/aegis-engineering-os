@@ -44,7 +44,8 @@ class WorkflowCatalogTests(unittest.TestCase):
                     )
                 elif display_name == "integration delivery":
                     self.assertIn("- integration delivery;", implemented)
-        self.assertIn("- architecture planning;", implemented)
+                elif display_name == "architecture planning":
+                    self.assertIn("- architecture planning;", implemented)
                 else:
                     self.assertIn(f"- {display_name};", implemented)
 
