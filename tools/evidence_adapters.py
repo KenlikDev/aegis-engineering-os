@@ -206,33 +206,32 @@ def integration_delivery_evidence(
     validation = result.get("validation")
     integration = result.get("integration")
     work_item = result.get("work_item")
+
     for field, value in (
         ("pull_request", pull_request),
-        ("validation", validation),
         ("integration", integration),
         ("work_item", work_item),
     ):
-        if status == "verified" and not isinstance(value, Mapping):
+        if not isinstance(value, Mapping):
             raise EvidenceContractError(
                 f"Integration delivery {field} result is required for verified status."
             )
+    if validation is not None and not isinstance(validation, Mapping):
+        raise EvidenceContractError("Integration delivery validation result is malformed.")
 
     revision: str | None = None
     if canonical_status == "verified":
         assert isinstance(pull_request, Mapping)
-        assert isinstance(validation, Mapping)
         assert isinstance(integration, Mapping)
         assert isinstance(work_item, Mapping)
 
-        validation_head = validation.get("head_sha")
+        validation_head = validation.get("head_sha") if isinstance(validation, Mapping) else None
         pr_head = pull_request.get("head_sha")
         merge_sha = pull_request.get("merge_commit_sha")
         integration_sha = integration.get("sha")
-        traceability_verified = result.get("traceability_verified")
         transition_verified = work_item.get("transition_verified")
 
         for field, value in (
-            ("validation head SHA", validation_head),
             ("pull-request head SHA", pr_head),
             ("merge commit SHA", merge_sha),
             ("integration SHA", integration_sha),
@@ -242,17 +241,37 @@ def integration_delivery_evidence(
                     f"Integration delivery {field} must be a 40-character hexadecimal SHA."
                 )
 
-        if validation_head != pr_head:
-            raise EvidenceContractError(
-                "Integration delivery validation head does not match the PR head."
+        if validation is not None:
+            if not isinstance(validation_head, str) or not re.fullmatch(
+                r"[0-9a-f]{40}", validation_head
+            ):
+                raise EvidenceContractError(
+                    "Integration delivery validation head SHA must be a 40-character hexadecimal SHA."
+                )
+            if validation_head != pr_head:
+                raise EvidenceContractError(
+                    "Integration delivery validation head does not match the PR head."
+                )
+            if validation.get("status") != "completed" or validation.get("conclusion") != "success":
+                raise EvidenceContractError(
+                    "Integration delivery validation must be a completed successful run."
+                )
+        else:
+            uncertainty.append(
+                "No new validation run was performed during already-merged integration synchronization."
             )
-        if merge_sha != integration_sha:
+
+        if pull_request.get("merged") is not True:
             raise EvidenceContractError(
-                "Integration delivery merge commit does not match the post-merge integration SHA."
+                "Verified integration delivery must describe a merged pull request."
             )
         if pull_request.get("base") != "ai/integration":
             raise EvidenceContractError(
                 "Integration delivery pull request base must be ai/integration."
+            )
+        if merge_sha != integration_sha:
+            raise EvidenceContractError(
+                "Integration delivery merge commit does not match the post-merge integration SHA."
             )
         if result.get("traceability_verified") is not True:
             raise EvidenceContractError(
@@ -262,25 +281,17 @@ def integration_delivery_evidence(
             raise EvidenceContractError(
                 "Integration delivery lifecycle transition must be read-after-write verified."
             )
-        if validation.get("status") != "completed" or validation.get("conclusion") != "success":
-            raise EvidenceContractError(
-                "Integration delivery validation must be a completed successful run."
-            )
         revision = merge_sha
 
-    pull_request_payload = (
-        {
-            "number": pull_request.get("number"),
-            "url": pull_request.get("url"),
-            "head": pull_request.get("head"),
-            "head_sha": pull_request.get("head_sha"),
-            "base": pull_request.get("base"),
-            "merged": pull_request.get("merged"),
-            "merge_commit_sha": pull_request.get("merge_commit_sha"),
-        }
-        if isinstance(pull_request, Mapping)
-        else None
-    )
+    pull_request_payload = {
+        "number": pull_request.get("number"),
+        "url": pull_request.get("url"),
+        "head": pull_request.get("head"),
+        "head_sha": pull_request.get("head_sha"),
+        "base": pull_request.get("base"),
+        "merged": pull_request.get("merged"),
+        "merge_commit_sha": pull_request.get("merge_commit_sha"),
+    }
     validation_payload = (
         {
             "id": validation.get("id"),
@@ -293,23 +304,15 @@ def integration_delivery_evidence(
         if isinstance(validation, Mapping)
         else None
     )
-    integration_payload = (
-        {
-            "branch": integration.get("branch"),
-            "sha": integration.get("sha"),
-            "protected": integration.get("protected"),
-        }
-        if isinstance(integration, Mapping)
-        else None
-    )
-    work_item_payload = (
-        {
-            "state_after": work_item.get("state_after"),
-            "transition_verified": work_item.get("transition_verified"),
-        }
-        if isinstance(work_item, Mapping)
-        else None
-    )
+    integration_payload = {
+        "branch": integration.get("branch"),
+        "sha": integration.get("sha"),
+        "protected": integration.get("protected"),
+    }
+    work_item_payload = {
+        "state_after": work_item.get("state_after"),
+        "transition_verified": work_item.get("transition_verified"),
+    }
 
     return build_evidence(
         {
@@ -331,15 +334,13 @@ def integration_delivery_evidence(
             "uncertainty": uncertainty,
             "references": (
                 [pull_request.get("url")]
-                if isinstance(pull_request, Mapping)
-                and isinstance(pull_request.get("url"), str)
+                if isinstance(pull_request.get("url"), str)
                 and pull_request.get("url").startswith("https://")
                 else []
             ),
             "artifact_sha256": None,
         }
     )
-
 
 def runtime_preflight_evidence(
     result: Mapping[str, Any],

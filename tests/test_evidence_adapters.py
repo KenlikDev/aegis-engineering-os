@@ -222,6 +222,80 @@ class EvidenceAdapterTests(unittest.TestCase):
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
 
+    def test_integration_delivery_already_merged_path_is_verified_with_uncertainty(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "163",
+            "traceability_verified": True,
+            "pull_request": {
+                "number": 163,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/163",
+                "head": "ai/feature/163-already-merged-provenance",
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "validation": None,
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        canonical = integration_delivery_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-09-28T18:00:00Z",
+        )
+
+        self.assertEqual("verified", canonical.status)
+        self.assertEqual(TARGET_SHA, canonical.revision)
+        self.assertIsNone(canonical.result["validation"])
+        self.assertEqual(1, len(canonical.uncertainty))
+        self.assertIn("No new validation run", canonical.uncertainty[0])
+
+    def test_integration_delivery_rejects_partial_verified_result_without_identity(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "163",
+            "traceability_verified": True,
+            "pull_request": {
+                "number": 163,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/163",
+                "head": "ai/feature/163-already-merged-provenance",
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "validation": None,
+            "integration": {
+                "branch": "ai/integration",
+                "sha": SOURCE_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "merge commit does not match the post-merge integration SHA",
+        ):
+            integration_delivery_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
     def test_integration_delivery_rejects_validation_head_mismatch(self):
         result = {
             "status": "verified",

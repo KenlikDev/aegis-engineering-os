@@ -104,7 +104,7 @@ The adapters do not reinterpret existing reports or change readiness decisions. 
 
 The integration-merge adapter preserves the exact validation head SHA when the merge caller supplied it, the merged pull-request identity, the merge commit SHA, the post-merge `ai/integration` SHA/protection state, and read-after-write verification flags.
 
-The composed integration-delivery adapter preserves the exact validation head, validation run identity, task pull-request identity, merge commit, post-merge integration SHA/protection state, and lifecycle verification as one canonical observation.
+The composed integration-delivery adapter preserves the exact validation head and validation run identity when a validation lookup occurred, the task pull-request identity, merge commit, post-merge integration SHA/protection state, and lifecycle verification as one canonical observation. The already-merged synchronization path may legitimately have no new validation object; canonical evidence records that fact as explicit uncertainty rather than inventing a validation run.
 
 The promotion-synchronization adapter preserves the human-controlled target branch, exact promotion merge revision, protected target identity, pull-request identity, traceability verification, and integration -> done lifecycle verification. It emits an observation only and never creates promotion authorization. It additionally checks consistency across those identities before emitting `verified` evidence. It does not create validation evidence, merge authorization, or promotion authorization. A `not-merged` result remains canonical `unknown` with explicit uncertainty. The adapter does not create merge authorization or validation evidence.
 

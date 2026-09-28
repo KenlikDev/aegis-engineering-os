@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- preserve already-merged integration delivery provenance without inventing a fresh validation run;
 
 - enforce read-after-write mutation verification across managed execution, quality-gate synchronization, and lifecycle CLI output;
 - add canonical provenance for human-controlled protected-branch promotion synchronization;
