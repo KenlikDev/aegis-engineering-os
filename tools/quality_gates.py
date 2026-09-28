@@ -30,12 +30,12 @@ MAX_OUTPUT_CHARS = 32768
 GATE_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 ENV_KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 SENSITIVE_ENV_KEY_RE = re.compile(
-    r"(?:TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|AUTH|CREDENTIAL)",
+    r"(?:TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|ACCESS_KEY|CREDENTIAL)",
     re.IGNORECASE,
 )
 SENSITIVE_OUTPUT_RE = re.compile(
-    r"(?i)(bearer\s+)[^\s,;]+|"
-    r"((?:api[_-]?key|token|password|secret)\s*[=:]\s*)[^\s,;]+"
+    r"(?i)((?:bearer|token)\s+)[^\s,;]+|"
+    r"((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret)\s*[:=]\s*)[^\s,;]+"
 )
 
 
@@ -170,6 +170,7 @@ def load_quality_gates(path: Path) -> tuple[QualityGate, ...]:
 
     seen: set[str] = set()
     parsed: list[QualityGate] = []
+    required_count = 0
     for raw_gate in gates:
         if not isinstance(raw_gate, dict):
             raise QualityGateError("Every quality gate must be an object.")
@@ -204,6 +205,9 @@ def load_quality_gates(path: Path) -> tuple[QualityGate, ...]:
             raise QualityGateError(f"Gate {gate_id!r} required must be boolean.")
 
         environment = _validate_environment(raw_gate.get("environment"), gate_id)
+        if required:
+            required_count += 1
+
         parsed.append(
             QualityGate(
                 id=gate_id,
@@ -215,6 +219,8 @@ def load_quality_gates(path: Path) -> tuple[QualityGate, ...]:
                 environment=environment,
             )
         )
+    if required_count == 0:
+        raise QualityGateError("Quality-gate manifest must declare at least one required gate.")
     return tuple(parsed)
 
 
@@ -339,8 +345,10 @@ def execute_quality_gates(
         raise QualityGateError(f"Project directory does not exist: {root}")
     manifest = manifest_path.expanduser().resolve()
     gates = load_quality_gates(manifest)
-    if root != manifest.parent and root not in manifest.parents and manifest.parent != root / ".aegis":
-        raise QualityGateError("Quality-gate manifest must live inside the project.")
+    try:
+        manifest.relative_to(root)
+    except ValueError as exc:
+        raise QualityGateError("Quality-gate manifest must live inside the project.") from exc
 
     results: list[QualityGateResult] = []
     required_failures: list[str] = []
