@@ -1,11 +1,14 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from integration_merge import (  # noqa: E402
+import integration_merge as integration_merge_module  # noqa: E402
+from integration_merge import (
     GitHubIntegrationMergeProvider,
     IntegrationMergeError,
     IntegrationPullRequest,
@@ -16,8 +19,11 @@ from promotion_readiness import BranchSnapshot  # noqa: E402
 from work_item_lifecycle import (  # noqa: E402
     InMemoryWorkItemProvider,
     LifecycleState,
+    MutationEvidence,
+    Traceability,
     WorkItem,
 )
+from evidence_contract import read_and_validate_evidence  # noqa: E402
 
 REPOSITORY = "KenlikDev/aegis-engineering-os"
 PR_NUMBER = 75
@@ -117,6 +123,36 @@ class FakeIntegrationProvider:
         return MergeResult(merged=True, merge_commit_sha=MERGE_SHA)
 
 
+class UnverifiedTraceabilityProvider(InMemoryWorkItemProvider):
+    def attach_traceability(self, work_item_id, traceability):
+        return MutationEvidence(
+            provider="memory",
+            operation="comment",
+            work_item_id=work_item_id,
+            verified=False,
+        )
+
+
+class UnverifiedTransitionProvider(InMemoryWorkItemProvider):
+    def transition(
+        self,
+        work_item_id,
+        target,
+        *,
+        expected_state=None,
+    ):
+        current = self.get(work_item_id)
+        return MutationEvidence(
+            provider=current.provider,
+            operation="transition",
+            work_item_id=work_item_id,
+            state_before=current.state.value,
+            state_after=target.value,
+            verified=False,
+            reference=current.provider_url,
+        )
+
+
 class FakeGitHubTransport:
     def __init__(self):
         self.calls = []
@@ -204,6 +240,96 @@ class IntegrationMergeTests(unittest.TestCase):
             [("exact", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
+
+    def test_unverified_traceability_blocks_verified_result(self):
+        merge = FakeIntegrationProvider()
+        items = UnverifiedTraceabilityProvider(
+            {
+                "75": WorkItem(
+                    id="75",
+                    title="integration merge",
+                    state=LifecycleState.REVIEW,
+                    provider="memory",
+                )
+            }
+        )
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "Traceability mutation was not read-after-write verified",
+        ):
+            sync_integration_merge(
+                merge,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+
+    def test_unverified_transition_blocks_verified_result(self):
+        merge = FakeIntegrationProvider()
+        items = UnverifiedTransitionProvider(
+            {
+                "75": WorkItem(
+                    id="75",
+                    title="integration merge",
+                    state=LifecycleState.REVIEW,
+                    provider="memory",
+                )
+            }
+        )
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "Lifecycle transition mutation was not read-after-write verified",
+        ):
+            sync_integration_merge(
+                merge,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+
+    def test_cli_writes_canonical_integration_merge_evidence(self):
+        merge = FakeIntegrationProvider()
+        items = work_items()
+
+        with tempfile.TemporaryDirectory() as temp:
+            canonical_path = Path(temp) / "integration-merge-evidence.json"
+            argv = [
+                "integration_merge.py",
+                REPOSITORY,
+                "75",
+                str(PR_NUMBER),
+                "--expected-head-sha",
+                HEAD_SHA,
+                "--canonical-evidence-output",
+                str(canonical_path),
+            ]
+            with (
+                patch.object(
+                    integration_merge_module,
+                    "GitHubIntegrationMergeProvider",
+                    return_value=merge,
+                ),
+                patch.object(
+                    integration_merge_module,
+                    "_build_work_item_provider",
+                    return_value=items,
+                ),
+                patch.object(sys, "argv", argv),
+            ):
+                self.assertEqual(0, integration_merge_module.main())
+
+            canonical = read_and_validate_evidence(canonical_path)
+            self.assertEqual("integration-merge", canonical.kind)
+            self.assertEqual(MERGE_SHA, canonical.revision)
+            self.assertEqual(HEAD_SHA, canonical.result["validation_head_sha"])
 
     def test_open_pr_with_non_clean_mergeability_is_blocked(self):
         provider = FakeIntegrationProvider(mergeable_state="blocked")
