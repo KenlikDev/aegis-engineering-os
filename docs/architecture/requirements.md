@@ -32,6 +32,14 @@ The executable tool reads the canonical Markdown work-item format and returns de
 
 Every blocker includes section-level evidence explaining what is missing.
 
+## Canonical provenance
+
+The clarification report can be adapted into the canonical evidence envelope with `--canonical-evidence-output`. The adapter preserves deterministic question IDs, severity, sections, question text, evidence text, and summary counts.
+
+A ready report maps to canonical `verified`; unresolved blocker questions map to `failed`. Warnings do not become blockers during adaptation.
+
+This output is additive and does not answer the questions or change the work item.
+
 ## User agency
 
 The clarification workflow does not select a priority, make a business commitment, invent an acceptance criterion, or decide disputed scope.
