@@ -15,9 +15,9 @@ from evidence_bundle import EvidenceBundle, EvidenceBundleError, read_and_valida
 from evidence_contract import (
     ALLOWED_STATUSES,
     KIND_RE,
+    SECRET_VALUE_PATTERNS,
     EvidenceContractError,
     EvidenceRecord,
-    SHA256_RE,
     read_and_validate_evidence,
 )
 
@@ -26,7 +26,6 @@ SCHEMA_VERSION = 1
 REQUIREMENT_KEYS = frozenset({"kind", "status", "subject", "source"})
 REQUIREMENTS_KEYS = frozenset({"schema_version", "requirements", "allow_extra_members"})
 MAX_REQUIREMENTS = 64
-REQUIREMENT_SET_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 MAX_SELECTOR_LENGTH = 4096
 
 
@@ -78,6 +77,11 @@ def _clean_selector_text(value: object, field: str) -> str:
         raise EvidenceSetRequirementsError(
             f"{field} contains invalid or oversized text."
         )
+    for pattern in SECRET_VALUE_PATTERNS:
+        if pattern.search(value):
+            raise EvidenceSetRequirementsError(
+                f"{field} contains secret-like material."
+            )
     return value
 
 
