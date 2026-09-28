@@ -52,7 +52,7 @@ class WorkflowCatalogTests(unittest.TestCase):
 
         self.assertIn("- integration delivery.", implemented)
         self.assertNotIn("- integration delivery.", planned)
-        self.assertIn("- CI remediation;", planned)
+        self.assertIn("- CI remediation.", planned)
 
 
 if __name__ == "__main__":
