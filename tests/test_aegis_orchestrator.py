@@ -84,7 +84,77 @@ class AegisOrchestratorTests(unittest.TestCase):
         (self.project / "README.md").write_text("test\n", encoding="utf-8")
         self._write_readiness_document("51")
         self._git("add", "README.md", "work-item.md", "version-evidence.txt")
-        self._git("commit"e:
+        self._git("commit", "-m", "test: initialize repository")
+
+    def _write_readiness_document(self, work_item_id: str) -> None:
+        document = f"""# Work Item
+
+## Identity
+
+Provider: memory
+Work item ID: {work_item_id}
+Title: Managed execution readiness test
+
+## Intent
+
+The managed execution test must verify readiness before execution.
+
+## Scope
+
+### In scope
+
+- managed readiness verification
+
+### Out of scope
+
+- unrelated product behavior
+
+## Acceptance criteria
+
+- [ ] Readiness is checked before execution.
+
+## Dependencies
+
+- Python runtime
+
+## Roles
+
+Primary role: software engineer
+
+## Technical notes
+
+Affected component: test fixture
+
+## Risks
+
+- Missing readiness evidence must block execution.
+
+## Verification plan
+
+- Run the Aegis policy tests.
+
+## Delivery links
+
+Branch:
+Pull request:
+Documentation:
+ADR:
+
+## Status log
+
+Test fixture.
+
+## Definition of done
+
+- [ ] Acceptance criteria satisfied
+"""
+        (self.project / "work-item.md").write_text(document, encoding="utf-8")
+        (self.project / "version-evidence.txt").write_text(
+            "Python 3.13 toolchain evidence.\n",
+            encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
         self.temp.cleanup()
 
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -136,7 +206,7 @@ class AegisOrchestratorTests(unittest.TestCase):
         return InMemoryWorkItemProvider(
             {
                 "51": WorkItem(
-                    id="56",
+                    id="51",
                     title="managed execution",
                     state=LifecycleState.READY,
                     provider="memory",
@@ -148,7 +218,7 @@ class AegisOrchestratorTests(unittest.TestCase):
         provider = InMemoryWorkItemProvider(
             {
                 "56": WorkItem(
-                    id="56",
+                    id="51",
                     title="managed execution",
                     state=LifecycleState.PLANNED,
                     provider="memory",
