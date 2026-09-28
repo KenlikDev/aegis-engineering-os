@@ -9,6 +9,7 @@ CATALOG = ROOT / "03-workflows" / "README.md"
 CORE_WORKFLOW_DISPLAY_NAMES = {
     "project-discovery": "project discovery",
     "work-item-lifecycle": "work-item lifecycle",
+    "workflow-composition": "workflow composition",
     "feature-implementation": "feature implementation",
     "bug-fix": "bug fixing",
     "code-review": "code review",
@@ -52,6 +53,8 @@ class WorkflowCatalogTests(unittest.TestCase):
                     self.assertIn("- testing;", implemented)
                 elif display_name == "refactoring":
                     self.assertIn("- refactoring;", implemented)
+                elif display_name == "workflow composition":
+                    self.assertIn("- workflow composition;", implemented)
                 else:
                     self.assertIn(f"- {display_name};", implemented)
 
@@ -69,6 +72,7 @@ class WorkflowCatalogTests(unittest.TestCase):
         self.assertNotIn("- architecture planning;", planned)
         self.assertNotRegex(planned, r"(?m)^- testing(?:[.;]|$)")
         self.assertNotRegex(planned, r"(?m)^- refactoring(?:[.;]|$)")
+        self.assertNotRegex(planned, r"(?m)^- workflow composition(?:[.;]|$)")
 
 
 if __name__ == "__main__":
