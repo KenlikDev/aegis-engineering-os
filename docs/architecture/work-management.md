@@ -96,6 +96,8 @@ The lifecycle provider returns `MutationEvidence` as the provider-neutral result
 
 A mutation with `verified=True` becomes canonical `verified`. A mutation with `verified=False` remains canonical `unknown` with explicit uncertainty. The adapter does not retry, repair, or reinterpret the provider result.
 
+Higher-level execution boundaries must enforce this invariant at their own return boundary. They must not synthesize `verified=True` from a successful transport or command result. Quality-gate synchronization and managed execution therefore fail closed when traceability, comment, or lifecycle mutation evidence is unverified.
+
 ## Release promotion readiness
 
 Promotion from \`ai/integration\` into \`develop\` or \`main\` is a separate human-controlled delivery stage.
