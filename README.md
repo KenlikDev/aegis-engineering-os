@@ -191,6 +191,14 @@ Run the read-only repository security review before high-impact integration or p
 
 Exit code 0 means no high-severity findings were observed. Exit code 2 means blocking findings are present. The review never modifies the repository.
 
+To additionally persist the deterministic review in the canonical provenance envelope:
+
+    python3 tools/security_review.py /path/to/repository \
+      --canonical-evidence-output /tmp/security-evidence.json \
+      --revision <exact-repository-revision>
+
+The canonical artifact preserves finding rule IDs, severity, paths, lines, and messages without introducing secret values.
+
 See docs/architecture/security.md for the security-review architecture and safety boundary.
 
 
