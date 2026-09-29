@@ -320,6 +320,34 @@ def _validate_semantics(payload: Mapping[str, Any]) -> tuple[str, str, str, str 
     )
 
 
+def _ensure_serialized_size(
+    payload: Mapping[str, Any],
+    *,
+    label: str,
+) -> None:
+    """Reject canonical JSON payloads whose persisted representation exceeds the reader limit."""
+    encoder = json.JSONEncoder(
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=2,
+        allow_nan=False,
+    )
+    size = 1  # The persisted representation always ends with one newline.
+    try:
+        for chunk in encoder.iterencode(payload):
+            size += len(chunk.encode("utf-8"))
+            if size > MAX_JSON_BYTES:
+                raise EvidenceContractError(
+                    f"{label} exceeds the {MAX_JSON_BYTES}-byte limit."
+                )
+    except EvidenceContractError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise EvidenceContractError(
+            f"{label} cannot be serialized as canonical JSON."
+        ) from exc
+
+
 def build_evidence(payload: Mapping[str, Any]) -> EvidenceRecord:
     """Normalize explicit evidence input, calculate its canonical self-hash, and return it."""
     if set(payload) != INPUT_KEYS:
@@ -361,8 +389,12 @@ def build_evidence(payload: Mapping[str, Any]) -> EvidenceRecord:
         "references": list(references),
         "artifact_sha256": artifact_sha256,
     }
+    _ensure_serialized_size(
+        unsigned,
+        label="Canonical evidence payload",
+    )
     digest = _calculate_evidence_sha256(unsigned)
-    return EvidenceRecord(
+    record = EvidenceRecord(
         schema_version=SCHEMA_VERSION,
         evidence_id=digest,
         kind=kind,
@@ -377,6 +409,11 @@ def build_evidence(payload: Mapping[str, Any]) -> EvidenceRecord:
         artifact_sha256=artifact_sha256,
         evidence_sha256=digest,
     )
+    _ensure_serialized_size(
+        _payload_from_record(record),
+        label="Canonical evidence record",
+    )
+    return record
 
 
 def _payload_from_record(record: EvidenceRecord) -> dict[str, Any]:
@@ -694,8 +731,13 @@ def write_json_atomically(
 
 def write_evidence(record: EvidenceRecord, output_path: str | Path) -> None:
     """Write a validated evidence record as canonical JSON."""
+    payload = _payload_from_record(record)
+    _ensure_serialized_size(
+        payload,
+        label="Canonical evidence record",
+    )
     write_json_atomically(
-        _payload_from_record(record),
+        payload,
         output_path,
         error_type=EvidenceContractError,
     )
