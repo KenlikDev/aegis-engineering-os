@@ -78,3 +78,8 @@ work item
 -> owner-controlled release publication
 
 Release publication remains outside the autonomous Aegis write boundary.
+
+
+## GitHub credential destination
+
+The GitHub release-readiness adapter sends bearer credentials only to the exact `https://api.github.com` origin. Arbitrary HTTPS hosts, non-root paths, URL credentials, queries, and fragments are rejected.
