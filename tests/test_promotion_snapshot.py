@@ -41,11 +41,10 @@ class FakeTransport:
         self.created_branch = False
         self.created_ref_sha = None
         self.created_commit = False
-        self.updated_ref = False
         self.created_pr = False
         self.target_reads = 0
         self.create_commit_payload = None
-        self.update_ref_payload = None
+        self.advance_source_after_snapshot = False
 
     def __call__(self, method, url, headers, payload):  # noqa: ANN001
         path = url.removeprefix("https://api.github.com")
@@ -75,6 +74,19 @@ class FakeTransport:
                 "commit": {"tree": {"sha": OTHER_SHA}},
                 "parents": [],
             }
+        if method == "GET" and path == f"/repos/{REPOSITORY}/commits/{SOURCE_SHA}":
+            return 200, {
+                "sha": SOURCE_SHA,
+                "commit": {"tree": {"sha": SOURCE_TREE}},
+                "parents": [{"sha": OTHER_SHA}],
+            }
+        if method == "GET" and path == f"/repos/{REPOSITORY}/commits/{TARGET_SHA}":
+            return 200, {
+                "sha": TARGET_SHA,
+                "commit": {"tree": {"sha": OTHER_SHA}},
+                "parents": [],
+            }
+
         if method == "GET" and path == f"/repos/{REPOSITORY}/commits/{SNAPSHOT_SHA}":
             return 200, {
                 "sha": SNAPSHOT_SHA,
@@ -103,12 +115,9 @@ class FakeTransport:
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/commits":
             self.created_commit = True
             self.create_commit_payload = payload
+            if self.advance_source_after_snapshot:
+                self.source_sha = OTHER_SHA
             return 201, {"sha": SNAPSHOT_SHA}
-        if method == "PATCH" and path == f"/repos/{REPOSITORY}/git/refs/heads/ai%2F1-develop-promotion":
-            self.updated_ref = True
-            self.update_ref_payload = payload
-            return 200, {"ref": "refs/heads/ai/1-develop-promotion"}
-
         if method == "GET" and path.startswith(f"/repos/{REPOSITORY}/pulls?"):
             query = parse_qs(urlparse(path).query)
             self.assert_query = query
@@ -215,6 +224,19 @@ class PromotionSnapshotTests(unittest.TestCase):
 
         self.assertFalse(transport.created_branch)
 
+    def test_source_advance_after_snapshot_commit_blocks_branch_publication(self):
+        transport = FakeTransport()
+        transport.advance_source_after_snapshot = True
+
+        with self.assertRaisesRegex(
+            PromotionSnapshotError,
+            "ai/integration changed while the promotion snapshot was being prepared",
+        ):
+            prepare_promotion_snapshot(self._provider(transport), self._request())
+
+        self.assertTrue(transport.created_commit)
+        self.assertFalse(transport.created_branch)
+        self.assertFalse(transport.created_pr)
     def test_reuses_matching_snapshot_and_pr(self):
         transport = FakeTransport(
             existing_branch=SNAPSHOT_SHA,
