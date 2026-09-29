@@ -33,6 +33,16 @@ class AIBackendConfigurationTests(unittest.TestCase):
         config = validate_ai_config.validate_profile_config(path, registry)
         self.assertEqual("development", config["active_profile"])
 
+    def test_rejects_duplicate_json_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ai-profiles.json"
+            path.write_text(
+                '{"schema_version":2,"schema_version":2}',
+                encoding="utf-8",
+            )
+            with self.assertRaises(validate_ai_config.ConfigurationError):
+                validate_ai_config.load_json(path)
+
     def test_unknown_provider_is_rejected(self):
         config = {
             "schema_version": 2,
