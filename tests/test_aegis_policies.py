@@ -145,6 +145,43 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertEqual(dry_run.returncode, 0, dry_run.stderr)
             self.assertIn("Would install", dry_run.stdout)
 
+    def test_symlinked_agents_root_is_rejected_before_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            external = Path(tmp) / "external-agents"
+            project.mkdir()
+            external.mkdir()
+            agents_root = project / ".agents"
+            try:
+                agents_root.symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlinked .agents/skills", result.stderr)
+            self.assertFalse(list(external.iterdir()))
+            self.assertFalse((project / ".aegis").exists())
+
+    def test_symlinked_aegis_root_is_rejected_before_state_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            external = Path(tmp) / "external-aegis"
+            project.mkdir()
+            external.mkdir()
+            state_root = project / ".aegis"
+            try:
+                state_root.symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlinked .aegis", result.stderr)
+            self.assertFalse(list(external.iterdir()))
+            self.assertTrue(state_root.is_symlink())
     def test_symlinked_managed_skill_is_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"

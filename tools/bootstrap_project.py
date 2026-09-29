@@ -317,6 +317,30 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def validate_managed_root(project: Path, path: Path, label: str) -> None:
+    """Reject symlinked managed roots and resolved paths outside the project."""
+    current = path
+    while current != project:
+        if current.is_symlink():
+            raise SystemExit(
+                f"Refusing to use symlinked {label}: {current}"
+            )
+        parent = current.parent
+        if parent == current:
+            raise SystemExit(
+                f"{label} is not contained by the project root: {path}"
+            )
+        current = parent
+
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(project)
+    except ValueError as exc:
+        raise SystemExit(
+            f"{label} resolves outside the project root: {resolved}"
+        ) from exc
+
+
 def validate_existing_managed_path(
     destination: Path,
     expected_checksum: str | None,
@@ -507,6 +531,9 @@ def main() -> int:
     state_path = state_root / "aegis-version.json"
     agents_path = project / "AGENTS.md"
     agents_template_path = root / "templates" / "AGENTS.md"
+
+    validate_managed_root(project, target_root, ".agents/skills")
+    validate_managed_root(project, state_root, ".aegis")
 
     previous_state = load_previous_state(state_path)
     agents_managed, agents_sha256 = inspect_agents_state(
