@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bound credential-bearing GitHub REST JSON responses before decoding;
 - pin release readiness GitHub bearer credentials to the exact api.github.com origin;
 - pin CI diagnosis GitHub bearer credentials to the exact api.github.com origin;
 - pin GitHub API bearer credential destinations to the exact api.github.com origin;
