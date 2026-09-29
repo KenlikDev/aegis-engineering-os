@@ -165,6 +165,46 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertIn("symlinked aegis skill file", result.stderr.lower())
             self.assertEqual("external content\n", external.read_text(encoding="utf-8"))
 
+    def test_broken_symlink_skill_target_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+            missing_target = Path(tmp) / "missing-skill"
+            skill_target = project / ".agents" / "skills" / "github-issues"
+            skill_target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                skill_target.symlink_to(missing_target, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlinked project skill target", result.stderr.lower())
+            self.assertTrue(skill_target.is_symlink())
+
+    def test_broken_symlink_managed_skill_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            first = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(first.returncode, 0, first.stderr)
+
+            managed = project / ".agents" / "skills" / "aegis-orchestrator"
+            managed_target = Path(tmp) / "missing-managed-skill"
+            shutil.rmtree(managed)
+            try:
+                managed.symlink_to(managed_target, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlinked aegis skill path", result.stderr.lower())
+            self.assertTrue(managed.is_symlink())
+
     def test_unowned_skill_is_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"

@@ -322,7 +322,7 @@ def validate_existing_managed_path(
     expected_checksum: str | None,
     name: str,
 ) -> None:
-    if not destination.exists():
+    if not destination.exists() and not destination.is_symlink():
         return
     if destination.is_symlink():
         raise SystemExit(
@@ -374,6 +374,10 @@ def preflight_targets(
         if name in previous_skills:
             expected = previous_checksums.get(name)
             validate_existing_managed_path(destination, expected, name)
+        elif destination.is_symlink():
+            raise SystemExit(
+                f"Refusing to manage symlinked project skill target: {destination}."
+            )
         elif destination.exists():
             raise SystemExit(
                 f"Refusing to overwrite unowned project skill: {destination}. "
