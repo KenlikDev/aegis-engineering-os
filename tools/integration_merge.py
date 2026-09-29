@@ -139,10 +139,12 @@ class GitHubIntegrationMergeProvider:
             raise IntegrationMergeError("Repository must use owner/name format.")
         if not token.strip():
             raise IntegrationMergeError("GitHub API token must not be empty.")
+        if not isinstance(api_base_url, str) or api_base_url != api_base_url.strip() or not api_base_url:
+            raise IntegrationMergeError(
+                "GitHub API base URL must be exactly https://api.github.com."
+            )
         parsed = urlparse(api_base_url)
         if (
-            not isinstance(api_base_url, str)
-            or api_base_url != api_base_url.strip()
             or parsed.scheme != "https"
             or parsed.netloc != "api.github.com"
             or parsed.path not in ("", "/")
