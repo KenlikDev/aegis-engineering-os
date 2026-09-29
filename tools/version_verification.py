@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from evidence_contract import EvidenceContractError, load_json_object
+
 
 SCHEMA_VERSION = 1
 CLAIM_SCOPES = frozenset(
@@ -134,8 +136,8 @@ def record_version_evidence(
 
     claim_file = Path(claims_path).expanduser().resolve()
     try:
-        payload = json.loads(claim_file.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        payload = load_json_object(claim_file)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
         raise VersionVerificationError(
             f"Unable to read version claim file {claim_file}: {exc}"
         ) from exc
@@ -246,14 +248,10 @@ def validate_version_evidence(
         ) from exc
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError) as exc:
+        payload = load_json_object(path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
         raise VersionVerificationError(
             f"Unable to read version evidence {path}: {exc}"
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise VersionVerificationError(
-            f"Version evidence is not valid JSON: {path}: {exc.msg}"
         ) from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
         raise VersionVerificationError("Unsupported or malformed version evidence schema.")

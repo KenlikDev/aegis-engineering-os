@@ -105,6 +105,27 @@ class AegisPolicyTests(unittest.TestCase):
             second_state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(first_state, second_state)
 
+    def test_bootstrap_rejects_duplicate_state_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            first = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(first.returncode, 0, first.stderr)
+
+            state_path = project / ".aegis" / "aegis-version.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            duplicate = json.dumps(state, sort_keys=True).replace(
+                '"preset": "core"',
+                '"preset": "core", "preset": "all"',
+                1,
+            )
+            state_path.write_text(duplicate, encoding="utf-8")
+
+            result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Duplicate JSON key", result.stderr)
+
     def test_bootstrap_reconciles_previous_preset(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"

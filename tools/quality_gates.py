@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
+from evidence_contract import EvidenceContractError, load_json_object
+
 from work_item_lifecycle import (
     GitHubIssuesProvider,
     LifecycleState,
@@ -87,8 +89,8 @@ CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        value = load_json_object(path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
         raise QualityGateError(f"Unable to read quality-gate manifest {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise QualityGateError("Quality-gate manifest must contain a JSON object.")

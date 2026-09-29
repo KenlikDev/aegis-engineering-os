@@ -13,6 +13,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from evidence_contract import EvidenceContractError, load_json_object
+
 
 STATE_SCHEMA_VERSION = 2
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -153,9 +155,9 @@ def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
 
     try:
         version = version_file.read_text(encoding="utf-8").strip()
-        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-        registry = json.loads(registry_file.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        manifest = load_json_object(manifest_file)
+        registry = load_json_object(registry_file)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
         raise SystemExit(f"Unable to read Aegis source metadata: {exc}") from exc
 
     if manifest.get("version") != version:
@@ -258,8 +260,8 @@ def load_previous_state(state_path: Path) -> dict | None:
         return None
 
     try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
+        state = load_json_object(state_path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
         raise SystemExit(
             f"Existing Aegis state is not valid JSON: {exc}"
         ) from exc

@@ -132,6 +132,17 @@ class QualityGateTests(unittest.TestCase):
 
             self.assertEqual("protected\n", target.read_text(encoding="utf-8"))
 
+    def test_manifest_rejects_duplicate_json_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root / "quality-gates.json"
+            manifest.write_text(
+                '{"schema_version":1,"schema_version":1,"gates":[]}',
+                encoding="utf-8",
+            )
+            with self.assertRaises(QualityGateError):
+                load_quality_gates(manifest)
+
     def test_manifest_requires_at_least_one_required_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

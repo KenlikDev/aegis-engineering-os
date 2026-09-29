@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- reject ambiguous duplicate-key JSON across configuration, policy, and state input boundaries;
 - reject symlinked and externally resolving bootstrap managed roots before state access or skill installation;
 - add caller-level regression coverage preventing canonical evidence output symlink checks from being bypassed by pre-write path resolution;
 - bind promotion snapshots to the exact source revision validated by promotion readiness and remove the unused ref-update mutation surface;
