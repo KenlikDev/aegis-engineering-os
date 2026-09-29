@@ -142,6 +142,21 @@ class EvidenceBundleTests(unittest.TestCase):
         with self.assertRaisesRegex(EvidenceBundleError, "must not overwrite"):
             write_evidence_bundle(bundle, root, one)
 
+    def test_write_rejects_symlinked_output(self):
+        root, one, two = self._project()
+        bundle = build_evidence_bundle(root, "Readiness input set", [one, two])
+        target = root / ".aegis" / "bundle-target.json"
+        target.write_text("preserve\n", encoding="utf-8")
+        output = root / ".aegis" / "bundle.json"
+        try:
+            output.symlink_to(target)
+        except OSError as exc:
+            self.skipTest(f"symbolic links unavailable: {exc}")
+
+        with self.assertRaisesRegex(EvidenceBundleError, "symbolic link"):
+            write_evidence_bundle(bundle, root, output)
+
+        self.assertEqual("preserve\n", target.read_text(encoding="utf-8"))
     def test_existing_evidence_remains_independently_valid(self):
         root, one, _ = self._project()
         self.assertEqual(

@@ -100,7 +100,7 @@ Requirements clarification, workflow composition, and architecture planning now 
 
 Local runtime preflight now has an explicit adapter as well. It preserves the selected profile, exact model tag, Ollama runtime version, optional OpenHands Agent Server identity, and a boolean credential-presence observation without recording credential values. A valid explicitly reported Agent Server build Git SHA becomes the canonical revision; absent or malformed build identity remains unknown rather than being inferred.
 
-The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
+Evidence outputs must not follow symbolic-link destinations. Specialized writers and the canonical evidence writer reject symlink outputs before writing; managed execution performs the same validation before execution begins and repeats it immediately before the final write. The adapters do not reinterpret existing reports or change readiness decisions. Future subsystem adapters must follow the same explicit boundary: preserve the subsystem schema, identify the exact observed revision, and retain meaningful uncertainty rather than silently upgrading evidence.
 
 The integration-merge adapter preserves the exact validation head SHA when the merge caller supplied it, the merged pull-request identity, the merge commit SHA, the post-merge `ai/integration` SHA/protection state, and read-after-write verification flags.
 

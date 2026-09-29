@@ -264,6 +264,21 @@ class VersionVerificationTests(unittest.TestCase):
                 root / "pyproject.toml",
             )
 
+    def test_record_rejects_symlinked_output(self):
+        root, claims = self._project()
+        target = root / "evidence-target.json"
+        target.write_text("preserve\n", encoding="utf-8")
+        output = root / ".aegis" / "version-evidence.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            output.symlink_to(target)
+        except OSError as exc:
+            self.skipTest(f"symbolic links unavailable: {exc}")
+
+        with self.assertRaisesRegex(VersionVerificationError, "symbolic link"):
+            record_version_evidence(root, claims, output)
+
+        self.assertEqual("preserve\n", target.read_text(encoding="utf-8"))
     def test_external_verification_pending_is_preserved(self):
         root, claims = self._project()
         claims.write_text(
