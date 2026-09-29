@@ -193,10 +193,22 @@ class GitHubPromotionSnapshotProvider:
             raise PromotionSnapshotError("Repository must use owner/name format.")
         if not token.strip():
             raise PromotionSnapshotError("GitHub API token must not be empty.")
-        parsed = urlparse(api_base_url)
-        if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
+        if not isinstance(api_base_url, str) or api_base_url != api_base_url.strip() or not api_base_url:
             raise PromotionSnapshotError(
-                "GitHub API base URL must be an HTTPS service root."
+                "GitHub API base URL must be exactly https://api.github.com."
+            )
+        parsed = urlparse(api_base_url)
+        if (
+            parsed.scheme != "https"
+            or parsed.netloc != "api.github.com"
+            or parsed.path not in ("", "/")
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise PromotionSnapshotError(
+                "GitHub API base URL must be exactly https://api.github.com."
             )
         self.repository = repository
         self._token = token
