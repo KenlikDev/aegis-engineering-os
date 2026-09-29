@@ -118,7 +118,12 @@ def _request_json(
     request = Request(url, data=body, headers=dict(request_headers), method=method)
     try:
         with _HTTP_OPENER.open(request, timeout=timeout) as response:
-            raw = response.read()
+            raw = response.read(MAX_JSON_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_JSON_RESPONSE_BYTES:
+                raise OpenHandsExecutionError(
+                    "OpenHands JSON response exceeds the "
+                    f"{MAX_JSON_RESPONSE_BYTES}-byte download limit."
+                )
             if not raw:
                 return response.status, {}
             parsed = json.loads(raw.decode("utf-8"))
