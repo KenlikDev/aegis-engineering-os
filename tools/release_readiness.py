@@ -108,9 +108,11 @@ def _default_transport(
     url: str,
     headers: Mapping[str, str],
 ) -> tuple[int, Any]:
+    request_headers = github_api_headers()
+    request_headers.update(headers)
     try:
         with _HTTP_OPENER.open(
-            Request(url, headers=dict(headers), method=method),
+            Request(url, headers=dict(request_headers), method=method),
             timeout=30.0,
         ) as response:
             raw = read_bounded_response(response)
