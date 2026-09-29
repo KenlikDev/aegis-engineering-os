@@ -44,9 +44,19 @@ jobs:
         with:
           persist-credentials: false
           ref: >-
-            ${{ github.event.action == 'closed' &&
+            ${{ github.event_name == 'pull_request' &&
+            github.event.action != 'closed' &&
+            github.event.pull_request.head.sha ||
+            github.event.action == 'closed' &&
             github.event.pull_request.merged == true &&
             github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Verify pull request head checkout
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.action != 'closed'
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
       - name: Verify merged integration checkout
         if: >-

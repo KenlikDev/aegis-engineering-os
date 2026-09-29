@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind pull-request validation checkout to the exact pull-request head SHA instead of a synthetic merge revision;
 - reject ambiguous duplicate-key JSON across configuration, policy, and state input boundaries;
 - reject symlinked and externally resolving bootstrap managed roots before state access or skill installation;
 - add caller-level regression coverage preventing canonical evidence output symlink checks from being bypassed by pre-write path resolution;
