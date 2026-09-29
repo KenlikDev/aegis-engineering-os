@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -339,6 +340,45 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertNotEqual(second.returncode, 0)
             self.assertIn("customized managed AGENTS.md", second.stderr)
             self.assertEqual(original, agents.read_text(encoding="utf-8"))
+
+    def test_legacy_agents_classification_uses_one_hash_snapshot(self) -> None:
+        import sys as _sys
+
+        sys_path = str(ROOT / "tools")
+        if sys_path not in _sys.path:
+            _sys.path.insert(0, sys_path)
+        import bootstrap_project  # noqa: E402
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            agents = root / "AGENTS.md"
+            template = root / "template-AGENTS.md"
+            content = "canonical instructions\n"
+            agents.write_text(content, encoding="utf-8")
+            template.write_text(content, encoding="utf-8")
+
+            original = bootstrap_project.sha256_file
+            calls = []
+
+            def counted(path: Path) -> str:
+                calls.append(path)
+                return original(path)
+
+            with patch.object(
+                bootstrap_project,
+                "sha256_file",
+                side_effect=counted,
+            ):
+                managed, checksum = bootstrap_project.inspect_agents_state(
+                    agents,
+                    template,
+                    None,
+                )
+
+            self.assertTrue(managed)
+            self.assertEqual(original(agents), checksum)
+            self.assertEqual(1, calls.count(agents))
+            self.assertEqual(1, calls.count(template))
 
     def test_user_owned_agents_is_not_claimed_as_aegis_managed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

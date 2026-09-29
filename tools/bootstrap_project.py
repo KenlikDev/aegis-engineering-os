@@ -248,8 +248,9 @@ def inspect_agents_state(
 
     if agents_path.is_file():
         template_sha = sha256_file(template_path)
-        return sha256_file(agents_path) == template_sha, (
-            template_sha if sha256_file(agents_path) == template_sha else None
+        agents_sha = sha256_file(agents_path)
+        return agents_sha == template_sha, (
+            template_sha if agents_sha == template_sha else None
         )
 
     return False, None
