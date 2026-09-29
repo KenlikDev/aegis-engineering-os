@@ -358,6 +358,51 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertIn("symlinked .aegis", result.stderr)
             self.assertFalse(list(external.iterdir()))
             self.assertTrue(state_root.is_symlink())
+
+    def test_bootstrap_managed_skill_install_is_safe_against_destination_symlink_race(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+            external = Path(tmp) / "external-skill.md"
+            external.write_text("external content\n", encoding="utf-8")
+            real_replace = os.replace
+            race_triggered = False
+
+            def race_replace(
+                source,
+                destination,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                nonlocal race_triggered
+                if destination == "SKILL.md" and not race_triggered:
+                    output = project / ".agents" / "skills" / "aegis-orchestrator" / "SKILL.md"
+                    output.symlink_to(external)
+                    race_triggered = True
+                return real_replace(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            import bootstrap_project  # noqa: E402
+
+            with patch("evidence_contract.os.replace", side_effect=race_replace):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [str(BOOTSTRAP), str(project), "--preset", "core"],
+                ):
+                    self.assertEqual(0, bootstrap_project.main())
+
+            self.assertTrue(race_triggered)
+            skill = project / ".agents" / "skills" / "aegis-orchestrator" / "SKILL.md"
+            self.assertFalse(skill.is_symlink())
+            self.assertEqual("external content\n", external.read_text(encoding="utf-8"))
+            self.assertNotEqual("external content\n", skill.read_text(encoding="utf-8"))
+
     def test_symlinked_managed_skill_is_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"

@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden bootstrap managed-file installation against destination symlink races with anchored atomic byte writes;
 - harden Python GitHub API-version review to require the header to reach an executable Request sink;
 - confine bootstrap registry skill paths to the Aegis source tree and reject symbolic-link resolution;
 - harden workflow API-version security review so YAML comments cannot satisfy the GitHub header requirement;

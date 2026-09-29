@@ -13,7 +13,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from evidence_contract import EvidenceContractError, load_json_object, write_json_atomically
+from evidence_contract import (
+    EvidenceContractError,
+    copy_file_atomically,
+    load_json_object,
+    write_json_atomically,
+)
 
 
 STATE_SCHEMA_VERSION = 2
@@ -650,11 +655,19 @@ def main() -> int:
             staged = stage_root / name / "SKILL.md"
             destination = target_root / name / "SKILL.md"
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(staged, destination)
+            copy_file_atomically(
+                staged,
+                destination,
+                error_type=EvidenceContractError,
+            )
             print(f"Installed {destination}")
 
         if not agents_path.exists() and not agents_path.is_symlink():
-            shutil.copy2(agents_template_path, agents_path)
+            copy_file_atomically(
+                agents_template_path,
+                agents_path,
+                error_type=EvidenceContractError,
+            )
             agents_created = True
             agents_managed = True
             agents_sha256 = sha256_file(agents_path)

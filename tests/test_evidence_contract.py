@@ -119,6 +119,40 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
 
             self.assertFalse((external / "evidence.json").exists())
 
+
+    def test_atomic_byte_writer_replaces_destination_symlink_without_following_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external.txt"
+            output = root / "output.txt"
+            external.write_text("protected\n", encoding="utf-8")
+
+            real_replace = os.replace
+
+            def race_replace(
+                source,
+                destination,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                output.symlink_to(external)
+                return real_replace(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with patch("evidence_contract.os.replace", side_effect=race_replace):
+                from evidence_contract import write_bytes_atomically
+
+                write_bytes_atomically(b"replacement\n", output)
+
+            self.assertEqual("protected\n", external.read_text(encoding="utf-8"))
+            self.assertEqual("replacement\n", output.read_text(encoding="utf-8"))
+            self.assertFalse(output.is_symlink())
+
     def test_write_evidence_rejects_symlink_output(self) -> None:
         record = build_evidence(
             {
