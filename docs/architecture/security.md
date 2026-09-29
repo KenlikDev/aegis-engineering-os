@@ -83,3 +83,5 @@ The helper is the single source of truth for the API version. Individual provide
 ## GitHub REST response bounds
 
 Credential-bearing GitHub REST adapters read response bodies through the shared bounded transport primitive. Successful and HTTP-error bodies are capped before decoding, preventing unexpectedly large JSON responses from becoming unbounded in-memory data. The limit is one mebibyte; responses exceeding it fail closed.
+
+After the byte bound is enforced, every credential-bearing GitHub REST adapter parses the response through `github_http_security.parse_github_json()`. The parser rejects duplicate object keys, non-standard JSON constants, invalid UTF-8, and malformed JSON before provider data is interpreted. It accepts any valid JSON root because GitHub endpoints may legitimately return objects, arrays, or empty bodies; endpoint-specific code remains responsible for validating the expected response shape.
