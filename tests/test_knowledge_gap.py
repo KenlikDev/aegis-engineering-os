@@ -108,6 +108,59 @@ class KnowledgeGapTests(unittest.TestCase):
                 [transition["to"] for transition in rejected.transitions],
             )
 
+    def test_rejects_duplicate_json_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            create_candidate(
+                scope="global",
+                capability="strict persistence",
+                problem="Candidate state must reject ambiguous JSON.",
+                proposed_change="Use the canonical strict JSON loader.",
+                references=["https://docs.example.test/knowledge/json"],
+                store_root=directory,
+                candidate_id="99999999-9999-4999-8999-999999999999",
+            )
+            path = Path(directory) / "99999999-9999-4999-8999-999999999999.json"
+            content = path.read_text(encoding="utf-8")
+            duplicate = content.replace(
+                '"schema_version": 1,',
+                '"schema_version": 1, "schema_version": 1,',
+                1,
+            )
+            path.write_text(duplicate, encoding="utf-8")
+
+            with self.assertRaisesRegex(KnowledgeGapError, "Duplicate JSON key"):
+                reject_candidate(
+                    path,
+                    reason="ambiguous state must fail closed",
+                )
+
+    def test_rejects_symlinked_candidate_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            real_root = root / "real"
+            real_root.mkdir()
+            external = root / "external"
+            external.mkdir()
+
+            (external / "sentinel.txt").write_text("protected\n", encoding="utf-8")
+            (root / "store").symlink_to(external, target_is_directory=True)
+
+            with self.assertRaisesRegex(
+                KnowledgeGapError,
+                "symbolic link|securely open JSON output",
+            ):
+                create_candidate(
+                    scope="global",
+                    capability="symlink-safe persistence",
+                    problem="Candidate writes must not follow symlinked parents.",
+                    proposed_change="Anchor the atomic writer to the destination directory.",
+                    references=["https://docs.example.test/knowledge/fs"],
+                    store_root=root / "store",
+                    candidate_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                )
+
+            self.assertFalse((external / "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.json").exists())
+
     def test_rejects_tampered_candidate_payload(self):
         with tempfile.TemporaryDirectory() as directory:
             create_candidate(

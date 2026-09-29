@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden knowledge-gap record persistence with strict JSON parsing and anchored atomic writes;
 - remove the redundant path-based bootstrap destination mkdir before atomic managed-file publication;
 - bound OpenHands event pagination by page count and accumulated event count;
 - bound local Ollama and OpenHands JSON response bodies before parsing;
