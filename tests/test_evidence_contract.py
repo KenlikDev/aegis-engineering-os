@@ -9,7 +9,12 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from evidence_contract import EvidenceContractError, build_evidence, write_evidence  # noqa: E402
+from evidence_contract import (  # noqa: E402
+    EvidenceContractError,
+    EvidenceRecord,
+    build_evidence,
+    write_evidence,
+)
 
 
 class EvidenceOutputSecurityTests(unittest.TestCase):
