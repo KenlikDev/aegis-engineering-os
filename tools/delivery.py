@@ -194,12 +194,20 @@ class GitHubPullRequestProvider:
             raise DeliveryError("GitHub API token must not be empty.")
         parsed = urlparse(api_base_url)
         if (
-            parsed.scheme != "https"
-            or not parsed.netloc
+            not isinstance(api_base_url, str)
+            or api_base_url != api_base_url.strip()
+            or parsed.scheme != "https"
+            or parsed.hostname != "api.github.com"
+            or parsed.port not in (None, 443)
+            or parsed.path not in ("", "/")
+            or parsed.username is not None
+            or parsed.password is not None
             or parsed.query
             or parsed.fragment
         ):
-            raise DeliveryError("GitHub API base URL must be an HTTPS service root.")
+            raise DeliveryError(
+                "GitHub API base URL must be exactly https://api.github.com."
+            )
         self._token = token
         self._transport = transport or _default_transport
         self._api_base_url = api_base_url.rstrip("/")
