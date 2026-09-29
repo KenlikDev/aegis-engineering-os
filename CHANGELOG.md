@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind promotion snapshots to the exact source revision validated by promotion readiness and remove the unused ref-update mutation surface;
 - reject broken symbolic-link bootstrap skill targets before managed filesystem mutation;
 - reject symbolic-link destinations across specialized evidence writers and validate managed-execution evidence output before execution;
 - harden promotion snapshot mutation ordering to avoid publishing incomplete promotion branches;
