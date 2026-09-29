@@ -410,30 +410,25 @@ class OpenHandsExecutionTests(unittest.TestCase):
     def test_event_pagination_is_bounded_by_event_count(self) -> None:
         from openhands_execution import MAX_EVENTS
 
-        responses = responses_with_states(["finished", "finished"])
-        page_count = MAX_EVENTS // 100 + 1
-        responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
-            (
-                200,
-                {
-                    "items": [
-                        {"id": f"event-{page * 100 + index}"}
-                        for index in range(100)
-                    ],
-                    "next_page_id": (
-                        f"page-{page + 1}" if page + 1 < page_count else None
-                    ),
-                },
-            )
-            for page in range(page_count)
-        ]
-        transport = FakeTransport(responses)
+        with patch("openhands_execution.MAX_EVENTS", 150):
+            responses = responses_with_states(["finished", "finished"])
+            responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
+                (
+                    200,
+                    {
+                        "items": [{"id": f"event-{page * 100 + index}"} for index in range(100)],
+                        "next_page_id": "page-2" if page == 0 else None,
+                    },
+                )
+                for page in range(2)
+            ]
+            transport = FakeTransport(responses)
 
-        with self.assertRaisesRegex(
-            OpenHandsExecutionError,
-            f"{MAX_EVENTS}-event limit",
-        ):
-            OpenHandsExecutionClient(transport).execute(request_data())
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                f"{MAX_EVENTS}-event limit",
+            ):
+                OpenHandsExecutionClient(transport).execute(request_data())
 
     def test_http_409_run_trigger_is_accepted(self) -> None:
         responses = responses_with_states(["running", "finished", "finished"])
