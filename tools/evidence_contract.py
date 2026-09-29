@@ -475,7 +475,12 @@ def _open_secure_destination_directory(
         raise error_type("JSON output must identify a file path.")
 
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    directory_fd = os.open(absolute.anchor, flags)
+    try:
+        directory_fd = os.open(absolute.anchor, flags)
+    except OSError as exc:
+        raise error_type(
+            f"Unable to securely open the JSON output filesystem root: {absolute.anchor}"
+        ) from exc
 
     try:
         for component in absolute.parent.parts:
@@ -491,9 +496,13 @@ def _open_secure_destination_directory(
                 next_fd = os.open(component, flags, dir_fd=directory_fd)
             os.close(directory_fd)
             directory_fd = next_fd
-    except Exception:
+    except Exception as exc:
         os.close(directory_fd)
-        raise
+        if isinstance(exc, error_type):
+            raise
+        raise error_type(
+            f"Unable to securely open JSON output directory: {absolute.parent}"
+        ) from exc
 
     return directory_fd, absolute.name
 
