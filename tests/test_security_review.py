@@ -135,6 +135,47 @@ class SecurityReviewTests(unittest.TestCase):
                 any(f.rule_id == "workflow.permissions-write" for f in result.findings)
             )
 
+
+    def test_blocks_workflow_github_api_without_explicit_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "api.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: api\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "steps:\n"
+                "  - run: curl https://api.github.com\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
+    def test_accepts_workflow_github_api_with_explicit_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "api.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: api\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "steps:\n"
+                "  - run: curl -H 'X-GitHub-Api-Version: 2026-03-10' https://api.github.com\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertFalse(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_blocks_subprocess_shell_true(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
