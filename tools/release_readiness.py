@@ -16,6 +16,7 @@ from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from github_http_security import (
+    github_api_headers,
     read_bounded_response,
     validate_github_api_base_url,
 )
@@ -192,8 +193,7 @@ class GitHubReleaseReadinessProvider:
                 f"{quote(path, safe='/')}?ref={quote(ref, safe='')}"
             ),
             {
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2026-03-10",
+                **github_api_headers(),
                 "Authorization": f"Bearer {self._token}",
             },
         )
