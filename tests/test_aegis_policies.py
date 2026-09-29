@@ -181,7 +181,7 @@ class AegisPolicyTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(SystemExit, "symbolic links"):
+            with self.assertRaisesRegex(SystemExit, "symbolic link"):
                 bootstrap_project.load_source_metadata(root)
 
     def test_state_verification_skill_exists_and_is_registered(self) -> None:
