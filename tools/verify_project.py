@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import re
 import sys
 from pathlib import Path
+
+from evidence_contract import EvidenceContractError, load_json_object
 
 
 STATE_SCHEMA_VERSION = 2
@@ -43,17 +44,22 @@ def main() -> int:
     if not project.is_dir():
         return fail(f"Project directory does not exist: {project}")
 
-    state_path = project / ".aegis" / "aegis-version.json"
+    aegis_root = project / ".aegis"
+    if aegis_root.is_symlink():
+        return fail("Aegis .aegis root must not be a symbolic link.")
+    if not aegis_root.is_dir():
+        return fail(f"Aegis state directory is missing: {aegis_root}")
+
+    state_path = aegis_root / "aegis-version.json"
+    if state_path.is_symlink():
+        return fail("Aegis state file must not be a symbolic link.")
     if not state_path.is_file():
         return fail(f"Aegis state file is missing: {state_path}")
 
     try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        return fail(f"Aegis state file is not valid JSON: {exc}")
-
-    if not isinstance(state, dict):
-        return fail("Aegis state file must contain a JSON object.")
+        state = load_json_object(state_path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        return fail(f"Aegis state file is not valid strict JSON: {exc}")
 
     required = (
         "schema_version",
@@ -124,7 +130,18 @@ def main() -> int:
     if set(checksums) != set(skills):
         return fail("Aegis skill_checksums must match the installed skills exactly.")
 
-    skill_root = project / ".agents" / "skills"
+    agents_root = project / ".agents"
+    if agents_root.is_symlink():
+        return fail("Aegis .agents root must not be a symbolic link.")
+    if not agents_root.is_dir():
+        return fail(f"Aegis agent skills root is missing: {agents_root}")
+
+    skill_root = agents_root / "skills"
+    if skill_root.is_symlink():
+        return fail("Aegis .agents/skills root must not be a symbolic link.")
+    if not skill_root.is_dir():
+        return fail(f"Aegis skill root is missing: {skill_root}")
+
     for name in skills:
         if not SKILL_NAME_PATTERN.fullmatch(name):
             return fail(f"Invalid Aegis skill name in state: {name!r}")
@@ -133,7 +150,19 @@ def main() -> int:
         if not isinstance(checksum, str) or not SHA256_PATTERN.fullmatch(checksum):
             return fail(f"Invalid checksum for Aegis skill: {name}")
 
-        path = skill_root / name / "SKILL.md"
+        skill_directory = skill_root / name
+        if skill_directory.is_symlink():
+            return fail(
+                f"Installed Aegis skill directory must not be a symbolic link: {skill_directory}"
+            )
+        if not skill_directory.is_dir():
+            return fail(f"Installed Aegis skill directory is missing: {skill_directory}")
+
+        path = skill_directory / "SKILL.md"
+        if path.is_symlink():
+            return fail(
+                f"Installed Aegis skill file must not be a symbolic link: {path}"
+            )
         if not path.is_file():
             return fail(f"Installed Aegis skill is missing: {path}")
 
