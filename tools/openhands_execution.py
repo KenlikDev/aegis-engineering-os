@@ -26,6 +26,8 @@ DEFAULT_OPENHANDS_VERSION = "1.49.5"
 DEFAULT_TIMEOUT_SECONDS = 3600.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
 MAX_JSON_RESPONSE_BYTES = 1024 * 1024
+MAX_EVENT_PAGES = 100
+MAX_EVENTS = 10_000
 DEFAULT_WORKSPACE_ROOT = "/projects"
 
 TERMINAL_STATUSES = frozenset({"finished", "error", "stuck"})
@@ -544,8 +546,16 @@ class OpenHandsExecutionClient:
         events: list[dict[str, Any]] = []
         page_id: str | None = None
         seen_pages: set[str] = set()
+        page_count = 0
 
         while True:
+            if page_count >= MAX_EVENT_PAGES:
+                raise OpenHandsExecutionError(
+                    "OpenHands event pagination exceeded the "
+                    f"{MAX_EVENT_PAGES}-page limit.",
+                    conversation_id,
+                )
+            page_count += 1
             query = {"limit": "100"}
             if page_id:
                 query["page_id"] = page_id
@@ -566,6 +576,12 @@ class OpenHandsExecutionClient:
             ):
                 raise OpenHandsExecutionError(
                     "OpenHands event search returned an invalid items list.",
+                    conversation_id,
+                )
+            if len(events) + len(items) > MAX_EVENTS:
+                raise OpenHandsExecutionError(
+                    "OpenHands execution event history exceeded the "
+                    f"{MAX_EVENTS}-event limit.",
                     conversation_id,
                 )
             events.extend(items)

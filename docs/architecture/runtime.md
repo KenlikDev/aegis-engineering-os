@@ -47,6 +47,8 @@ The local Ollama and OpenHands JSON clients enforce a 1 MiB maximum response bod
 
 This bound applies to liveness, readiness, version, settings, conversation state, event-search, and model-list responses. It limits resource consumption without changing endpoint semantics or authentication behavior.
 
+OpenHands event pagination also has explicit page and accumulated-event limits. Excessive histories fail closed instead of being partially accepted.
+
 ## OpenHands boundary
 
 The runtime preflight deliberately does not hard-code an OpenHands CLI command.

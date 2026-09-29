@@ -391,6 +391,45 @@ class OpenHandsExecutionTests(unittest.TestCase):
         with self.assertRaises(OpenHandsExecutionError):
             OpenHandsExecutionClient(transport).execute(request_data())
 
+    def test_event_pagination_is_bounded_by_page_count(self) -> None:
+        from openhands_execution import MAX_EVENT_PAGES
+
+        responses = responses_with_states(["finished", "finished"])
+        responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
+            (200, {"items": [], "next_page_id": f"page-{index}"})
+            for index in range(MAX_EVENT_PAGES + 1)
+        ]
+        transport = FakeTransport(responses)
+
+        with self.assertRaisesRegex(
+            OpenHandsExecutionError,
+            f"{MAX_EVENT_PAGES}-page limit",
+        ):
+            OpenHandsExecutionClient(transport).execute(request_data())
+
+    def test_event_pagination_is_bounded_by_event_count(self) -> None:
+        event_limit = 150
+
+        with patch("openhands_execution.MAX_EVENTS", event_limit):
+            responses = responses_with_states(["finished", "finished"])
+            responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
+                (
+                    200,
+                    {
+                        "items": [{"id": f"event-{page * 100 + index}"} for index in range(100)],
+                        "next_page_id": "page-2" if page == 0 else None,
+                    },
+                )
+                for page in range(2)
+            ]
+            transport = FakeTransport(responses)
+
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                f"{event_limit}-event limit",
+            ):
+                OpenHandsExecutionClient(transport).execute(request_data())
+
     def test_http_409_run_trigger_is_accepted(self) -> None:
         responses = responses_with_states(["running", "finished", "finished"])
         responses[("POST", f"{SERVER}/api/conversations/{CID}/run")] = [(409, {})]
