@@ -78,3 +78,6 @@ CI diagnosis is therefore a precursor to engineering remediation, not remediatio
 ## GitHub credential destination
 
 CI diagnosis sends bearer credentials only to the exact `https://api.github.com` origin. The API client rejects arbitrary HTTPS hosts, non-root paths, URL credentials, queries, and fragments. This keeps CI diagnosis aligned with the repository-wide GitHub credential destination boundary.
+
+
+The CI diagnosis GitHub API transport uses the shared one-mebibyte response bound. Job logs have their own one-mebibyte download boundary before text decoding because signed log redirects are handled separately and without GitHub credentials.
