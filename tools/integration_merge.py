@@ -148,18 +148,6 @@ class GitHubIntegrationMergeProvider:
             normalized_api_base_url = validate_github_api_base_url(api_base_url)
         except ValueError as exc:
             raise IntegrationMergeError(str(exc)) from exc
-        if (
-            parsed.scheme != "https"
-            or parsed.netloc != "api.github.com"
-            or parsed.path not in ("", "/")
-            or parsed.username is not None
-            or parsed.password is not None
-            or parsed.query
-            or parsed.fragment
-        ):
-            raise IntegrationMergeError(
-                "GitHub API base URL must be exactly https://api.github.com."
-            )
         self.repository = repository
         self._token = token
         self._transport = transport or _default_transport
