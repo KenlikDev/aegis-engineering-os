@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- add caller-level regression coverage preventing canonical evidence output symlink checks from being bypassed by pre-write path resolution;
 - bind promotion snapshots to the exact source revision validated by promotion readiness and remove the unused ref-update mutation surface;
 - reject broken symbolic-link bootstrap skill targets before managed filesystem mutation;
 - reject symbolic-link destinations across specialized evidence writers and validate managed-execution evidence output before execution;
