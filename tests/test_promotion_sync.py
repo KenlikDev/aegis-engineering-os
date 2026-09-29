@@ -7,9 +7,16 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from promotion_readiness import BranchSnapshot
+from delivery import DeliveryError, GitHubPullRequestProvider
+from integration_merge import IntegrationMergeError, GitHubIntegrationMergeProvider
+from promotion_readiness import (
+    BranchSnapshot,
+    GitHubPromotionProvider,
+    PromotionReadinessError,
+)
 import promotion_sync as promotion_sync_module
 from evidence_contract import read_and_validate_evidence
+from promotion_snapshot import GitHubPromotionSnapshotProvider, PromotionSnapshotError
 from promotion_sync import (
     GitHubPromotionSyncProvider,
     PromotionPullRequest,
@@ -17,10 +24,12 @@ from promotion_sync import (
     sync_promotion_merge,
 )
 from work_item_lifecycle import (
+    GitHubIssuesProvider,
     LifecycleState,
     MutationEvidence,
     Traceability,
     WorkItem,
+    WorkItemLifecycleError,
 )
 
 
@@ -161,25 +170,6 @@ class FakeGitHubTransport:
         }
 
 
-    def test_github_provider_requires_identical_compare(self):
-        transport = FakeGitHubTransport()
-        provider = GitHubPromotionSyncProvider(
-            REPOSITORY,
-            "test-token",
-            transport=transport,
-            api_base_url="https://api.github.test",
-        )
-
-        self.assertFalse(provider.target_matches_commit("main", MERGE_SHA))
-        self.assertEqual(
-            f"/repos/{REPOSITORY}/compare/main...{MERGE_SHA}",
-            transport.url.removeprefix("https://api.github.test"),
-        )
-
-        transport.status = "identical"
-        self.assertTrue(provider.target_matches_commit("main", MERGE_SHA))
-
-
     def test_cli_writes_canonical_promotion_sync_evidence(self):
         provider = FakePromotionProvider()
         work_items = FakeWorkItemProvider()
@@ -216,6 +206,44 @@ class FakeGitHubTransport:
             self.assertEqual("promotion:1->main", canonical.subject)
 
 class PromotionSyncTests(unittest.TestCase):
+    def test_github_provider_requires_identical_compare(self):
+        transport = FakeGitHubTransport()
+        provider = GitHubPromotionSyncProvider(
+            REPOSITORY,
+            "test-token",
+            transport=transport,
+            api_base_url="https://api.github.com",
+        )
+
+        self.assertFalse(provider.target_matches_commit("main", MERGE_SHA))
+        self.assertEqual(
+            f"/repos/{REPOSITORY}/compare/main...{MERGE_SHA}",
+            transport.url.removeprefix("https://api.github.com"),
+        )
+
+        transport.status = "identical"
+        self.assertTrue(provider.target_matches_commit("main", MERGE_SHA))
+
+    def test_all_github_providers_reject_untrusted_credential_destination(self):
+        invalid_url = "https://api.github.com.attacker.example"
+        factories = (
+            (GitHubPullRequestProvider, DeliveryError),
+            (GitHubIntegrationMergeProvider, IntegrationMergeError),
+            (GitHubPromotionSnapshotProvider, PromotionSnapshotError),
+            (GitHubPromotionProvider, PromotionReadinessError),
+            (GitHubPromotionSyncProvider, PromotionSyncError),
+            (GitHubIssuesProvider, WorkItemLifecycleError),
+        )
+
+        for provider_class, error_type in factories:
+            with self.subTest(provider=provider_class.__name__):
+                with self.assertRaises(error_type):
+                    provider_class(
+                        REPOSITORY,
+                        "test-token",
+                        api_base_url=invalid_url,
+                    )
+
     def test_successful_merge_advances_integration_to_done(self):
         provider = FakePromotionProvider()
         work_items = FakeWorkItemProvider()
