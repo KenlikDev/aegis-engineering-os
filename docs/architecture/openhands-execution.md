@@ -31,7 +31,7 @@ The run trigger accepts the \`409 Conflict\` response documented by the installe
 
 ## Response-size safety
 
-Every OpenHands JSON response is bounded to 1 MiB before JSON parsing. A larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
+Every OpenHands JSON response is bounded to 1 MiB and parsed through the shared strict JSON object contract before interpretation. Duplicate object keys and non-standard JSON constants are rejected; a larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
 
 Event history retrieval is additionally bounded to 100 pages and 10,000 accumulated events. A history that exceeds either boundary is rejected rather than being returned as incomplete execution evidence.
 

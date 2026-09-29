@@ -102,17 +102,20 @@ def parse_json_object(
     raw: bytes | str,
     *,
     label: str = "JSON input",
+    max_bytes: int = MAX_JSON_BYTES,
 ) -> dict[str, Any]:
     """Parse a bounded JSON object while rejecting ambiguous JSON syntax."""
+    if not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise EvidenceContractError("JSON maximum byte size must be a positive integer.")
     if isinstance(raw, str):
         encoded = raw.encode("utf-8")
     elif isinstance(raw, bytes):
         encoded = raw
     else:
         raise EvidenceContractError(f"{label} must be text or bytes.")
-    if len(encoded) > MAX_JSON_BYTES:
+    if len(encoded) > max_bytes:
         raise EvidenceContractError(
-            f"{label} exceeds the {MAX_JSON_BYTES}-byte limit."
+            f"{label} exceeds the {max_bytes}-byte limit."
         )
     try:
         value = json.loads(

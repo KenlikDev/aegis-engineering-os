@@ -235,6 +235,32 @@ class OpenHandsExecutionTests(unittest.TestCase):
         self.assertNotIn("llm-secret-value", repr(result))
         self.assertNotIn("event-secret", repr(result))
 
+    def test_real_http_json_response_rejects_duplicate_keys(self) -> None:
+        from openhands_execution import _request_json
+
+        class DuplicateResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b'{"execution_status":"running","execution_status":"finished"}'
+
+        class DuplicateOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return DuplicateResponse()
+
+        with patch("openhands_execution._HTTP_OPENER", DuplicateOpener()):
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                "Duplicate JSON key",
+            ):
+                _request_json("GET", f"{SERVER}/api/conversations/{CID}", {}, None)
+
     def test_real_http_json_response_is_bounded(self) -> None:
         from openhands_execution import MAX_JSON_RESPONSE_BYTES, _request_json
 

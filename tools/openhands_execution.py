@@ -13,6 +13,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Callable, Literal, Mapping
+
+from evidence_contract import EvidenceContractError, parse_json_object
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import (
@@ -128,7 +130,11 @@ def _request_json(
                 )
             if not raw:
                 return response.status, {}
-            parsed = json.loads(raw.decode("utf-8"))
+            parsed = parse_json_object(
+                raw,
+                label="OpenHands JSON response",
+                max_bytes=MAX_JSON_RESPONSE_BYTES,
+            )
     except HTTPError as exc:
         # Preserve the HTTP status so callers can intentionally accept a documented
         # non-2xx response such as 409 Conflict from the run endpoint.
@@ -139,15 +145,12 @@ def _request_json(
         OSError,
         UnicodeDecodeError,
         json.JSONDecodeError,
+        EvidenceContractError,
     ) as exc:
         raise OpenHandsExecutionError(
             f"Unable to communicate with OpenHands at {url}: {exc}"
         ) from exc
 
-    if not isinstance(parsed, dict):
-        raise OpenHandsExecutionError(
-            f"OpenHands endpoint returned a non-object JSON document: {url}"
-        )
     return response.status, parsed
 
 

@@ -24,6 +24,32 @@ class RuntimePreflightTests(unittest.TestCase):
         ):
             handler.redirect_request(Request("http://127.0.0.1:9000/api/settings"))
 
+    def test_request_json_rejects_duplicate_keys(self) -> None:
+        from preflight_runtime import _request_json
+
+        class DuplicateResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b'{"status":"ok","status":"verified"}'
+
+        class DuplicateOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return DuplicateResponse()
+
+        with patch("preflight_runtime._NO_REDIRECT_OPENER", DuplicateOpener()):
+            with self.assertRaisesRegex(
+                preflight_runtime.RuntimePreflightError,
+                "Duplicate JSON key",
+            ):
+                _request_json("http://127.0.0.1:11434/api/version", 5)
+
     def test_request_json_rejects_oversized_response(self) -> None:
         from preflight_runtime import MAX_JSON_RESPONSE_BYTES, _request_json
 
