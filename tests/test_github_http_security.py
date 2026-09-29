@@ -2,6 +2,19 @@ import unittest
 
 
 class GitHubHttpSecurityTests(unittest.TestCase):
+    def test_exposes_mandatory_github_api_version_headers(self):
+        from github_http_security import (
+            GITHUB_API_VERSION,
+            GITHUB_API_VERSION_HEADER,
+            github_api_headers,
+        )
+
+        headers = github_api_headers()
+        self.assertEqual("X-GitHub-Api-Version", GITHUB_API_VERSION_HEADER)
+        self.assertEqual("2026-03-10", GITHUB_API_VERSION)
+        self.assertEqual("2026-03-10", headers["X-GitHub-Api-Version"])
+        self.assertEqual("application/vnd.github+json", headers["Accept"])
+
     def test_validates_exact_github_api_origin(self):
         from github_http_security import (
             GITHUB_API_ORIGIN,
