@@ -15,6 +15,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from evidence_contract import EvidenceContractError, parse_json_object
+
 from github_http_security import (
     github_api_headers,
     read_bounded_response,
@@ -265,10 +267,18 @@ def assess_release_readiness(
     changelog_text = provider.get_file(CHANGELOG_PATH, target_branch)
 
     try:
-        manifest = json.loads(manifest_text)
-        registry = json.loads(registry_text)
-    except json.JSONDecodeError as exc:
-        raise ReleaseReadinessError("Release metadata contains invalid JSON.") from exc
+        manifest = parse_json_object(
+            manifest_text,
+            label="Release manifest JSON",
+        )
+        registry = parse_json_object(
+            registry_text,
+            label="Release skill registry JSON",
+        )
+    except EvidenceContractError as exc:
+        raise ReleaseReadinessError(
+            f"Release metadata contains invalid or ambiguous JSON: {exc}"
+        ) from exc
 
     if not isinstance(manifest, Mapping) or not isinstance(registry, Mapping):
         raise ReleaseReadinessError(

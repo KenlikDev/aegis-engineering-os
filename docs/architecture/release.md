@@ -79,6 +79,8 @@ work item
 
 Release publication remains outside the autonomous Aegis write boundary.
 
+Release metadata (`aegis-manifest.json` and `skills/registry.json`) is parsed through the shared strict JSON contract. Duplicate object keys, non-standard JSON constants, invalid UTF-8, and oversized JSON are rejected before release readiness is evaluated.
+
 
 ## GitHub credential destination
 

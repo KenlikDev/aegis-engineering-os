@@ -98,6 +98,37 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def parse_json_object(
+    raw: bytes | str,
+    *,
+    label: str = "JSON input",
+) -> dict[str, Any]:
+    """Parse a bounded JSON object while rejecting ambiguous JSON syntax."""
+    if isinstance(raw, str):
+        encoded = raw.encode("utf-8")
+    elif isinstance(raw, bytes):
+        encoded = raw
+    else:
+        raise EvidenceContractError(f"{label} must be text or bytes.")
+    if len(encoded) > MAX_JSON_BYTES:
+        raise EvidenceContractError(
+            f"{label} exceeds the {MAX_JSON_BYTES}-byte limit."
+        )
+    try:
+        value = json.loads(
+            encoded.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_constants,
+        )
+    except EvidenceContractError:
+        raise
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise EvidenceContractError(f"{label} is invalid: {exc}") from exc
+    if not isinstance(value, dict):
+        raise EvidenceContractError(f"{label} must contain an object.")
+    return value
+
+
 def load_json_object(path: str | Path) -> dict[str, Any]:
     """Read a bounded JSON object and reject ambiguous JSON syntax."""
     file_path = Path(path).expanduser().resolve()
@@ -111,19 +142,7 @@ def load_json_object(path: str | Path) -> dict[str, Any]:
         raise EvidenceContractError(
             f"Evidence JSON exceeds the {MAX_JSON_BYTES}-byte limit."
         )
-    try:
-        value = json.loads(
-            raw.decode("utf-8"),
-            object_pairs_hook=_reject_duplicate_keys,
-            parse_constant=_reject_constants,
-        )
-    except EvidenceContractError:
-        raise
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise EvidenceContractError(f"Evidence JSON is invalid: {exc}") from exc
-    if not isinstance(value, dict):
-        raise EvidenceContractError("Evidence JSON must contain an object.")
-    return value
+    return parse_json_object(raw, label="Evidence JSON")
 
 
 def _validate_string(

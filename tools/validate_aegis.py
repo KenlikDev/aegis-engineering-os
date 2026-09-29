@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
 
+from evidence_contract import EvidenceContractError, load_json_object
 from validate_ai_config import load_registry, validate_profile_config
 
 
@@ -19,6 +19,14 @@ SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def load_metadata(path: Path) -> dict:
+    """Load repository metadata through the shared strict JSON contract."""
+    try:
+        return load_json_object(path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        fail(f"Unable to read {path}: {exc}")
 
 
 def validate_skill(path: Path, seen_names: dict[str, str]) -> None:
@@ -68,7 +76,7 @@ def main() -> int:
     if not VERSION_PATTERN.fullmatch(version):
         fail(f"Unsupported experimental version format: {version!r}")
 
-    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    manifest = load_metadata(manifest_file)
     if manifest.get("version") != version:
         fail("VERSION and aegis-manifest.json disagree.")
     for key in (
@@ -81,7 +89,7 @@ def main() -> int:
         if key not in manifest:
             fail(f"aegis-manifest.json is missing required key: {key}")
 
-    registry = json.loads(registry_file.read_text(encoding="utf-8"))
+    registry = load_metadata(registry_file)
     if registry.get("version") != version:
         fail("VERSION and skills/registry.json disagree.")
     if not isinstance(registry.get("skills"), list):

@@ -34,6 +34,19 @@ class AegisPolicyTests(unittest.TestCase):
         )
 
 
+    def test_structural_validator_rejects_duplicate_metadata_keys(self) -> None:
+        import validate_aegis
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "manifest.json"
+            path.write_text(
+                '{"version":"0.1.0-alpha.1","version":"0.1.0-alpha.1"}',
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SystemExit):
+                validate_aegis.load_metadata(path)
+
     def test_bootstrap_registry_paths_stay_inside_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
