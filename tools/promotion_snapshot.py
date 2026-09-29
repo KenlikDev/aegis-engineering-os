@@ -505,7 +505,6 @@ def prepare_promotion_snapshot(
             )
         promotion_sha = existing_branch.sha
     else:
-        provider.create_ref(branch, target.sha)
         promotion_sha = provider.create_snapshot_commit(
             message=(
                 f"chore: prepare promotion snapshot for #{request.work_item_id} "
@@ -515,7 +514,14 @@ def prepare_promotion_snapshot(
             target_sha=target.sha,
             source_sha=source.sha,
         )
-        provider.update_ref(branch, promotion_sha)
+
+        current_target = provider.get_commit(request.target_branch)
+        if current_target.sha != target.sha:
+            raise PromotionSnapshotError(
+                f"{request.target_branch} changed while the promotion snapshot was being prepared."
+            )
+
+        provider.create_ref(branch, promotion_sha)
 
     verified = provider.get_ref_commit(branch)
     if verified is None:
@@ -529,11 +535,12 @@ def prepare_promotion_snapshot(
             "Promotion branch verification failed after snapshot creation."
         )
 
-    current_target = provider.get_commit(request.target_branch)
-    if current_target.sha != target.sha:
-        raise PromotionSnapshotError(
-            f"{request.target_branch} changed while the promotion snapshot was being prepared."
-        )
+    if not branch_reused:
+        current_target = provider.get_commit(request.target_branch)
+        if current_target.sha != target.sha:
+            raise PromotionSnapshotError(
+                f"{request.target_branch} changed after the promotion branch was published."
+            )
 
     existing_prs = provider.list_open_pull_requests(
         head=branch,

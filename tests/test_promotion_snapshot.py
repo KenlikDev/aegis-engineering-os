@@ -39,6 +39,7 @@ class FakeTransport:
         self.existing_branch = existing_branch
         self.existing_pr = existing_pr
         self.created_branch = False
+        self.created_ref_sha = None
         self.created_commit = False
         self.updated_ref = False
         self.created_pr = False
@@ -97,6 +98,7 @@ class FakeTransport:
 
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/refs":
             self.created_branch = True
+            self.created_ref_sha = payload["sha"]
             return 201, {"ref": "refs/heads/ai/1-develop-promotion"}
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/commits":
             self.created_commit = True
@@ -183,17 +185,35 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertFalse(result.branch_reused)
         self.assertFalse(result.pull_request_reused)
         self.assertTrue(transport.created_branch)
+        self.assertEqual(SNAPSHOT_SHA, transport.created_ref_sha)
         self.assertTrue(transport.created_commit)
-        self.assertTrue(transport.updated_ref)
         self.assertTrue(transport.created_pr)
         self.assertEqual(
             [TARGET_SHA, SOURCE_SHA],
             transport.create_commit_payload["parents"],
         )
         self.assertEqual(SOURCE_TREE, transport.create_commit_payload["tree"])
-        self.assertEqual({"sha": SNAPSHOT_SHA, "force": False}, transport.update_ref_payload)
         self.assertEqual(["KenlikDev:ai/1-develop-promotion"], transport.assert_query["head"])
         self.assertEqual(["develop"], transport.assert_query["base"])
+
+    def test_does_not_publish_incomplete_branch_when_snapshot_commit_fails(self):
+        transport = FakeTransport()
+
+        def failing_commit(method, url, headers, payload):  # noqa: ANN001
+            if method == "POST" and url.endswith("/git/commits"):
+                raise PromotionSnapshotError("snapshot commit failed")
+            return transport(method, url, headers, payload)
+
+        provider = GitHubPromotionSnapshotProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=failing_commit,
+        )
+
+        with self.assertRaisesRegex(PromotionSnapshotError, "snapshot commit failed"):
+            prepare_promotion_snapshot(provider, self._request())
+
+        self.assertFalse(transport.created_branch)
 
     def test_reuses_matching_snapshot_and_pr(self):
         transport = FakeTransport(
