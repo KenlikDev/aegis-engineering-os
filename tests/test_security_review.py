@@ -136,6 +136,45 @@ class SecurityReviewTests(unittest.TestCase):
             )
 
 
+
+    def test_does_not_accept_workflow_api_header_only_in_comment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "api.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: api\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "# curl https://api.github.com -H 'X-GitHub-Api-Version: 2026-03-10'\n"
+                "steps:\n"
+                "  - run: curl https://api.github.com\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
+    def test_preserves_quoted_hash_in_workflow_api_version_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "api.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: api\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "steps:\n"
+                "  - run: echo \"# https://api.github.com X-GitHub-Api-Version\"\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+
     def test_blocks_workflow_github_api_without_explicit_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
