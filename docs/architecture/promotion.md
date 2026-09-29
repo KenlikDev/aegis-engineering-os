@@ -32,6 +32,16 @@ tools/promotion_snapshot.py is the write boundary.
 
 The operation is intentionally conservative:
 
+The snapshot mutation order is intentionally transactional at the branch-publication boundary:
+
+1. create the immutable snapshot commit with the exact target SHA, integration SHA, and integration tree;
+2. reread the protected target and require its SHA to remain unchanged;
+3. create the promotion branch directly at the snapshot commit SHA;
+4. verify the branch commit, parents, and tree.
+
+The branch is never intentionally published first at the protected target SHA. Therefore a snapshot-commit failure cannot leave an incomplete promotion branch that blocks a later retry.
+
+
 1. run the readiness gate;
 2. reread the source and target commit objects;
 3. verify that target is an ancestor of the source;
