@@ -452,7 +452,7 @@ def main() -> int:
             )
             write_evidence(
                 canonical,
-                args.canonical_evidence_output.expanduser().resolve(),
+                args.canonical_evidence_output.expanduser(),
             )
     except (OSError, ValueError, PromotionSyncError, WorkItemLifecycleError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

@@ -21,8 +21,9 @@ from evidence_contract import (
 def record_state_evidence(input_path: str | Path, output_path: str | Path):
     """Record explicit observed state without mutating the observed system."""
     source = Path(input_path).expanduser().resolve()
-    destination = Path(output_path).expanduser().resolve()
-    if source == destination:
+    destination = Path(output_path).expanduser()
+    resolved_destination = destination.resolve()
+    if source == resolved_destination:
         raise EvidenceContractError("Evidence input and output paths must differ.")
     payload = load_json_object(source)
     record = build_evidence(payload)

@@ -523,7 +523,7 @@ def main() -> int:
         )
         write_evidence(
             canonical,
-            Path(args.canonical_evidence_output).expanduser().resolve(),
+            Path(args.canonical_evidence_output).expanduser(),
         )
 
     print(json.dumps(result, indent=2, sort_keys=True))

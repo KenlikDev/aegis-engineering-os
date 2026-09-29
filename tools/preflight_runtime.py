@@ -281,9 +281,10 @@ def main() -> int:
             from evidence_adapters import runtime_preflight_evidence
             from evidence_contract import write_evidence
 
-            canonical_path = args.canonical_evidence_output.expanduser().resolve()
+            canonical_path = args.canonical_evidence_output.expanduser()
+            resolved_canonical_path = canonical_path.resolve()
             profile_path = args.profile_config.expanduser().resolve()
-            if canonical_path == profile_path:
+            if resolved_canonical_path == profile_path:
                 raise RuntimePreflightError(
                     "Canonical evidence output must not overwrite the AI profile configuration."
                 )
