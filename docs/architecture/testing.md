@@ -52,6 +52,12 @@ The result preserves:
 
 The workflow itself adds no hidden pass/fail rules beyond the existing quality-gate contract.
 
+## Pull request revision identity
+
+For non-closed pull-request events, validation checks out the exact pull-request head SHA rather than GitHub's synthetic merge ref. A dedicated checkout assertion verifies that the executed workspace is exactly that revision. The merged `ai/integration` close-event path continues to check out the actual merge commit SHA.
+
+This keeps the workflow run's revision identity aligned with the source files whose validation actually executed.
+
 ## Validation run concurrency
 
 The repository validation workflow is required to produce a completed post-merge validation for the actual `ai/integration` merge commit.
