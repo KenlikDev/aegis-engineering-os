@@ -233,8 +233,11 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
         )
         for node in ast.walk(tree)
     )
+    relative_path = path.relative_to(root).as_posix()
+    is_shared_header_policy_module = relative_path == "tools/github_http_security.py"
     if (
         GITHUB_API_RE.search(text)
+        and not is_shared_header_policy_module
         and not shared_header_call
         and not explicit_header_mapping
     ):
