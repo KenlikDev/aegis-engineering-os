@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from evidence_contract import write_json_atomically
 from quality_gates import (
     DEFAULT_MANIFEST,
     QualityGate,
@@ -164,10 +165,10 @@ def run_testing(
                     raise TestingWorkflowError(
                         "Testing evidence output must not be a symbolic link."
                     )
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_text(
-                    json.dumps(output, indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8",
+                write_json_atomically(
+                    output,
+                    destination,
+                    error_type=TestingWorkflowError,
                 )
         else:
             output = run_with_optional_work_item(
