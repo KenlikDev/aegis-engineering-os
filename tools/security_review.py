@@ -34,6 +34,7 @@ SECRET_PATTERNS = (
 PROTECTED_REF_VALUES = {"refs/heads/main", "refs/heads/develop"}
 GITHUB_API_RE = re.compile(r"https://api\.github\.com\b")
 API_VERSION_HEADER = "X-GitHub-Api-Version"
+SHARED_GITHUB_HEADERS_RE = re.compile(r"\bgithub_api_headers\s*\(")
 PERMISSIONS_RE = re.compile(r"^permissions:\s*$", re.MULTILINE)
 WRITE_PERMISSION_RE = re.compile(
     r"^\s{2,}[A-Za-z0-9_-]+:\s*write\s*$",
@@ -184,7 +185,7 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
                 line=_line_number(text, match.start()),
             )
 
-    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text:
+    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text and not SHARED_GITHUB_HEADERS_RE.search(text):
         _finding(
             findings,
             rule_id="github.api-version",
@@ -196,7 +197,7 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
 
 
 def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
-    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text:
+    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text and not SHARED_GITHUB_HEADERS_RE.search(text):
         _finding(
             findings,
             rule_id="github.api-version",
