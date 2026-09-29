@@ -133,7 +133,7 @@ class AegisPolicyTests(unittest.TestCase):
                 json.dumps(
                     {
                         "version": "0.1.0-alpha.1",
-                        "skills": [{"name": "external", "path": "../%s"} % outside.name],
+                        "skills": [{"name": "external", "path": f"../{outside.name}"}],
                     }
                 ),
                 encoding="utf-8",
