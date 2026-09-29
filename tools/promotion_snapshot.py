@@ -217,7 +217,7 @@ class GitHubPromotionSnapshotProvider:
         source_branch: str,
         target_branch: str,
         workflow: str,
-    ) -> None:
+    ) -> PromotionReadiness:
         result = self._readiness_provider().assess(
             source_branch=source_branch,
             target_branch=target_branch,
@@ -528,18 +528,6 @@ def prepare_promotion_snapshot(
         raise PromotionSnapshotError(
             "Promotion branch verification failed after snapshot creation."
         )
-
-    if not branch_reused:
-        current_source = provider.get_commit(request.source_branch)
-        current_target = provider.get_commit(request.target_branch)
-        if current_source.sha != source.sha:
-            raise PromotionSnapshotError(
-                "ai/integration changed after the promotion branch was published."
-            )
-        if current_target.sha != target.sha:
-            raise PromotionSnapshotError(
-                f"{request.target_branch} changed after the promotion branch was published."
-            )
 
     existing_prs = provider.list_open_pull_requests(
         head=branch,
