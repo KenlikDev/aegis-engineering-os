@@ -357,8 +357,8 @@ def main() -> int:
                 project_root = args.project.expanduser().resolve()
                 if not output_path.is_absolute():
                     output_path = project_root / output_path
-                output_path = output_path.resolve()
-                if output_path == evidence_path:
+                resolved_output_path = output_path.resolve()
+                if resolved_output_path == evidence_path:
                     raise VersionVerificationError(
                         "Canonical evidence output must differ from the version evidence input."
                     )
