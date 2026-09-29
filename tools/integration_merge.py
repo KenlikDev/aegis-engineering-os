@@ -16,6 +16,7 @@ from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from github_http_security import (
+    github_api_headers,
     read_bounded_response,
     validate_github_api_base_url,
 )
@@ -28,7 +29,6 @@ from work_item_lifecycle import (
     WorkItemProvider,
 )
 
-GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_API_BASE_URL = "https://api.github.com"
 INTEGRATION_BRANCH = "ai/integration"
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -102,10 +102,7 @@ def _default_transport(
     payload: Mapping[str, Any] | None,
 ) -> tuple[int, Any]:
     body = None
-    request_headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": GITHUB_API_VERSION,
-    }
+    request_headers = github_api_headers()
     request_headers.update(headers)
     if payload is not None:
         body = json.dumps(payload).encode("utf-8")

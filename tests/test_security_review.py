@@ -248,6 +248,24 @@ class SecurityReviewTests(unittest.TestCase):
             ):
                 assess_repository(root)
 
+    def test_accepts_shared_github_api_version_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "safe.py").write_text(
+                "API = 'https://api.github.com'\n"
+                "from github_http_security import github_api_headers\n"
+                "HEADERS = github_api_headers()\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertFalse(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_blocks_github_api_without_explicit_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

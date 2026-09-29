@@ -65,6 +65,11 @@ The read-only CI diagnosis GitHub adapter follows the same credential destinatio
 Release readiness follows the same GitHub credential destination policy as the other GitHub adapters: bearer credentials are restricted to the exact `https://api.github.com` origin.
 
 
+## GitHub REST transport baseline headers
+
+All credential-bearing GitHub REST adapters use the shared `tools/github_http_security.py::github_api_headers()` helper for the mandatory API media type and explicit GitHub API version. Adapter-specific headers such as `Authorization` and `Content-Type` remain local to the request boundary.
+
+The helper is the single source of truth for the API version. Individual providers must not duplicate the version constant or construct a parallel baseline header map.
 ## GitHub REST response bounds
 
 Credential-bearing GitHub REST adapters read response bodies through the shared bounded transport primitive. Successful and HTTP-error bodies are capped before decoding, preventing unexpectedly large JSON responses from becoming unbounded in-memory data. The limit is one mebibyte; responses exceeding it fail closed.
