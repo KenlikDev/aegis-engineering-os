@@ -42,6 +42,10 @@ The recorder:
 
 The tool records explicit observations. It does not itself contact GitHub, CI, Jira, or another provider.
 
+## Persisted size invariant
+
+Canonical evidence is bounded to 65,536 bytes in its persisted JSON representation. Construction and write paths enforce the same limit used by the canonical reader, so Aegis cannot create an artifact that it cannot subsequently read and validate. Size checking uses incremental JSON encoding rather than materializing an unbounded serialized buffer solely for the bound check.
+
 ## Validation
 
 \`tools/state_verification.py validate\` reads an evidence artifact and recomputes its identity.
