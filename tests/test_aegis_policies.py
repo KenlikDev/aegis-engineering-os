@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import bootstrap_project
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = ROOT / "tools" / "bootstrap_project.py"
@@ -30,6 +32,157 @@ class AegisPolicyTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
+
+
+    def test_bootstrap_registry_paths_stay_inside_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            (root / "aegis-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "repository": "test",
+                        "default_work_item_provider": "github",
+                        "work_item_strategy": "issues",
+                        "optional_integrations": [],
+                        "active_knowledge_model": "repository",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            skills = root / "skills"
+            skills.mkdir()
+            (skills / "safe.md").write_text("safe\n", encoding="utf-8")
+            registry = skills / "registry.json"
+            registry.write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "skills": [
+                            {"name": "safe", "path": "skills/safe.md"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            version, manifest, loaded_registry = bootstrap_project.load_source_metadata(root)
+            self.assertEqual("0.1.0-alpha.1", version)
+            self.assertEqual("0.1.0-alpha.1", manifest["version"])
+            self.assertEqual("safe", loaded_registry["skills"][0]["name"])
+
+    def test_bootstrap_rejects_registry_absolute_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            (root / "aegis-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "repository": "test",
+                        "default_work_item_provider": "github",
+                        "work_item_strategy": "issues",
+                        "optional_integrations": [],
+                        "active_knowledge_model": "repository",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            skills = root / "skills"
+            skills.mkdir()
+            (skills / "registry.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "skills": [{"name": "external", "path": str(root.parent / "outside.md")}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root.parent / "outside.md").write_text("outside\n", encoding="utf-8")
+            self.addCleanup((root.parent / "outside.md").unlink, missing_ok=True)
+
+            with self.assertRaisesRegex(SystemExit, "relative source path"):
+                bootstrap_project.load_source_metadata(root)
+
+
+    def test_bootstrap_rejects_registry_traversal_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            (root / "aegis-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "repository": "test",
+                        "default_work_item_provider": "github",
+                        "work_item_strategy": "issues",
+                        "optional_integrations": [],
+                        "active_knowledge_model": "repository",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            skills = root / "skills"
+            skills.mkdir()
+            outside = root.parent / f"{root.name}-outside.md"
+            outside.write_text("outside\n", encoding="utf-8")
+            self.addCleanup(outside.unlink, missing_ok=True)
+            (skills / "registry.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "skills": [{"name": "external", "path": f"../{outside.name}"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(SystemExit, "relative source path"):
+                bootstrap_project.load_source_metadata(root)
+
+    def test_bootstrap_rejects_registry_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            (root / "aegis-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "repository": "test",
+                        "default_work_item_provider": "github",
+                        "work_item_strategy": "issues",
+                        "optional_integrations": [],
+                        "active_knowledge_model": "repository",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            skills = root / "skills"
+            skills.mkdir()
+            outside = root.parent / f"{root.name}-outside.md"
+            outside.write_text("outside\n", encoding="utf-8")
+            link = skills / "linked.md"
+            try:
+                link.symlink_to(outside)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"Symbolic links are unavailable: {exc}")
+            self.addCleanup(outside.unlink, missing_ok=True)
+
+            registry = skills / "registry.json"
+            registry.write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "skills": [{"name": "linked", "path": "skills/linked.md"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(SystemExit, "symbolic link"):
+                bootstrap_project.load_source_metadata(root)
 
     def test_state_verification_skill_exists_and_is_registered(self) -> None:
         skill_path = ROOT / "skills/state-verification/SKILL.md"

@@ -167,6 +167,44 @@ def verify_source_checkpoint(root: Path, expected_commit: str) -> None:
         )
 
 
+
+def _resolve_registry_skill_path(root: Path, raw_path: object, skill_name: str) -> Path:
+    """Resolve one registry path while keeping the source boundary explicit."""
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise SystemExit(
+            f"Aegis registry skill {skill_name!r} must contain a non-empty relative path."
+        )
+
+    candidate = Path(raw_path)
+    if candidate.is_absolute() or any(part == ".." for part in candidate.parts):
+        raise SystemExit(
+            f"Aegis registry skill {skill_name!r} must use a relative source path without traversal."
+        )
+
+    absolute_candidate = (root / candidate).absolute()
+    if absolute_candidate.is_symlink():
+        raise SystemExit(
+            f"Aegis registry skill {skill_name!r} must not reference a symbolic link."
+        )
+
+    resolved = (root / candidate).resolve()
+    if resolved != absolute_candidate:
+        raise SystemExit(
+            f"Aegis registry skill {skill_name!r} must not resolve through symbolic links."
+        )
+
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit(
+            f"Aegis registry skill {skill_name!r} resolves outside the Aegis source repository."
+        ) from exc
+    if not resolved.is_file():
+        raise SystemExit(
+            f"Aegis registry points to a missing skill: {skill_name} -> {raw_path}"
+        )
+    return resolved
+
 def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
     version_file = root / "VERSION"
     manifest_file = root / "aegis-manifest.json"
@@ -211,19 +249,17 @@ def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
 
     registry_names: set[str] = set()
     for entry in registry["skills"]:
+        if not isinstance(entry, dict):
+            raise SystemExit("Every Aegis registry entry must be an object.")
         name = entry.get("name")
         path = entry.get("path")
-        if not name or not path:
+        if not isinstance(name, str) or not name or not path:
             raise SystemExit("Every Aegis registry entry must contain name and path.")
         if name in registry_names:
             raise SystemExit(f"Duplicate Aegis registry skill name: {name}")
         registry_names.add(name)
 
-        registry_path = root / path
-        if not registry_path.is_file():
-            raise SystemExit(
-                f"Aegis registry points to a missing skill: {name} -> {path}"
-            )
+        _resolve_registry_skill_path(root, path, name)
 
     return version, manifest, registry
 
