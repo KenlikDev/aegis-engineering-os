@@ -141,6 +141,32 @@ def ensure_source_clean(root: Path) -> None:
         )
 
 
+def read_source_commit(root: Path) -> str:
+    """Read the exact Aegis source HEAD used as the bootstrap provenance checkpoint."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    commit = result.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise SystemExit(f"Aegis source HEAD is not a valid commit SHA: {commit!r}")
+    return commit
+
+
+def verify_source_checkpoint(root: Path, expected_commit: str) -> None:
+    """Require the source to remain clean and at the exact captured commit."""
+    ensure_source_clean(root)
+    actual_commit = read_source_commit(root)
+    if actual_commit != expected_commit:
+        raise SystemExit(
+            "Aegis source commit changed during bootstrap: "
+            f"expected {expected_commit}, got {actual_commit}."
+        )
+
+
 def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
     version_file = root / "VERSION"
     manifest_file = root / "aegis-manifest.json"
@@ -512,6 +538,7 @@ def main() -> int:
         raise SystemExit(f"Project directory does not exist: {project}")
 
     ensure_source_clean(root)
+    source_commit = read_source_commit(root)
     manifest_version, manifest, _registry = load_source_metadata(root)
     selected = selected_sources(args.preset, args.integration)
 
@@ -565,6 +592,7 @@ def main() -> int:
 
     try:
         skill_checksums = stage_skills(root, selected, stage_root)
+        verify_source_checkpoint(root, source_commit)
         backups, state_backup, state_existed = backup_paths(
             project=project,
             target_root=target_root,
@@ -601,13 +629,7 @@ def main() -> int:
                 "reconcile Aegis rules manually."
             )
 
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            check=True,
-            text=True,
-            capture_output=True,
-        ).stdout.strip()
+        verify_source_checkpoint(root, source_commit)
 
         source_repository = manifest.get(
             "repository",
@@ -618,7 +640,7 @@ def main() -> int:
             "schema_version": STATE_SCHEMA_VERSION,
             "aegis_version": manifest_version,
             "source_repository": source_repository,
-            "source_commit": commit,
+            "source_commit": source_commit,
             "source_worktree_clean": True,
             "preset": args.preset,
             "integrations": sorted(
