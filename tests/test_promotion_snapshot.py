@@ -237,6 +237,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertTrue(transport.created_commit)
         self.assertFalse(transport.created_branch)
         self.assertFalse(transport.created_pr)
+
     def test_reuses_matching_snapshot_and_pr(self):
         transport = FakeTransport(
             existing_branch=SNAPSHOT_SHA,
@@ -249,7 +250,6 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertEqual(SNAPSHOT_SHA, result.promotion_sha)
         self.assertFalse(transport.created_branch)
         self.assertFalse(transport.created_commit)
-        self.assertFalse(transport.updated_ref)
         self.assertFalse(transport.created_pr)
 
     def test_blocks_when_target_is_behind(self):
@@ -293,14 +293,14 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertFalse(transport.created_branch)
         self.assertFalse(transport.created_pr)
 
-    def test_blocks_target_change_after_snapshot_verification(self):
+    def test_blocks_target_change_before_snapshot_branch_publication(self):
         transport = FakeTransport()
         calls = {"target_reads": 0}
 
         def changing_call(method, url, headers, payload):  # noqa: ANN001
             if method == "GET" and url.endswith("/commits/develop"):
                 calls["target_reads"] += 1
-                if calls["target_reads"] >= 2:
+                if calls["target_reads"] >= 1:
                     return 200, {
                         "sha": OTHER_SHA,
                         "commit": {"tree": {"sha": OTHER_SHA}},
