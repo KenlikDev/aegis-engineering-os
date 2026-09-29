@@ -140,7 +140,7 @@ class GitHubPromotionSyncProvider:
             )
         parsed = urlparse(api_base_url)
         if (
-            or parsed.scheme != "https"
+            parsed.scheme != "https"
             or parsed.netloc != "api.github.com"
             or parsed.path not in ("", "/")
             or parsed.username is not None
