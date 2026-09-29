@@ -92,6 +92,19 @@ class VersionVerificationTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(snapshot).hexdigest(), digest)
         self.assertEqual(snapshot.decode("utf-8"), content)
         read_bytes.assert_called_once_with()
+    def test_record_rejects_duplicate_json_keys(self):
+        root, claims = self._project()
+        claims.write_text(
+            '{"schema_version":1,"schema_version":1,"claims":[]}',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(VersionVerificationError, "Unable to read version"):
+            record_version_evidence(
+                root,
+                claims,
+                root / ".aegis" / "version-evidence.json",
+            )
+
     def test_validate_rejects_source_drift(self):
         root, claims = self._project()
         output = root / ".aegis" / "version-evidence.json"
