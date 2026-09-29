@@ -256,6 +256,7 @@ Test fixture.
         *,
         work_item_id: str = "51",
         work_item_provider: InMemoryWorkItemProvider | None = None,
+        evidence_path: Path | None = None,
     ) -> aegis_orchestrator.OrchestratorConfig:
         return aegis_orchestrator.OrchestratorConfig(
             project_path=self.project,
@@ -269,6 +270,7 @@ Test fixture.
             agent_server_url="http://127.0.0.1:8000",
             container_workspace="/projects/aegis-target",
             profile_config=self.project / "profiles.json",
+            evidence_path=evidence_path,
             expected_model="gemma4:31b",
             expected_ollama_version="0.34.3",
             expected_openhands_version="1.49.5",
@@ -453,6 +455,35 @@ Test fixture.
         branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
         self.assertNotIn("ai/feature/51-execution", branches)
 
+    def test_symlinked_evidence_output_is_rejected_before_execution(self) -> None:
+        target = self.project / "evidence-target.json"
+        target.write_text("must remain unchanged\n", encoding="utf-8")
+        output = self.project / "evidence.json"
+        try:
+            output.symlink_to(target)
+        except OSError as exc:
+            self.skipTest(f"symbolic links unavailable: {exc}")
+
+        executed = {"value": False}
+
+        def execute(request):
+            executed["value"] = True
+            raise AssertionError("OpenHands must not start for a symlinked evidence output.")
+
+        with self.assertRaisesRegex(
+            aegis_orchestrator.AegisOrchestratorError,
+            "must not be a symbolic link",
+        ):
+            aegis_orchestrator.orchestrate(
+                self._config(evidence_path=output),
+                preflight_fn=self._preflight,
+                execute_fn=execute,
+            )
+
+        self.assertFalse(executed["value"])
+        self.assertEqual("must remain unchanged\n", target.read_text(encoding="utf-8"))
+        branches = self._git("branch", "--format=%(refname:short)").stdout.splitlines()
+        self.assertNotIn("ai/feature/51-execution", branches)
     def test_success_synchronizes_work_item_to_verification(self) -> None:
         provider = self._ready_provider()
         project = self.project
