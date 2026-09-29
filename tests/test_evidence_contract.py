@@ -23,9 +23,20 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             payload = {"status": "verified"}
             real_replace = os.replace
 
-            def race_replace(source, destination):  # noqa: ANN001
+            def race_replace(
+                source,
+                destination,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
                 output.symlink_to(target)
-                real_replace(source, destination)
+                return real_replace(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
 
             from evidence_contract import write_json_atomically
 
