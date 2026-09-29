@@ -118,6 +118,24 @@ class EvidenceContractTests(unittest.TestCase):
             with self.assertRaisesRegex(EvidenceContractError, "Duplicate JSON key"):
                 load_json_object(path)
 
+    def test_recording_rejects_symlinked_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            input_path = root / "state.json"
+            target = root / "target.json"
+            output = root / "evidence.json"
+            input_path.write_text(json.dumps(_payload()), encoding="utf-8")
+            target.write_text("preserve\n", encoding="utf-8")
+            try:
+                output.symlink_to(target)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            with self.assertRaisesRegex(EvidenceContractError, "symbolic link"):
+                record_state_evidence(input_path, output)
+
+            self.assertEqual("preserve\n", target.read_text(encoding="utf-8"))
+
     def test_recording_preserves_input_and_validates_output(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
