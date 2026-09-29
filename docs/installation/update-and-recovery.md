@@ -25,7 +25,7 @@ Each bootstrapped project records its effective Aegis installation in
 - SHA-256 checksums for every installed skill;
 - active status.
 
-The bootstrap state is deterministic for identical inputs. Re-running bootstrap
+The bootstrap state is deterministic for identical inputs. Bootstrap captures the exact Aegis source HEAD before reading metadata or staging skills and verifies that the source remains clean and at that same commit before writing state. Re-running bootstrap
 with a different preset reconciles skills previously installed by Aegis while
 leaving unrelated project-local skills untouched. Aegis refuses to overwrite
 unowned skills or customized managed skills.
