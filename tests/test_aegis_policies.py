@@ -204,6 +204,7 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("symlinked aegis skill path", result.stderr.lower())
             self.assertTrue(managed.is_symlink())
+
     def test_unowned_skill_is_never_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"
