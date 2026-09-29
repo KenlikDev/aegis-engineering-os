@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from evidence_contract import EvidenceContractError, load_json_object
+from evidence_contract import EvidenceContractError, load_json_object, write_json_atomically
 
 
 SCHEMA_VERSION = 1
@@ -211,19 +211,14 @@ def record_version_evidence(
             "Version evidence output must not overwrite a referenced version source."
         )
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(
-            {
-                "schema_version": evidence.schema_version,
-                "claims": [asdict(claim) for claim in evidence.claims],
-                "external_verification_pending": evidence.external_verification_pending,
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
+    write_json_atomically(
+        {
+            "schema_version": evidence.schema_version,
+            "claims": [asdict(claim) for claim in evidence.claims],
+            "external_verification_pending": evidence.external_verification_pending,
+        },
+        destination,
+        error_type=VersionVerificationError,
     )
     return evidence
 

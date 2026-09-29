@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
-from evidence_contract import EvidenceContractError, load_json_object
+from evidence_contract import EvidenceContractError, load_json_object, write_json_atomically
 
 from work_item_lifecycle import (
     GitHubIssuesProvider,
@@ -505,10 +505,10 @@ def run_with_optional_work_item(
                 "Quality-gate evidence output must not be a symbolic link."
             )
         destination = destination.resolve()
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(
-            json.dumps(output, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        write_json_atomically(
+            output,
+            destination,
+            error_type=QualityGateError,
         )
         evidence_reference = _evidence_ref(destination)
     else:

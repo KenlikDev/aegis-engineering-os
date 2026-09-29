@@ -39,6 +39,23 @@ def _resolved_path_assignments(tree: ast.AST) -> set[str]:
 
 
 class EvidenceOutputCallerTests(unittest.TestCase):
+    def test_specialized_evidence_writers_use_atomic_primitive(self) -> None:
+        required = {
+            "tools/aegis_orchestrator.py",
+            "tools/evidence_bundle.py",
+            "tools/quality_gates.py",
+            "tools/testing.py",
+            "tools/version_verification.py",
+        }
+        for relative_path in required:
+            path = ROOT / relative_path
+            source = path.read_text(encoding="utf-8")
+            self.assertIn(
+                "write_json_atomically(",
+                source,
+                relative_path,
+            )
+
     def test_canonical_writer_never_receives_a_resolved_output_path(self) -> None:
         for path in CALLERS:
             tree = ast.parse(

@@ -17,6 +17,7 @@ from evidence_contract import (
     SHA256_RE,
     load_json_object,
     read_and_validate_evidence,
+    write_json_atomically,
 )
 
 
@@ -302,10 +303,10 @@ def write_evidence_bundle(
     if _bundle_digest(payload) != bundle.bundle_id:
         raise EvidenceBundleError("Evidence bundle object is internally inconsistent.")
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-        encoding="utf-8",
+    write_json_atomically(
+        payload,
+        destination,
+        error_type=EvidenceBundleError,
     )
 
 

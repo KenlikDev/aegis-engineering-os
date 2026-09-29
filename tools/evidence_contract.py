@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -451,24 +453,60 @@ def _validate_record(payload: Mapping[str, Any]) -> EvidenceRecord:
     )
 
 
-def write_evidence(record: EvidenceRecord, output_path: str | Path) -> None:
-    """Write a validated evidence record as canonical JSON."""
+def write_json_atomically(
+    payload: Mapping[str, Any],
+    output_path: str | Path,
+    *,
+    error_type: type[Exception] = EvidenceContractError,
+) -> None:
+    """Write JSON through a same-directory temporary file and atomic replacement."""
+    if not isinstance(payload, Mapping):
+        raise error_type("JSON output payload must be an object.")
+
     path = Path(output_path).expanduser()
     if path.is_symlink():
-        raise EvidenceContractError(
-            "Evidence output must not be a symbolic link."
-        )
-    path = path.resolve()
+        raise error_type("JSON output must not be a symbolic link.")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(
-            _payload_from_record(record),
-            ensure_ascii=False,
-            sort_keys=True,
-            indent=2,
+
+    temporary: Path | None = None
+    file_descriptor: int | None = None
+    try:
+        file_descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
         )
-        + "\n",
-        encoding="utf-8",
+        temporary = Path(temporary_name)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
+            file_descriptor = None
+            json.dump(
+                payload,
+                handle,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+                allow_nan=False,
+            )
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    except Exception:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        raise
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def write_evidence(record: EvidenceRecord, output_path: str | Path) -> None:
+    """Write a validated evidence record as canonical JSON."""
+    write_json_atomically(
+        _payload_from_record(record),
+        output_path,
+        error_type=EvidenceContractError,
     )
 
 
