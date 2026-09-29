@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden Python GitHub API-version review to require executable header mappings;
 - harden security review to recognize shared GitHub API header usage only through executable AST call nodes;
 - update security review to recognize the shared GitHub REST baseline header helper;
 - centralize GitHub REST baseline headers in the shared transport security policy;
