@@ -66,8 +66,6 @@ class PromotionSnapshotProvider(Protocol):
         source_sha: str,
     ) -> str: ...
 
-    def update_ref(self, branch: str, sha: str) -> None: ...
-
     def list_open_pull_requests(
         self,
         *,
@@ -338,18 +336,6 @@ class GitHubPromotionSnapshotProvider:
                 f"Unable to create promotion snapshot commit; HTTP {status}."
             )
         return self._require_sha(data.get("sha"), "Promotion commit SHA")
-
-    def update_ref(self, branch: str, sha: str) -> None:
-        self._require_sha(sha, "Promotion reference SHA")
-        status, _ = self._request(
-            "PATCH",
-            f"/repos/{self.repository}/git/refs/heads/{quote(branch, safe='')}",
-            {"sha": sha, "force": False},
-        )
-        if status != 200:
-            raise PromotionSnapshotError(
-                f"Unable to update promotion branch {branch!r}; HTTP {status}."
-            )
 
     def list_open_pull_requests(
         self,
