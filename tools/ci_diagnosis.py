@@ -21,6 +21,7 @@ from evidence_contract import EvidenceContractError
 GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_API_BASE_URL = "https://api.github.com"
 DEFAULT_LOG_LIMIT = 8000
+MAX_LOG_DOWNLOAD_BYTES = 1024 * 1024
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 RUN_ID_RE = re.compile(r"^[1-9][0-9]*$")
 TOKEN_PATTERNS = (
@@ -139,6 +140,19 @@ class _LogRedirectHandler(HTTPRedirectHandler):
 
 
 _LOG_HTTP_OPENER = build_opener(_LogRedirectHandler())
+
+
+def _read_bounded_response(response: Any, *, limit: int = MAX_LOG_DOWNLOAD_BYTES) -> bytes:
+    """Read a CI job-log response without allowing unbounded memory growth."""
+    if limit <= 0:
+        raise CIDiagnosisError("CI log download limit must be positive.")
+
+    raw = response.read(limit + 1)
+    if len(raw) > limit:
+        raise CIDiagnosisError(
+            f"CI job log exceeds the {limit}-byte download limit."
+        )
+    return raw
 
 
 def _redact(value: str) -> str:
@@ -587,7 +601,8 @@ class GitHubCIDiagnosisProvider:
         )
         try:
             with _LOG_HTTP_OPENER.open(request, timeout=30.0) as response:
-                return response.read().decode("utf-8", errors="replace")
+                raw = _read_bounded_response(response)
+                return raw.decode("utf-8", errors="replace")
         except HTTPError as exc:
             raise CIDiagnosisError(
                 f"Unable to read workflow job log; HTTP {exc.code}."
