@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
 
+from evidence_contract import write_json_atomically
 from implementation_readiness import (
     ImplementationReadiness,
     ImplementationReadinessError,
@@ -572,10 +573,10 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
 
     if evidence_output is not None:
         path = _validate_evidence_output_path(evidence_output).resolve()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        write_json_atomically(
+            evidence,
+            path,
+            error_type=AegisOrchestratorError,
         )
         evidence["evidence_path"] = str(path)
     return evidence
