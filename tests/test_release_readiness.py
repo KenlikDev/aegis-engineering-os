@@ -104,6 +104,25 @@ class FakeTransport:
 
 
 class ReleaseReadinessTests(unittest.TestCase):
+    def test_github_provider_rejects_untrusted_credential_destination(self):
+        from release_readiness import GitHubReleaseProvider
+
+        invalid_urls = (
+            "https://api.github.com.attacker.example",
+            "https://attacker.example",
+            "https://api.github.com/api/v1",
+            "https://user:password@api.github.com",
+        )
+
+        for invalid_url in invalid_urls:
+            with self.subTest(api_base_url=invalid_url):
+                with self.assertRaises(ReleaseReadinessError):
+                    GitHubReleaseProvider(
+                        "KenlikDev/aegis-engineering-os",
+                        "test-token",
+                        api_base_url=invalid_url,
+                    )
+
     def _provider(self, transport):
         return GitHubReleaseReadinessProvider(
             REPOSITORY,
