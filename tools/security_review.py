@@ -123,6 +123,53 @@ def _iter_review_files(root: Path) -> Iterable[Path]:
                 yield path
 
 
+
+def _strip_yaml_comments(text: str) -> str:
+    """Remove YAML comments without treating quoted '#' characters as comments."""
+    cleaned_lines: list[str] = []
+
+    for line in text.splitlines(keepends=True):
+        single_quoted = False
+        double_quoted = False
+        escaped = False
+        cut_at: int | None = None
+
+        for index, character in enumerate(line):
+            if double_quoted:
+                if escaped:
+                    escaped = False
+                elif character == "\\":
+                    escaped = True
+                elif character == '"':
+                    double_quoted = False
+                continue
+
+            if single_quoted:
+                if character == "'":
+                    if index + 1 < len(line) and line[index + 1] == "'":
+                        continue
+                    single_quoted = False
+                continue
+
+            if character == "'":
+                single_quoted = True
+                continue
+            if character == '"':
+                double_quoted = True
+                continue
+
+            if character == "#" and (index == 0 or line[index - 1].isspace()):
+                cut_at = index
+                break
+
+        if cut_at is None:
+            cleaned_lines.append(line)
+        else:
+            newline = "\n" if line.endswith("\n") else ""
+            cleaned_lines.append(line[:cut_at] + newline)
+
+    return "".join(cleaned_lines)
+
 def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
     if PULL_REQUEST_TARGET_RE.search(text):
         match = PULL_REQUEST_TARGET_RE.search(text)
@@ -184,7 +231,8 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
                 line=_line_number(text, match.start()),
             )
 
-    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text:
+    workflow_text = _strip_yaml_comments(text)
+    if GITHUB_API_RE.search(workflow_text) and API_VERSION_HEADER not in workflow_text:
         _finding(
             findings,
             rule_id="github.api-version",
