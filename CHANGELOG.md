@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- fail security review closed on symbolic-link inputs and review roots;
 - bound credential-bearing GitHub REST JSON responses before decoding;
 - pin release readiness GitHub bearer credentials to the exact api.github.com origin;
 - pin CI diagnosis GitHub bearer credentials to the exact api.github.com origin;
