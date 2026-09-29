@@ -150,7 +150,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         class FakeResponse:
             status = 200
 
-            def read(self):
+            def read(self, limit):
                 return b"{}"
 
             def __enter__(self):
