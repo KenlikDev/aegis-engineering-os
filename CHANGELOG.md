@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden version verification to hash and validate each source from one byte snapshot;
 - harden validation concurrency so post-merge ai/integration runs cannot be cancelled by later pushes;
 - verify integrity of Aegis-managed AGENTS.md without claiming user-owned instruction files;
 - harden runtime preflight redirects, managed bootstrap symlinks, and evidence output symlink boundaries;
