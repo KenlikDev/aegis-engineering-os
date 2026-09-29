@@ -13,6 +13,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from evidence_contract import EvidenceContractError, parse_json_object
 from validate_ai_config import load_registry, validate_profile_config
 
 
@@ -54,12 +55,14 @@ def _request_json(
                     "Local runtime JSON response exceeds the "
                     f"{MAX_JSON_RESPONSE_BYTES}-byte download limit."
                 )
-            payload = json.loads(raw.decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            payload = parse_json_object(
+                raw,
+                label="Local runtime JSON response",
+                max_bytes=MAX_JSON_RESPONSE_BYTES,
+            )
+    except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError, EvidenceContractError) as exc:
         raise RuntimePreflightError(f"Unable to verify local runtime at {url}: {exc}") from exc
 
-    if not isinstance(payload, dict):
-        raise RuntimePreflightError(f"Runtime endpoint returned a non-object JSON document: {url}")
     return payload
 
 
