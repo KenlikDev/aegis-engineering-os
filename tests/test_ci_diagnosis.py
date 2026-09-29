@@ -280,6 +280,25 @@ class CIDiagnosisTests(unittest.TestCase):
         with self.assertRaisesRegex(CIDiagnosisError, "Log limit"):
             _bounded_excerpt("log", limit=0)
 
+    def test_github_provider_rejects_untrusted_credential_destination(self):
+        from ci_diagnosis import GitHubCIDiagnosisProvider
+
+        invalid_urls = (
+            "https://api.github.com.attacker.example",
+            "https://attacker.example",
+            "https://api.github.com/api/v1",
+            "https://user:password@api.github.com",
+        )
+
+        for invalid_url in invalid_urls:
+            with self.subTest(api_base_url=invalid_url):
+                with self.assertRaises(CIDiagnosisError):
+                    GitHubCIDiagnosisProvider(
+                        REPOSITORY,
+                        "test-token",
+                        api_base_url=invalid_url,
+                    )
+
     def test_latest_run_contract_is_provider_neutral(self):
         provider = FakeProvider()
         result = provider.latest_run(".github/workflows/validate.yml", "ai/integration")

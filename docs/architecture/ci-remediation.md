@@ -73,3 +73,8 @@ failure
 -> remediation work item
 
 CI diagnosis is therefore a precursor to engineering remediation, not remediation itself.
+
+
+## GitHub credential destination
+
+CI diagnosis sends bearer credentials only to the exact `https://api.github.com` origin. The API client rejects arbitrary HTTPS hosts, non-root paths, URL credentials, queries, and fragments. This keeps CI diagnosis aligned with the repository-wide GitHub credential destination boundary.

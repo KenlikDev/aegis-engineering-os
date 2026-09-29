@@ -57,3 +57,6 @@ Managed bootstrap roots and skill paths reject symbolic links, including broken 
 GitHub credential destination
 
 GitHub API adapters may send bearer credentials only to the exact `https://api.github.com` origin. HTTPS alone is not sufficient: custom hosts, credentials in the URL, non-root paths, queries, and fragments are rejected. GitHub Enterprise endpoints must be introduced as an explicit provider policy rather than broadening this default credential destination.
+
+
+The read-only CI diagnosis GitHub adapter follows the same credential destination policy: bearer credentials are sent only to the exact `https://api.github.com` origin. Its separate job-log redirect path deliberately strips credentials before following signed log URLs.
