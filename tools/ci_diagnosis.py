@@ -17,13 +17,13 @@ from urllib.parse import quote, urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from github_http_security import (
+    github_api_headers,
     read_bounded_response,
     validate_github_api_base_url,
 )
 
 from evidence_contract import EvidenceContractError
 
-GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_API_BASE_URL = "https://api.github.com"
 DEFAULT_LOG_LIMIT = 8000
 MAX_LOG_DOWNLOAD_BYTES = 1024 * 1024
