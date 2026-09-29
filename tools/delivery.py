@@ -192,10 +192,12 @@ class GitHubPullRequestProvider:
         self.repository = _validate_repository(repository)
         if not token.strip():
             raise DeliveryError("GitHub API token must not be empty.")
+        if not isinstance(api_base_url, str) or api_base_url != api_base_url.strip() or not api_base_url:
+            raise DeliveryError(
+                "GitHub API base URL must be exactly https://api.github.com."
+            )
         parsed = urlparse(api_base_url)
         if (
-            not isinstance(api_base_url, str)
-            or api_base_url != api_base_url.strip()
             or parsed.scheme != "https"
             or parsed.netloc != "api.github.com"
             or parsed.path not in ("", "/")
