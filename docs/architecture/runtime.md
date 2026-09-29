@@ -41,6 +41,12 @@ The preflight does not pull models, change Ollama state, modify the project, or 
 
 Ollama documents model names as model:tag values, the local-model listing at GET /api/tags, and runtime version reporting at GET /api/version. The exact model tag therefore remains part of the runtime evidence instead of being inferred from a mutable latest alias.
 
+## Local HTTP response bounds
+
+The local Ollama and OpenHands JSON clients enforce a 1 MiB maximum response body. They read at most one byte beyond the limit and fail closed before JSON parsing when the boundary is exceeded.
+
+This bound applies to liveness, readiness, version, settings, conversation state, event-search, and model-list responses. It limits resource consumption without changing endpoint semantics or authentication behavior.
+
 ## OpenHands boundary
 
 The runtime preflight deliberately does not hard-code an OpenHands CLI command.
