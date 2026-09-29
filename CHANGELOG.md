@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden legacy AGENTS ownership classification to use one observed SHA-256 snapshot;
 - make canonical and specialized evidence JSON persistence atomic against destination symlink races;
 - bind pull-request validation checkout to the exact pull-request head SHA instead of a synthetic merge revision;
 - reject ambiguous duplicate-key JSON across configuration, policy, and state input boundaries;
