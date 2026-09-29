@@ -1,3 +1,4 @@
+import os
 import json
 import shutil
 import subprocess
@@ -425,6 +426,53 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("symlinked AGENTS.md", result.stderr)
             self.assertEqual("external\n", external.read_text(encoding="utf-8"))
+
+
+    def test_bootstrap_state_writer_is_anchored_against_parent_symlink_race(self) -> None:
+        if os.name != "posix":
+            self.skipTest("directory-FD anchoring is only available on POSIX.")
+
+        import bootstrap_project  # noqa: E402
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_root = root / "state"
+            moved_root = root / "state-original"
+            external = root / "external"
+            state_root.mkdir()
+            external.mkdir()
+            state_path = state_root / "aegis-version.json"
+            payload = {"schema_version": 2, "status": "active"}
+
+            real_replace = os.replace
+
+            def race_replace(
+                source,
+                destination,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                state_root.rename(moved_root)
+                state_root.symlink_to(external, target_is_directory=True)
+                return real_replace(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with patch("evidence_contract.os.replace", side_effect=race_replace):
+                bootstrap_project.write_state_atomically(state_path, payload)
+
+            self.assertFalse((external / state_path.name).exists())
+            self.assertEqual(
+                payload,
+                json.loads(
+                    (moved_root / state_path.name).read_text(encoding="utf-8")
+                ),
+            )
+            self.assertTrue(state_root.is_symlink())
 
     def test_dirty_aegis_source_is_rejected_before_project_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from evidence_contract import EvidenceContractError, load_json_object
+from evidence_contract import EvidenceContractError, load_json_object, write_json_atomically
 
 
 STATE_SCHEMA_VERSION = 2
@@ -493,26 +493,12 @@ def restore_transaction(
 
 
 def write_state_atomically(state_path: Path, state: dict) -> None:
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=state_path.parent,
-        prefix=".aegis-version.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        temporary = Path(handle.name)
-        json.dump(state, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-
-    try:
-        os.replace(temporary, state_path)
-    except Exception:
-        temporary.unlink(missing_ok=True)
-        raise
+    """Persist bootstrap state through the canonical anchored JSON writer."""
+    write_json_atomically(
+        state,
+        state_path,
+        error_type=EvidenceContractError,
+    )
 
 
 def main() -> int:

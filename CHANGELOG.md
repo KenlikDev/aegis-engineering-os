@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- anchor bootstrap state persistence to the secure destination directory used by the canonical atomic JSON writer;
 - anchor atomic evidence persistence to the opened destination directory to resist ancestor symlink substitution;
 - harden legacy AGENTS ownership classification to use one observed SHA-256 snapshot;
 - make canonical and specialized evidence JSON persistence atomic against destination symlink races;
