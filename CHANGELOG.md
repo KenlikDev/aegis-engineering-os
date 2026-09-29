@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- centralize GitHub REST baseline headers in the shared transport security policy;
 - fail security review closed on symbolic-link inputs and review roots;
 - bound credential-bearing GitHub REST JSON responses before decoding;
 - pin release readiness GitHub bearer credentials to the exact api.github.com origin;
