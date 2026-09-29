@@ -168,7 +168,7 @@ class SecurityReviewTests(unittest.TestCase):
                 "permissions:\n"
                 "  contents: read\n"
                 "steps:\n"
-                "  - run: echo \"https://api.github.com X-GitHub-Api-Version\"\n",
+                "  - run: echo \"# https://api.github.com X-GitHub-Api-Version\"\n",
                 encoding="utf-8",
             )
 
