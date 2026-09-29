@@ -133,8 +133,10 @@ def _strip_yaml_comments(text: str) -> str:
         double_quoted = False
         escaped = False
         cut_at: int | None = None
+        index = 0
 
-        for index, character in enumerate(line):
+        while index < len(line):
+            character = line[index]
             if double_quoted:
                 if escaped:
                     escaped = False
@@ -142,25 +144,20 @@ def _strip_yaml_comments(text: str) -> str:
                     escaped = True
                 elif character == '"':
                     double_quoted = False
-                continue
-
-            if single_quoted:
+            elif single_quoted:
                 if character == "'":
                     if index + 1 < len(line) and line[index + 1] == "'":
-                        continue
-                    single_quoted = False
-                continue
-
-            if character == "'":
+                        index += 1
+                    else:
+                        single_quoted = False
+            elif character == "'":
                 single_quoted = True
-                continue
-            if character == '"':
+            elif character == '"':
                 double_quoted = True
-                continue
-
-            if character == "#" and (index == 0 or line[index - 1].isspace()):
+            elif character == "#" and (index == 0 or line[index - 1].isspace()):
                 cut_at = index
                 break
+            index += 1
 
         if cut_at is None:
             cleaned_lines.append(line)
