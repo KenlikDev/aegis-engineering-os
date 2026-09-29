@@ -146,8 +146,7 @@ class GitHubPromotionProvider:
             not isinstance(api_base_url, str)
             or api_base_url != api_base_url.strip()
             or parsed.scheme != "https"
-            or parsed.hostname != "api.github.com"
-            or parsed.port not in (None, 443)
+            or parsed.netloc != "api.github.com"
             or parsed.path not in ("", "/")
             or parsed.username is not None
             or parsed.password is not None
