@@ -181,24 +181,24 @@ def _resolve_registry_skill_path(root: Path, raw_path: object, skill_name: str) 
             f"Aegis registry skill {skill_name!r} must use a relative source path without traversal."
         )
 
-    absolute_candidate = candidate.absolute()
+    absolute_candidate = (root / candidate).absolute()
     if absolute_candidate.is_symlink():
         raise SystemExit(
             f"Aegis registry skill {skill_name!r} must not reference a symbolic link."
         )
 
     resolved = (root / candidate).resolve()
+    if resolved != absolute_candidate:
+        raise SystemExit(
+            f"Aegis registry skill {skill_name!r} must not resolve through symbolic links."
+        )
+
     try:
         resolved.relative_to(root)
     except ValueError as exc:
         raise SystemExit(
             f"Aegis registry skill {skill_name!r} resolves outside the Aegis source repository."
         ) from exc
-
-    if resolved != absolute_candidate:
-        raise SystemExit(
-            f"Aegis registry skill {skill_name!r} must not resolve through symbolic links."
-        )
     if not resolved.is_file():
         raise SystemExit(
             f"Aegis registry points to a missing skill: {skill_name} -> {raw_path}"
