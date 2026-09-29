@@ -43,6 +43,8 @@ Ollama documents model names as model:tag values, the local-model listing at GET
 
 ## Local HTTP response bounds
 
+Local runtime JSON responses are parsed through the shared strict JSON object contract as well as the runtime-specific 1 MiB transport bound. Duplicate object keys and non-standard JSON constants are rejected before runtime facts are interpreted. The larger runtime bound is explicit and does not weaken the canonical evidence 65,536-byte persistence bound.
+
 The local Ollama and OpenHands JSON clients enforce a 1 MiB maximum response body. They read at most one byte beyond the limit and fail closed before JSON parsing when the boundary is exceeded.
 
 This bound applies to liveness, readiness, version, settings, conversation state, event-search, and model-list responses. It limits resource consumption without changing endpoint semantics or authentication behavior.
