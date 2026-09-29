@@ -4,7 +4,7 @@
 
 CI remediation begins with evidence collection, not automatic changes.
 
-tools/ci_diagnosis.py is the read-only diagnostic boundary. It reads workflow-run metadata, job state, failed step names, and bounded logs, then applies deterministic classification rules.
+tools/ci_diagnosis.py is the read-only diagnostic boundary. It reads workflow-run metadata, job state, failed step names, and bounded logs, then applies deterministic classification rules. GitHub job-log downloads are bounded before decoding; the evidence excerpt limit is a separate downstream bound.
 
 ## Evidence model
 
@@ -58,7 +58,7 @@ An unknown failure is inconclusive; Aegis must not invent a root cause from inco
 
 ## GitHub boundary
 
-The GitHub adapter is read-only. Workflow-run and job metadata are read through the versioned GitHub REST API. Job logs are downloaded through GitHub's redirect-based log endpoint; the redirect handler strips the GitHub Authorization header before following a cross-host HTTPS download.
+The GitHub adapter is read-only. Workflow-run and job metadata are read through the versioned GitHub REST API. Job logs are downloaded through GitHub's redirect-based log endpoint; the redirect handler strips the GitHub Authorization header before following a cross-host HTTPS download. The response body is limited to 1 MiB plus one sentinel byte before decoding. Oversized logs are rejected rather than partially interpreted.
 
 The adapter cannot rerun, cancel, dispatch, approve, merge, or edit workflows.
 

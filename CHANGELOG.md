@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bound CI job-log downloads before decoding to prevent unbounded response memory use;
 - anchor bootstrap state persistence to the secure destination directory used by the canonical atomic JSON writer;
 - anchor atomic evidence persistence to the opened destination directory to resist ancestor symlink substitution;
 - harden legacy AGENTS ownership classification to use one observed SHA-256 snapshot;
