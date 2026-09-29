@@ -251,6 +251,16 @@ def _verify_post_execution(state: GitState, task_branch: str, *, allow_no_change
     return final
 
 
+def _validate_evidence_output_path(path: Path) -> Path:
+    """Validate an evidence output destination without following a symlink."""
+    expanded = path.expanduser()
+    if expanded.is_symlink():
+        raise AegisOrchestratorError(
+            "Managed execution evidence output must not be a symbolic link."
+        )
+    return expanded
+
+
 def _resolve_evidence_ref(config: OrchestratorConfig) -> str | None:
     if config.evidence_ref is not None:
         value = config.evidence_ref.strip()
@@ -357,6 +367,11 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
     work_item = normalize_work_item_id(config.work_item_id)
     container_workspace = validate_container_workspace(config.container_workspace)
     evidence_ref = _resolve_evidence_ref(config)
+    evidence_output = (
+        _validate_evidence_output_path(config.evidence_path)
+        if config.evidence_path is not None
+        else None
+    )
     if not config.task.strip():
         raise AegisOrchestratorError("task must not be empty.")
     if not config.base_branch.startswith("ai/") or config.base_branch in PROTECTED_BRANCHES:
@@ -555,13 +570,8 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
     if work_item_sync is not None:
         evidence["work_item"] = work_item_sync
 
-    if config.evidence_path is not None:
-        path = config.evidence_path.expanduser()
-        if path.is_symlink():
-            raise AegisOrchestratorError(
-                "Managed execution evidence output must not be a symbolic link."
-            )
-        path = path.resolve()
+    if evidence_output is not None:
+        path = _validate_evidence_output_path(evidence_output).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(evidence, indent=2, sort_keys=True) + "\n",
