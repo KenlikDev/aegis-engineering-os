@@ -507,6 +507,109 @@ def _open_secure_destination_directory(
     return directory_fd, absolute.name
 
 
+
+def write_bytes_atomically(
+    payload: bytes,
+    output_path: str | Path,
+    *,
+    error_type: type[Exception] = EvidenceContractError,
+    file_mode: int = 0o600,
+) -> None:
+    """Write raw bytes through an anchored directory FD and atomic replacement."""
+    if not isinstance(payload, bytes):
+        raise error_type("Atomic byte output payload must be bytes.")
+    if not isinstance(file_mode, int) or file_mode < 0 or file_mode > 0o777:
+        raise error_type("Atomic byte output file mode must be a valid POSIX mode.")
+
+    path = Path(output_path).expanduser()
+    directory_fd, filename = _open_secure_destination_directory(
+        path,
+        error_type=error_type,
+    )
+    temporary_name: str | None = None
+    file_descriptor: int | None = None
+
+    try:
+        try:
+            destination_stat = os.stat(
+                filename,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            destination_stat = None
+        if destination_stat is not None and stat.S_ISLNK(destination_stat.st_mode):
+            raise error_type("Atomic byte output must not be a symbolic link.")
+
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        for _ in range(32):
+            candidate = f".{filename}.{uuid.uuid4().hex}.tmp"
+            try:
+                file_descriptor = os.open(
+                    candidate,
+                    flags,
+                    file_mode,
+                    dir_fd=directory_fd,
+                )
+            except FileExistsError:
+                continue
+            temporary_name = candidate
+            break
+        else:
+            raise error_type("Unable to allocate a unique temporary byte output path.")
+
+        with os.fdopen(file_descriptor, "wb") as handle:
+            file_descriptor = None
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        os.replace(
+            temporary_name,
+            filename,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        temporary_name = None
+        os.fsync(directory_fd)
+    except Exception:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+            file_descriptor = None
+        raise
+    finally:
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+        os.close(directory_fd)
+
+
+def copy_file_atomically(
+    source_path: str | Path,
+    output_path: str | Path,
+    *,
+    error_type: type[Exception] = EvidenceContractError,
+) -> None:
+    """Copy one regular source file into a destination through the atomic byte writer."""
+    source = Path(source_path).expanduser()
+    if source.is_symlink() or not source.is_file():
+        raise error_type(f"Atomic copy source must be a regular non-symlink file: {source}")
+    try:
+        payload = source.read_bytes()
+        mode = stat.S_IMODE(source.stat().st_mode)
+    except (OSError, UnicodeError) as exc:
+        raise error_type(f"Unable to read atomic copy source: {source}") from exc
+
+    write_bytes_atomically(
+        payload,
+        output_path,
+        error_type=error_type,
+        file_mode=mode,
+    )
+}
+
 def write_json_atomically(
     payload: Mapping[str, Any],
     output_path: str | Path,
