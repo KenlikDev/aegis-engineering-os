@@ -193,7 +193,6 @@ class AegisPolicyTests(unittest.TestCase):
 
             managed = project / ".agents" / "skills" / "aegis-orchestrator"
             managed_target = Path(tmp) / "missing-managed-skill"
-            import shutil
             shutil.rmtree(managed)
             try:
                 managed.symlink_to(managed_target, target_is_directory=True)
