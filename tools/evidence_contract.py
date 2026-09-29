@@ -608,7 +608,6 @@ def copy_file_atomically(
         error_type=error_type,
         file_mode=mode,
     )
-}
 
 def write_json_atomically(
     payload: Mapping[str, Any],
