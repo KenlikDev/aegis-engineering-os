@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, str(ROOT / "tools"))
 
-from security_review import assess_repository  # noqa: E402
+from security_review import SecurityReviewError, assess_repository  # noqa: E402
 from evidence_contract import read_and_validate_evidence  # noqa: E402
 
 
@@ -223,7 +223,7 @@ class SecurityReviewTests(unittest.TestCase):
             self.addCleanup(outside.unlink, missing_ok=True)
 
             with self.assertRaisesRegex(
-                Exception,
+                SecurityReviewError,
                 "symbolic link",
             ):
                 assess_repository(root)
