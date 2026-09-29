@@ -23,9 +23,20 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             payload = {"status": "verified"}
             real_replace = os.replace
 
-            def race_replace(source, destination):  # noqa: ANN001
+            def race_replace(
+                source,
+                destination,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
                 output.symlink_to(target)
-                real_replace(source, destination)
+                return real_replace(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
 
             from evidence_contract import write_json_atomically
 
@@ -35,6 +46,78 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             self.assertEqual("protected\n", target.read_text(encoding="utf-8"))
             self.assertEqual(payload, json.loads(output.read_text(encoding="utf-8")))
             self.assertFalse(output.is_symlink())
+
+
+    def test_atomic_writer_is_anchored_when_parent_directory_becomes_symlink(self) -> None:
+        if os.name != "posix":
+            self.skipTest("directory-FD anchoring is only available on POSIX.")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            parent = root / "output"
+            moved_parent = root / "output-original"
+            external = root / "external"
+            parent.mkdir()
+            external.mkdir()
+            output = parent / "evidence.json"
+            payload = {"status": "verified"}
+
+            real_replace = os.replace
+            race_triggered = False
+
+            def race_replace(
+                source,
+                destination,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                nonlocal race_triggered
+                parent.rename(moved_parent)
+                parent.symlink_to(external, target_is_directory=True)
+                race_triggered = True
+                return real_replace(
+                    source,
+                    destination,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            from evidence_contract import write_json_atomically
+
+            with patch("evidence_contract.os.replace", side_effect=race_replace):
+                write_json_atomically(payload, output)
+
+            self.assertTrue(race_triggered)
+            self.assertFalse((external / "evidence.json").exists())
+            self.assertEqual(
+                payload,
+                json.loads((moved_parent / "evidence.json").read_text(encoding="utf-8")),
+            )
+            self.assertTrue(parent.is_symlink())
+
+
+    def test_atomic_writer_rejects_symlinked_parent_directory(self) -> None:
+        if os.name != "posix":
+            self.skipTest("directory-FD no-follow support is only available on POSIX.")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external"
+            external.mkdir()
+            parent = root / "output"
+            parent.symlink_to(external, target_is_directory=True)
+            output = parent / "evidence.json"
+
+            from evidence_contract import write_json_atomically
+
+            with self.assertRaisesRegex(
+                EvidenceContractError,
+                "securely open JSON output directory",
+            ):
+                write_json_atomically({"status": "verified"}, output)
+
+            self.assertFalse((external / "evidence.json").exists())
 
     def test_write_evidence_rejects_symlink_output(self) -> None:
         record = build_evidence(

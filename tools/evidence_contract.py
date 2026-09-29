@@ -7,7 +7,9 @@ import json
 import math
 import os
 import re
+import stat
 import tempfile
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -453,30 +455,105 @@ def _validate_record(payload: Mapping[str, Any]) -> EvidenceRecord:
     )
 
 
+def _open_secure_destination_directory(
+    path: Path,
+    *,
+    error_type: type[Exception],
+) -> tuple[int, str]:
+    """Open the destination directory without following symlinked path components."""
+    if (
+        os.name != "posix"
+        or not hasattr(os, "O_DIRECTORY")
+        or not hasattr(os, "O_NOFOLLOW")
+    ):
+        raise error_type(
+            "Atomic JSON output requires POSIX directory-FD and no-follow support."
+        )
+
+    absolute = Path(os.path.abspath(path))
+    if absolute == Path(absolute.anchor):
+        raise error_type("JSON output must identify a file path.")
+
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        directory_fd = os.open(absolute.anchor, flags)
+    except OSError as exc:
+        raise error_type(
+            f"Unable to securely open the JSON output filesystem root: {absolute.anchor}"
+        ) from exc
+
+    try:
+        for component in absolute.parent.parts:
+            if component == absolute.anchor:
+                continue
+            try:
+                next_fd = os.open(component, flags, dir_fd=directory_fd)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, 0o700, dir_fd=directory_fd)
+                except FileExistsError:
+                    pass
+                next_fd = os.open(component, flags, dir_fd=directory_fd)
+            os.close(directory_fd)
+            directory_fd = next_fd
+    except Exception as exc:
+        os.close(directory_fd)
+        if isinstance(exc, error_type):
+            raise
+        raise error_type(
+            f"Unable to securely open JSON output directory: {absolute.parent}"
+        ) from exc
+
+    return directory_fd, absolute.name
+
+
 def write_json_atomically(
     payload: Mapping[str, Any],
     output_path: str | Path,
     *,
     error_type: type[Exception] = EvidenceContractError,
 ) -> None:
-    """Write JSON through a same-directory temporary file and atomic replacement."""
+    """Write JSON through an anchored directory FD and atomic replacement."""
     if not isinstance(payload, Mapping):
         raise error_type("JSON output payload must be an object.")
 
     path = Path(output_path).expanduser()
-    if path.is_symlink():
-        raise error_type("JSON output must not be a symbolic link.")
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    temporary: Path | None = None
+    directory_fd, filename = _open_secure_destination_directory(
+        path,
+        error_type=error_type,
+    )
+    temporary_name: str | None = None
     file_descriptor: int | None = None
+
     try:
-        file_descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            dir=path.parent,
-        )
-        temporary = Path(temporary_name)
+        try:
+            destination_stat = os.stat(
+                filename,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            destination_stat = None
+        if destination_stat is not None and stat.S_ISLNK(destination_stat.st_mode):
+            raise error_type("JSON output must not be a symbolic link.")
+
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        for _ in range(32):
+            candidate = f".{filename}.{uuid.uuid4().hex}.tmp"
+            try:
+                file_descriptor = os.open(
+                    candidate,
+                    flags,
+                    0o600,
+                    dir_fd=directory_fd,
+                )
+            except FileExistsError:
+                continue
+            temporary_name = candidate
+            break
+        else:
+            raise error_type("Unable to allocate a unique temporary JSON output path.")
+
         with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
             file_descriptor = None
             json.dump(
@@ -490,15 +567,27 @@ def write_json_atomically(
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        temporary = None
+
+        os.replace(
+            temporary_name,
+            filename,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        temporary_name = None
+        os.fsync(directory_fd)
     except Exception:
         if file_descriptor is not None:
             os.close(file_descriptor)
+            file_descriptor = None
         raise
     finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+        os.close(directory_fd)
 
 
 def write_evidence(record: EvidenceRecord, output_path: str | Path) -> None:
