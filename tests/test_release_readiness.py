@@ -43,6 +43,8 @@ class FakeTransport:
         manifest_version="0.1.0-alpha.1",
         registry_version="0.1.0-alpha.1",
         changelog=BASE_FILES["CHANGELOG.md"],
+        manifest_text=None,
+        registry_text=None,
     ):
         self.protected = protected
         self.validation = validation
@@ -50,6 +52,8 @@ class FakeTransport:
         self.manifest_version = manifest_version
         self.registry_version = registry_version
         self.changelog = changelog
+        self.manifest_text = manifest_text
+        self.registry_text = registry_text
         self.requests = []
 
     def __call__(self, method, url, headers):
@@ -82,11 +86,15 @@ class FakeTransport:
 
         files = {
             "VERSION": self.version,
-            "aegis-manifest.json": json.dumps(
-                {"version": self.manifest_version}
+            "aegis-manifest.json": (
+                self.manifest_text
+                if self.manifest_text is not None
+                else json.dumps({"version": self.manifest_version})
             ),
-            "skills/registry.json": json.dumps(
-                {"version": self.registry_version, "skills": []}
+            "skills/registry.json": (
+                self.registry_text
+                if self.registry_text is not None
+                else json.dumps({"version": self.registry_version, "skills": []})
             ),
             "CHANGELOG.md": self.changelog,
         }
@@ -202,6 +210,26 @@ class ReleaseReadinessTests(unittest.TestCase):
             self._provider(FakeTransport(validation=False))
         )
         self.assertIn("exact main SHA", " ".join(result.blockers))
+
+    def test_rejects_duplicate_manifest_keys(self):
+        transport = FakeTransport(
+            manifest_text='{"version":"0.1.0-alpha.1","version":"0.1.0-alpha.1"}'
+        )
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "Duplicate JSON key",
+        ):
+            assess_release_readiness(self._provider(transport))
+
+    def test_rejects_duplicate_registry_keys(self):
+        transport = FakeTransport(
+            registry_text='{"version":"0.1.0-alpha.1","version":"0.1.0-alpha.1","skills":[]}'
+        )
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "Duplicate JSON key",
+        ):
+            assess_release_readiness(self._provider(transport))
 
     def test_blocks_version_mismatch(self):
         result = assess_release_readiness(
