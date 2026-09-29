@@ -100,29 +100,27 @@ def _finding(
 
 
 def _iter_review_files(root: Path) -> Iterable[Path]:
-    workflow_root = root / ".github" / "workflows"
-    if workflow_root.is_dir():
-        yield from sorted(
-            path
-            for path in workflow_root.rglob("*")
-            if path.is_file() and path.suffix.lower() in WORKFLOW_SUFFIXES
-        )
+    review_roots = (
+        (root / ".github" / "workflows", WORKFLOW_SUFFIXES),
+        (root / "tools", {".py"}),
+        (root / "config", {".json", ".yaml", ".yml"}),
+    )
 
-    tools_root = root / "tools"
-    if tools_root.is_dir():
-        yield from sorted(
-            path
-            for path in tools_root.rglob("*.py")
-            if path.is_file()
-        )
+    for review_root, suffixes in review_roots:
+        if review_root.is_symlink():
+            raise SecurityReviewError(
+                f"Security review scope must not be a symbolic link: {review_root}"
+            )
+        if not review_root.is_dir():
+            continue
 
-    config_root = root / "config"
-    if config_root.is_dir():
-        yield from sorted(
-            path
-            for path in config_root.rglob("*")
-            if path.is_file() and path.suffix.lower() in {".json", ".yaml", ".yml"}
-        )
+        for path in sorted(review_root.rglob("*")):
+            if path.is_symlink():
+                raise SecurityReviewError(
+                    f"Security review input must not be a symbolic link: {path}"
+                )
+            if path.is_file() and path.suffix.lower() in suffixes:
+                yield path
 
 
 def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
