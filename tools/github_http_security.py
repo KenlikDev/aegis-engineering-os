@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from urllib.parse import urlparse
 
@@ -10,6 +11,41 @@ GITHUB_API_ORIGIN = "https://api.github.com"
 GITHUB_API_VERSION = "2026-03-10"
 GITHUB_API_VERSION_HEADER = "X-GitHub-Api-Version"
 MAX_GITHUB_JSON_BYTES = 1024 * 1024
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"GitHub JSON contains unsupported constant {value!r}.")
+
+
+def _reject_duplicate_json_keys(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON key: {key!r}.")
+        result[key] = value
+    return result
+
+
+def parse_github_json(
+    raw: bytes,
+    *,
+    label: str = "GitHub JSON response",
+) -> Any:
+    """Parse one already-bounded GitHub REST JSON response with strict semantics."""
+    if not isinstance(raw, bytes):
+        raise ValueError("GitHub JSON response body must be bytes.")
+    if not raw:
+        raise ValueError(f"{label} must not be empty.")
+    try:
+        return json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except ValueError as exc:
+        raise ValueError(f"{label} is invalid: {exc}") from exc
 
 
 def validate_github_api_base_url(value: str) -> str:
