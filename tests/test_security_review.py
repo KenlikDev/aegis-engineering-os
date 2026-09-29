@@ -391,7 +391,9 @@ class SecurityReviewTests(unittest.TestCase):
             tools.mkdir(parents=True)
             (tools / "safe.py").write_text(
                 "API = \"https://api.github.com\"\n"
-                "HEADERS = {\"X-GitHub-Api-Version\": \"2026-03-10\"}\n",
+                "from urllib.request import Request\n"
+                "HEADERS = {\"X-GitHub-Api-Version\": \"2026-03-10\"}\n"
+                "REQUEST = Request(API, headers=HEADERS)\n",
                 encoding="utf-8",
             )
 
