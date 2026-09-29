@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -10,6 +11,29 @@ from evidence_contract import EvidenceContractError, build_evidence, write_evide
 
 
 class EvidenceOutputSecurityTests(unittest.TestCase):
+    def test_atomic_writer_replaces_destination_if_it_becomes_symlink_during_write(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            target = root / "protected.json"
+            output = root / "evidence.json"
+            target.write_text("protected\n", encoding="utf-8")
+
+            payload = {"status": "verified"}
+            real_replace = os.replace
+
+            def race_replace(source, destination):  # noqa: ANN001
+                output.symlink_to(target)
+                real_replace(source, destination)
+
+            from evidence_contract import write_json_atomically
+
+            with patch("evidence_contract.os.replace", side_effect=race_replace):
+                write_json_atomically(payload, output)
+
+            self.assertEqual("protected\n", target.read_text(encoding="utf-8"))
+            self.assertEqual(payload, json.loads(output.read_text(encoding="utf-8")))
+            self.assertFalse(output.is_symlink())
+
     def test_write_evidence_rejects_symlink_output(self) -> None:
         record = build_evidence(
             {
