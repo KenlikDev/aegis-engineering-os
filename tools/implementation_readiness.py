@@ -528,7 +528,7 @@ def main() -> int:
             )
             if not output_path.is_absolute():
                 output_path = project_root / output_path
-            output_path = output_path.resolve()
+            resolved_output_path = output_path.resolve()
 
             evidence_bundle_path, _ = (
                 _resolve_local_reference(project_root, args.evidence_bundle, "evidence bundle")
@@ -556,7 +556,7 @@ def main() -> int:
                 protected_inputs.add(evidence_bundle_path)
             if requirements_path is not None:
                 protected_inputs.add(requirements_path)
-            if output_path in protected_inputs:
+            if resolved_output_path in protected_inputs:
                 raise ImplementationReadinessError(
                     "Canonical evidence output must not overwrite any readiness input artifact."
                 )
