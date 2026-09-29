@@ -6,6 +6,10 @@ Version verification establishes a reproducible, source-pinned inventory of the 
 
 The executable boundary does not discover arbitrary versions by heuristic. It validates explicit claims against authoritative project files and records source SHA-256 hashes.
 
+## Source snapshot integrity
+
+Each version source is read as one byte snapshot. The SHA-256 digest and decoded text used for version matching are derived from that same snapshot, preventing a split-read provenance mismatch if the source changes concurrently.
+
 ## Evidence model
 
 A version claim contains:
