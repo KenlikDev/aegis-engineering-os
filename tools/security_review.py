@@ -224,10 +224,19 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
         )
         for node in ast.walk(tree)
     )
+    explicit_header_mapping = any(
+        isinstance(node, ast.Dict)
+        and any(
+            isinstance(key, ast.Constant)
+            and key.value == API_VERSION_HEADER
+            for key in node.keys
+        )
+        for node in ast.walk(tree)
+    )
     if (
         GITHUB_API_RE.search(text)
-        and API_VERSION_HEADER not in text
         and not shared_header_call
+        and not explicit_header_mapping
     ):
         _finding(
             findings,
