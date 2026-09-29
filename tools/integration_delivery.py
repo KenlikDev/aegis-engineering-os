@@ -260,7 +260,7 @@ def main() -> int:
             )
             write_evidence(
                 canonical,
-                args.canonical_evidence_output.expanduser().resolve(),
+                args.canonical_evidence_output.expanduser(),
             )
     except (EvidenceContractError, OSError, ValueError, IntegrationDeliveryError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
