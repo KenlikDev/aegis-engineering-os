@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- update security review to recognize the shared GitHub REST baseline header helper;
 - centralize GitHub REST baseline headers in the shared transport security policy;
 - fail security review closed on symbolic-link inputs and review roots;
 - bound credential-bearing GitHub REST JSON responses before decoding;
