@@ -184,7 +184,7 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
                 line=_line_number(text, match.start()),
             )
 
-    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text and not SHARED_GITHUB_HEADERS_RE.search(text):
+    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text:
         _finding(
             findings,
             rule_id="github.api-version",
