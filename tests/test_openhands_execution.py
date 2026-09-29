@@ -408,9 +408,9 @@ class OpenHandsExecutionTests(unittest.TestCase):
             OpenHandsExecutionClient(transport).execute(request_data())
 
     def test_event_pagination_is_bounded_by_event_count(self) -> None:
-        from openhands_execution import MAX_EVENTS
+        event_limit = 150
 
-        with patch("openhands_execution.MAX_EVENTS", 150):
+        with patch("openhands_execution.MAX_EVENTS", event_limit):
             responses = responses_with_states(["finished", "finished"])
             responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
                 (
@@ -426,7 +426,7 @@ class OpenHandsExecutionTests(unittest.TestCase):
 
             with self.assertRaisesRegex(
                 OpenHandsExecutionError,
-                f"{MAX_EVENTS}-event limit",
+                f"{event_limit}-event limit",
             ):
                 OpenHandsExecutionClient(transport).execute(request_data())
 
