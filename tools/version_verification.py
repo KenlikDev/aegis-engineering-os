@@ -82,15 +82,15 @@ def _relative_source(project: Path, source: str) -> tuple[Path, str]:
 
 def _sha256_and_text(path: Path) -> tuple[str, str]:
     try:
-        content = path.read_text(encoding="utf-8")
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        snapshot = path.read_bytes()
+        content = snapshot.decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise VersionVerificationError(
             f"Unable to read version source {path}: {exc}"
         ) from exc
     if not content.strip():
         raise VersionVerificationError(f"Version source is empty: {path}")
-    return digest, content
+    return hashlib.sha256(snapshot).hexdigest(), content
 
 
 def _validate_claim_input(

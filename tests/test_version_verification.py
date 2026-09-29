@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +71,27 @@ class VersionVerificationTests(unittest.TestCase):
         ).hexdigest()
         self.assertEqual(digest, payload["claims"][0]["source_sha256"])
 
+    def test_hash_and_version_match_same_source_snapshot(self):
+        root, _ = self._project()
+        source = root / "pyproject.toml"
+        snapshot = b'[project]\nrequires-python = ">=3.13"\n'
+
+        import version_verification as module
+
+        with patch.object(
+            Path,
+            "read_bytes",
+            return_value=snapshot,
+        ) as read_bytes, patch.object(
+            Path,
+            "read_text",
+            side_effect=AssertionError("source must be read once as bytes"),
+        ):
+            digest, content = module._sha256_and_text(source)
+
+        self.assertEqual(hashlib.sha256(snapshot).hexdigest(), digest)
+        self.assertEqual(snapshot.decode("utf-8"), content)
+        read_bytes.assert_called_once_with()
     def test_validate_rejects_source_drift(self):
         root, claims = self._project()
         output = root / ".aegis" / "version-evidence.json"
