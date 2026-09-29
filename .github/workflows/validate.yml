@@ -22,8 +22,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: aegis-validation-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action || 'none' }}
-  cancel-in-progress: true
+  group: aegis-validation-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}-${{ github.event.action || 'none' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'closed' }}
 
 jobs:
   validate:

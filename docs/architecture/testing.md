@@ -52,6 +52,12 @@ The result preserves:
 
 The workflow itself adds no hidden pass/fail rules beyond the existing quality-gate contract.
 
+## Validation run concurrency
+
+The repository validation workflow is required to produce a completed post-merge validation for the actual `ai/integration` merge commit.
+
+Push-triggered validation runs include the exact commit SHA in their concurrency group and are never cancelled by later push events. Normal non-closed pull-request validation runs remain cancellable so obsolete synchronize runs do not accumulate. Closed pull-request events are also non-cancellable, preserving the post-merge validation checkpoint for merged pull requests targeting `ai/integration`.
+
 ## Safety
 
 Testing is execution, so it may run project-declared commands. It does not mutate project source or Git state itself. Any lifecycle mutation is explicit provider synchronization delegated to the existing quality-gate contract.
