@@ -85,6 +85,29 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             )
             self.assertTrue(parent.is_symlink())
 
+
+    def test_atomic_writer_rejects_symlinked_parent_directory(self) -> None:
+        if os.name != "posix":
+            self.skipTest("directory-FD no-follow support is only available on POSIX.")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external"
+            external.mkdir()
+            parent = root / "output"
+            parent.symlink_to(external, target_is_directory=True)
+            output = parent / "evidence.json"
+
+            from evidence_contract import write_json_atomically
+
+            with self.assertRaisesRegex(
+                EvidenceContractError,
+                "securely open JSON output directory",
+            ):
+                write_json_atomically({"status": "verified"}, output)
+
+            self.assertFalse((external / "evidence.json").exists())
+
     def test_write_evidence_rejects_symlink_output(self) -> None:
         record = build_evidence(
             {
