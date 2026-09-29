@@ -600,8 +600,7 @@ class GitHubCIDiagnosisProvider:
         request = Request(
             url,
             headers={
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": GITHUB_API_VERSION,
+                **github_api_headers(),
                 "Authorization": f"Bearer {self._token}",
             },
             method="GET",
