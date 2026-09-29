@@ -60,3 +60,6 @@ GitHub API adapters may send bearer credentials only to the exact `https://api.g
 
 
 The read-only CI diagnosis GitHub adapter follows the same credential destination policy: bearer credentials are sent only to the exact `https://api.github.com` origin. Its separate job-log redirect path deliberately strips credentials before following signed log URLs.
+
+
+Release readiness follows the same GitHub credential destination policy as the other GitHub adapters: bearer credentials are restricted to the exact `https://api.github.com` origin.
