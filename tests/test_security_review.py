@@ -266,6 +266,24 @@ class SecurityReviewTests(unittest.TestCase):
                 any(f.rule_id == "github.api-version" for f in result.findings)
             )
 
+    def test_does_not_accept_textual_shared_header_reference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "# github_api_headers()\n"
+                "REFERENCE = \"github_api_headers()\"\n"
+                "API = \"https://api.github.com\"\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_blocks_github_api_without_explicit_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

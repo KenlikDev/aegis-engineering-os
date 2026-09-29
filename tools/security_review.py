@@ -34,7 +34,6 @@ SECRET_PATTERNS = (
 PROTECTED_REF_VALUES = {"refs/heads/main", "refs/heads/develop"}
 GITHUB_API_RE = re.compile(r"https://api\.github\.com\b")
 API_VERSION_HEADER = "X-GitHub-Api-Version"
-SHARED_GITHUB_HEADERS_RE = re.compile(r"\bgithub_api_headers\s*\(")
 PERMISSIONS_RE = re.compile(r"^permissions:\s*$", re.MULTILINE)
 WRITE_PERMISSION_RE = re.compile(
     r"^\s{2,}[A-Za-z0-9_-]+:\s*write\s*$",
@@ -197,16 +196,6 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
 
 
 def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
-    if GITHUB_API_RE.search(text) and API_VERSION_HEADER not in text and not SHARED_GITHUB_HEADERS_RE.search(text):
-        _finding(
-            findings,
-            rule_id="github.api-version",
-            severity=HIGH,
-            path=path,
-            root=root,
-            message="GitHub API usage must send the explicit API-version header.",
-        )
-
     try:
         tree = ast.parse(text, filename=str(path))
     except SyntaxError as exc:
@@ -220,6 +209,34 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
             line=exc.lineno,
         )
         return
+
+    shared_header_call = any(
+        isinstance(node, ast.Call)
+        and (
+            (
+                isinstance(node.func, ast.Name)
+                and node.func.id == "github_api_headers"
+            )
+            or (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "github_api_headers"
+            )
+        )
+        for node in ast.walk(tree)
+    )
+    if (
+        GITHUB_API_RE.search(text)
+        and API_VERSION_HEADER not in text
+        and not shared_header_call
+    ):
+        _finding(
+            findings,
+            rule_id="github.api-version",
+            severity=HIGH,
+            path=path,
+            root=root,
+            message="GitHub API usage must send the explicit API-version header.",
+        )
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
