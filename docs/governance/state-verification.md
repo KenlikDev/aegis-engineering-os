@@ -48,6 +48,12 @@ For material state, record:
 
 The canonical executable envelope is defined by `tools/evidence_contract.py` and recorded through `tools/state_verification.py`. Its SHA-256 identity covers the normalized evidence payload while excluding only the identity fields themselves.
 
+## Installed Aegis project state
+
+Project verification is an independent trust boundary. `tools/verify_project.py` rejects ambiguous state JSON, symbolic links for the `.aegis` state root or file, and symbolic links in the managed `.agents/skills` root, skill directories, and managed `SKILL.md` files before calculating integrity checksums.
+
+The verifier does not assume bootstrap created the state safely. It validates the filesystem topology first and then validates the strict state schema and recorded checksums.
+
 ## Mutation verification
 
 A successful write response is not sufficient proof that the intended state now exists when the system supports read-after-write verification.
