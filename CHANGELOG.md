@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- pin GitHub API bearer credential destinations to the exact api.github.com origin;
 - pin the Aegis source commit across the full bootstrap transaction and fail closed on source drift;
 - bound CI job-log downloads before decoding to prevent unbounded response memory use;
 - anchor bootstrap state persistence to the secure destination directory used by the canonical atomic JSON writer;
