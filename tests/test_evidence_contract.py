@@ -163,7 +163,7 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             EvidenceContractError,
-            r"Canonical evidence payload exceeds 65536-byte limit",
+            r"Canonical evidence payload exceeds the 65536-byte limit",
         ):
             build_evidence(
                 {
@@ -202,7 +202,7 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             output = Path(temp) / "evidence.json"
             with self.assertRaisesRegex(
                 EvidenceContractError,
-                r"Canonical evidence record exceeds 65536-byte limit",
+                r"Canonical evidence record exceeds the 65536-byte limit",
             ):
                 write_evidence(record, output)
 
