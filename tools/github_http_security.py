@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 
 GITHUB_API_ORIGIN = "https://api.github.com"
+GITHUB_API_VERSION = "2026-03-10"
+GITHUB_API_VERSION_HEADER = "X-GitHub-Api-Version"
 MAX_GITHUB_JSON_BYTES = 1024 * 1024
 
 
@@ -31,6 +33,14 @@ def validate_github_api_base_url(value: str) -> str:
             "GitHub API base URL must be exactly https://api.github.com."
         )
     return GITHUB_API_ORIGIN
+
+
+def github_api_headers() -> dict[str, str]:
+    """Return the mandatory baseline headers for credential-bearing GitHub REST calls."""
+    return {
+        "Accept": "application/vnd.github+json",
+        GITHUB_API_VERSION_HEADER: GITHUB_API_VERSION,
+    }
 
 
 def read_bounded_response(
