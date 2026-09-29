@@ -9,7 +9,12 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from evidence_contract import EvidenceContractError, build_evidence, write_evidence  # noqa: E402
+from evidence_contract import (  # noqa: E402
+    EvidenceContractError,
+    EvidenceRecord,
+    build_evidence,
+    write_evidence,
+)
 
 
 class EvidenceOutputSecurityTests(unittest.TestCase):
@@ -152,6 +157,56 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             self.assertEqual("protected\n", external.read_text(encoding="utf-8"))
             self.assertEqual("replacement\n", output.read_text(encoding="utf-8"))
             self.assertFalse(output.is_symlink())
+
+    def test_build_evidence_rejects_oversized_canonical_payload(self) -> None:
+        large_result = {"items": ["x" * 4096 for _ in range(20)]}
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            r"Canonical evidence payload exceeds the 65536-byte limit",
+        ):
+            build_evidence(
+                {
+                    "schema_version": 1,
+                    "kind": "testing",
+                    "source": "aegis:test",
+                    "subject": "large",
+                    "revision": None,
+                    "observed_at": "2026-09-29T00:00:00Z",
+                    "status": "verified",
+                    "result": large_result,
+                    "uncertainty": [],
+                    "references": [],
+                    "artifact_sha256": None,
+                }
+            )
+
+    def test_write_evidence_rejects_oversized_record_before_persistence(self) -> None:
+        record = EvidenceRecord(
+            schema_version=1,
+            evidence_id="0" * 64,
+            kind="testing",
+            source="aegis:test",
+            subject="large",
+            revision=None,
+            observed_at="2026-09-29T00:00:00Z",
+            status="verified",
+            result={"items": ["x" * 4096 for _ in range(20)]},
+            uncertainty=(),
+            references=(),
+            artifact_sha256=None,
+            evidence_sha256="0" * 64,
+        )
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "evidence.json"
+            with self.assertRaisesRegex(
+                EvidenceContractError,
+                r"Canonical evidence record exceeds the 65536-byte limit",
+            ):
+                write_evidence(record, output)
+
+            self.assertFalse(output.exists())
 
     def test_write_evidence_rejects_symlink_output(self) -> None:
         record = build_evidence(
