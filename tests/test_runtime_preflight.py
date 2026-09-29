@@ -24,6 +24,30 @@ class RuntimePreflightTests(unittest.TestCase):
         ):
             handler.redirect_request(Request("http://127.0.0.1:9000/api/settings"))
 
+    def test_request_json_rejects_oversized_response(self) -> None:
+        from preflight_runtime import MAX_JSON_RESPONSE_BYTES, _request_json
+
+        class OversizedResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b"{" + b"x" * limit
+
+        class OversizedOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return OversizedResponse()
+
+        with patch("preflight_runtime._NO_REDIRECT_OPENER", OversizedOpener()):
+            with self.assertRaisesRegex(
+                preflight_runtime.RuntimePreflightError,
+                f"{MAX_JSON_RESPONSE_BYTES}-byte download limit",
+            ):
+                _request_json("http://127.0.0.1:11434/api/version", 5)
+
     def test_preflight_verifies_exact_local_model(self) -> None:
         responses = {
             "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
