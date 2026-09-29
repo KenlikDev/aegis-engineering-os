@@ -556,7 +556,12 @@ def orchestrate(config: OrchestratorConfig, *, preflight_fn: Callable[..., dict[
         evidence["work_item"] = work_item_sync
 
     if config.evidence_path is not None:
-        path = config.evidence_path.expanduser().resolve()
+        path = config.evidence_path.expanduser()
+        if path.is_symlink():
+            raise AegisOrchestratorError(
+                "Managed execution evidence output must not be a symbolic link."
+            )
+        path = path.resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(evidence, indent=2, sort_keys=True) + "\n",
