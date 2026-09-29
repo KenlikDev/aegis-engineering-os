@@ -3,7 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
-- distinguish the shared GitHub REST policy definition from API consumer checks in security review;
+- harden workflow GitHub API-version review so stale shared-header symbols cannot mask missing version headers;
 - harden Python GitHub API-version review to require executable header mappings;
 - harden security review to recognize shared GitHub API header usage only through executable AST call nodes;
 - update security review to recognize the shared GitHub REST baseline header helper;
