@@ -411,15 +411,21 @@ class OpenHandsExecutionTests(unittest.TestCase):
         from openhands_execution import MAX_EVENTS
 
         responses = responses_with_states(["finished", "finished"])
+        page_count = MAX_EVENTS // 100 + 1
         responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
             (
                 200,
                 {
-                    "items": [{"id": f"event-{index}"} for index in range(100)],
-                    "next_page_id": "overflow",
+                    "items": [
+                        {"id": f"event-{page * 100 + index}"}
+                        for index in range(100)
+                    ],
+                    "next_page_id": (
+                        f"page-{page + 1}" if page + 1 < page_count else None
+                    ),
                 },
             )
-            for _ in range(MAX_EVENTS // 100 + 1)
+            for page in range(page_count)
         ]
         transport = FakeTransport(responses)
 
