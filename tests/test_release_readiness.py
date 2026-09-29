@@ -143,6 +143,12 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertFalse(result.changelog.unreleased_content_present)
         self.assertEqual(0, len(result.blockers))
         self.assertTrue(all(request[0] == "GET" for request in transport.requests))
+        self.assertTrue(
+            all(
+                request[2].get("X-GitHub-Api-Version") == "2026-03-10"
+                for request in transport.requests
+            )
+        )
 
     def test_blocks_unreleased_notes(self):
         changelog = (
