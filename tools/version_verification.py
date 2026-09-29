@@ -253,10 +253,6 @@ def validate_version_evidence(
         raise VersionVerificationError(
             f"Unable to read version evidence {path}: {exc}"
         ) from exc
-    except json.JSONDecodeError as exc:
-        raise VersionVerificationError(
-            f"Version evidence is not valid JSON: {path}: {exc.msg}"
-        ) from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
         raise VersionVerificationError("Unsupported or malformed version evidence schema.")
     claims = payload.get("claims")
