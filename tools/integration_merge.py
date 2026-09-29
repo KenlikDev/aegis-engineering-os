@@ -15,6 +15,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from github_http_security import (
+    read_bounded_response,
+    validate_github_api_base_url,
+)
+
 from promotion_readiness import BranchSnapshot
 from work_item_lifecycle import (
     LifecycleState,
@@ -111,10 +116,10 @@ def _default_transport(
             Request(url, data=body, headers=dict(request_headers), method=method),
             timeout=30.0,
         ) as response:
-            raw = response.read()
+            raw = read_bounded_response(response)
             return response.status, json.loads(raw.decode("utf-8")) if raw else {}
     except HTTPError as exc:
-        raw = exc.read()
+        raw = read_bounded_response(exc)
         try:
             data = json.loads(raw.decode("utf-8")) if raw else {}
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -139,11 +144,10 @@ class GitHubIntegrationMergeProvider:
             raise IntegrationMergeError("Repository must use owner/name format.")
         if not token.strip():
             raise IntegrationMergeError("GitHub API token must not be empty.")
-        if not isinstance(api_base_url, str) or api_base_url != api_base_url.strip() or not api_base_url:
-            raise IntegrationMergeError(
-                "GitHub API base URL must be exactly https://api.github.com."
-            )
-        parsed = urlparse(api_base_url)
+        try:
+            normalized_api_base_url = validate_github_api_base_url(api_base_url)
+        except ValueError as exc:
+            raise IntegrationMergeError(str(exc)) from exc
         if (
             parsed.scheme != "https"
             or parsed.netloc != "api.github.com"
@@ -159,7 +163,7 @@ class GitHubIntegrationMergeProvider:
         self.repository = repository
         self._token = token
         self._transport = transport or _default_transport
-        self._api_base_url = api_base_url.rstrip("/")
+        self._api_base_url = normalized_api_base_url
 
     def _request(
         self,
