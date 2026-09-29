@@ -29,6 +29,10 @@ A single execution follows this order:
 
 The run trigger accepts the \`409 Conflict\` response documented by the installed SDK as an indication that the conversation is already running.
 
+## Response-size safety
+
+Every OpenHands JSON response is bounded to 1 MiB before JSON parsing. A larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
+
 ## State handling
 
 The OpenHands Agent Server defines \`finished\`, \`error\`, and \`stuck\` as terminal execution states.
