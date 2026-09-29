@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden installed-project verification against ambiguous state JSON and symlinked Aegis state and skill paths;
 - reject ambiguous release metadata JSON in structural and release-readiness validation;
 - harden knowledge-gap record persistence with strict JSON parsing and anchored atomic writes;
 - remove the redundant path-based bootstrap destination mkdir before atomic managed-file publication;

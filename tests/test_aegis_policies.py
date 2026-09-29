@@ -294,6 +294,88 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Duplicate JSON key", result.stderr)
 
+    def test_project_verifier_rejects_duplicate_state_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            bootstrap = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            state_path = project / ".aegis" / "aegis-version.json"
+            state = state_path.read_text(encoding="utf-8")
+            duplicate = state.replace(
+                '"preset": "core"',
+                '"preset": "core", "preset": "all"',
+                1,
+            )
+            state_path.write_text(duplicate, encoding="utf-8")
+
+            result = self.run_tool(VERIFY_PROJECT, project)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Duplicate JSON key", result.stderr)
+
+    def test_project_verifier_rejects_symlinked_aegis_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            bootstrap = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            state_root = project / ".aegis"
+            real_state = project / ".aegis-real"
+            state_root.rename(real_state)
+            try:
+                state_root.symlink_to(real_state, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(VERIFY_PROJECT, project)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symbolic link", result.stderr.lower())
+
+    def test_project_verifier_rejects_symlinked_skill_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            bootstrap = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            skill_root = project / ".agents" / "skills"
+            real_skills = project / ".agents" / "skills-real"
+            skill_root.rename(real_skills)
+            try:
+                skill_root.symlink_to(real_skills, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(VERIFY_PROJECT, project)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("skills root", result.stderr.lower())
+
+    def test_project_verifier_rejects_symlinked_skill_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+
+            bootstrap = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+
+            skill = project / ".agents" / "skills" / "aegis-orchestrator" / "SKILL.md"
+            external = Path(tmp) / "external-skill.md"
+            external.write_text(skill.read_text(encoding="utf-8"), encoding="utf-8")
+            skill.unlink()
+            try:
+                skill.symlink_to(external)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            result = self.run_tool(VERIFY_PROJECT, project)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("skill file", result.stderr.lower())
+
     def test_bootstrap_reconciles_previous_preset(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"
