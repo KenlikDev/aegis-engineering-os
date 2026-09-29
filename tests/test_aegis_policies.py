@@ -515,6 +515,54 @@ class AegisPolicyTests(unittest.TestCase):
                     text=True,
                 )
 
+
+    def test_bootstrap_source_checkpoint_rejects_head_change(self) -> None:
+        import bootstrap_project  # noqa: E402
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "aegis-source"
+            source.mkdir()
+            subprocess.run(["git", "init"], cwd=source, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "aegis-tests@example.invalid"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Aegis Tests"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+            )
+
+            tracked = source / "VERSION"
+            tracked.write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "VERSION"], cwd=source, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "test: initial source"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+            )
+
+            checkpoint = bootstrap_project.read_source_commit(source)
+
+            tracked.write_text("0.1.0-alpha.2\n", encoding="utf-8")
+            subprocess.run(["git", "add", "VERSION"], cwd=source, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "test: advance source"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+            )
+
+            with self.assertRaisesRegex(
+                SystemExit,
+                "source commit changed during bootstrap",
+            ):
+                bootstrap_project.verify_source_checkpoint(source, checkpoint)
+
     def test_bootstrap_rejects_target_inside_aegis_source(self) -> None:
         target = ROOT / ".aegis-audit-forbidden-target"
         result = self.run_tool(BOOTSTRAP, target, "--preset", "core")
