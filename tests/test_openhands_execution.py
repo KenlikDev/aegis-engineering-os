@@ -235,6 +235,32 @@ class OpenHandsExecutionTests(unittest.TestCase):
         self.assertNotIn("llm-secret-value", repr(result))
         self.assertNotIn("event-secret", repr(result))
 
+    def test_real_http_json_response_is_bounded(self) -> None:
+        from openhands_execution import MAX_JSON_RESPONSE_BYTES, _request_json
+
+        class OversizedResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b"{" + b"x" * limit
+
+        class OversizedOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return OversizedResponse()
+
+        with patch("openhands_execution._HTTP_OPENER", OversizedOpener()):
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                f"{MAX_JSON_RESPONSE_BYTES}-byte download limit",
+            ):
+                _request_json("GET", f"{SERVER}/alive", {}, None)
+
     def test_real_http_409_is_returned_for_status_specific_handling(self) -> None:
         response = HTTPError(
             f"{SERVER}/api/conversations/{CID}/run",

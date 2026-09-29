@@ -17,6 +17,7 @@ from validate_ai_config import load_registry, validate_profile_config
 
 
 DEFAULT_TIMEOUT_SECONDS = 5
+MAX_JSON_RESPONSE_BYTES = 1024 * 1024
 
 
 class RuntimePreflightError(RuntimeError):
@@ -47,7 +48,13 @@ def _request_json(
     request = Request(url, headers=request_headers)
     try:
         with _NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read(MAX_JSON_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_JSON_RESPONSE_BYTES:
+                raise RuntimePreflightError(
+                    "Local runtime JSON response exceeds the "
+                    f"{MAX_JSON_RESPONSE_BYTES}-byte download limit."
+                )
+            payload = json.loads(raw.decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RuntimePreflightError(f"Unable to verify local runtime at {url}: {exc}") from exc
 

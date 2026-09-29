@@ -25,6 +25,7 @@ from urllib.request import (
 DEFAULT_OPENHANDS_VERSION = "1.49.5"
 DEFAULT_TIMEOUT_SECONDS = 3600.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
+MAX_JSON_RESPONSE_BYTES = 1024 * 1024
 DEFAULT_WORKSPACE_ROOT = "/projects"
 
 TERMINAL_STATUSES = frozenset({"finished", "error", "stuck"})
@@ -117,7 +118,12 @@ def _request_json(
     request = Request(url, data=body, headers=dict(request_headers), method=method)
     try:
         with _HTTP_OPENER.open(request, timeout=timeout) as response:
-            raw = response.read()
+            raw = response.read(MAX_JSON_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_JSON_RESPONSE_BYTES:
+                raise OpenHandsExecutionError(
+                    "OpenHands JSON response exceeds the "
+                    f"{MAX_JSON_RESPONSE_BYTES}-byte download limit."
+                )
             if not raw:
                 return response.status, {}
             parsed = json.loads(raw.decode("utf-8"))
