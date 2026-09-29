@@ -255,36 +255,71 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
         )
         return
 
-    shared_header_call = any(
+    def contains_api_version_header(expression: ast.AST | None) -> bool:
+        if expression is None:
+            return False
+        for child in ast.walk(expression):
+            if isinstance(child, ast.Call) and (
+                (
+                    isinstance(child.func, ast.Name)
+                    and child.func.id == "github_api_headers"
+                )
+                or (
+                    isinstance(child.func, ast.Attribute)
+                    and child.func.attr == "github_api_headers"
+                )
+            ):
+                return True
+            if isinstance(child, ast.Dict):
+                if any(
+                    isinstance(key, ast.Constant)
+                    and key.value == API_VERSION_HEADER
+                    for key in child.keys
+                ):
+                    return True
+        return False
+
+    header_assignments: dict[str, tuple[int, bool]] = {}
+    for node in sorted(
+        (candidate for candidate in ast.walk(tree) if isinstance(candidate, ast.Assign)),
+        key=lambda candidate: candidate.lineno,
+    ):
+        compliant = contains_api_version_header(node.value)
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                header_assignments[target.id] = (node.lineno, compliant)
+
+    def request_headers_are_compliant(expression: ast.AST | None, line: int) -> bool:
+        if expression is None:
+            return False
+        for child in ast.walk(expression):
+            if isinstance(child, ast.Name):
+                assignment = header_assignments.get(child.id)
+                if assignment is not None and assignment[0] < line and assignment[1]:
+                    return True
+            if contains_api_version_header(child):
+                return True
+        return False
+
+    request_has_compliant_headers = any(
         isinstance(node, ast.Call)
         and (
-            (
-                isinstance(node.func, ast.Name)
-                and node.func.id == "github_api_headers"
-            )
-            or (
-                isinstance(node.func, ast.Attribute)
-                and node.func.attr == "github_api_headers"
-            )
+            (isinstance(node.func, ast.Name) and node.func.id == "Request")
+            or (isinstance(node.func, ast.Attribute) and node.func.attr == "Request")
+        )
+        and request_headers_are_compliant(
+            next((keyword.value for keyword in node.keywords if keyword.arg == "headers"), None),
+            node.lineno,
         )
         for node in ast.walk(tree)
     )
-    explicit_header_mapping = any(
-        isinstance(node, ast.Dict)
-        and any(
-            isinstance(key, ast.Constant)
-            and key.value == API_VERSION_HEADER
-            for key in node.keys
-        )
-        for node in ast.walk(tree)
-    )
+
     relative_path = path.relative_to(root).as_posix()
     is_shared_header_policy_module = relative_path == "tools/github_http_security.py"
     if (
         GITHUB_API_RE.search(text)
         and not is_shared_header_policy_module
-        and not shared_header_call
-        and not explicit_header_mapping
+        and not request_has_compliant_headers
     ):
         _finding(
             findings,

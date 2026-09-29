@@ -67,9 +67,9 @@ Release readiness follows the same GitHub credential destination policy as the o
 
 ## Security-review executable API-version header check
 
-For Python sources, the GitHub API-version rule is evaluated after AST parsing. A shared-header exemption is valid only when `github_api_headers()` appears as an executable call node; comments, docstrings, and string literals do not satisfy the control.
+For Python sources, the GitHub API-version rule is evaluated after AST parsing and follows the executable request sink. A shared-header exemption is valid only when `github_api_headers()` reaches a `Request(..., headers=...)` expression; comments, docstrings, unused calls, and unused variables do not satisfy the control.
 
-A direct `X-GitHub-Api-Version` exemption is valid only when the header appears as an executable dictionary key in the AST. The shared `tools/github_http_security.py` module is a policy-definition surface rather than a GitHub API consumer, so the consumer rule intentionally excludes that exact path while reviewing all other Python sources.
+A direct `X-GitHub-Api-Version` exemption is valid only when the header appears in the executable request headers, either directly or through a simple assigned mapping that reaches `Request(..., headers=...)`. The shared `tools/github_http_security.py` module is a policy-definition surface rather than a GitHub API consumer, so the consumer rule intentionally excludes that exact path while reviewing all other Python sources.
 
 For workflow files, the API-version check remains a textual workflow-level check because YAML is not executed by the Python AST analyzer. Workflows that reference `https://api.github.com` must also contain the explicit `X-GitHub-Api-Version` header. YAML comments do not satisfy this requirement; the check ignores comment text while preserving quoted content.
 

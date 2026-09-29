@@ -3,6 +3,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -10,6 +11,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from release_readiness import (  # noqa: E402
     GitHubReleaseReadinessProvider,
     ReleaseReadinessError,
+    _default_transport,
     assess_release_readiness,
 )
 
@@ -143,6 +145,32 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertFalse(result.changelog.unreleased_content_present)
         self.assertEqual(0, len(result.blockers))
         self.assertTrue(all(request[0] == "GET" for request in transport.requests))
+
+    def test_default_transport_adds_required_api_version_header(self):
+        class FakeResponse:
+            status = 200
+
+            def read(self, limit):
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+        with patch("release_readiness._HTTP_OPENER.open", return_value=FakeResponse()) as open_request:
+            _default_transport(
+                "GET",
+                "https://api.github.com/repos/example/project",
+                {"Authorization": "Bearer test-token"},
+            )
+
+        request = open_request.call_args.args[0]
+        self.assertEqual(
+            "2026-03-10",
+            request.get_header("X-github-api-version"),
+        )
 
     def test_blocks_unreleased_notes(self):
         changelog = (
