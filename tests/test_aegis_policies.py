@@ -106,6 +106,42 @@ class AegisPolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "relative source path"):
                 bootstrap_project.load_source_metadata(root)
 
+
+    def test_bootstrap_rejects_registry_traversal_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            (root / "aegis-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "repository": "test",
+                        "default_work_item_provider": "github",
+                        "work_item_strategy": "issues",
+                        "optional_integrations": [],
+                        "active_knowledge_model": "repository",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            skills = root / "skills"
+            skills.mkdir()
+            outside = root.parent / f"{root.name}-outside.md"
+            outside.write_text("outside\n", encoding="utf-8")
+            self.addCleanup(outside.unlink, missing_ok=True)
+            (skills / "registry.json").write_text(
+                json.dumps(
+                    {
+                        "version": "0.1.0-alpha.1",
+                        "skills": [{"name": "external", "path": "../%s"} % outside.name],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(SystemExit, "relative source path"):
+                bootstrap_project.load_source_metadata(root)
+
     def test_bootstrap_rejects_registry_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
