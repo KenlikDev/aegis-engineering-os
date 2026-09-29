@@ -387,10 +387,16 @@ class AegisPolicyTests(unittest.TestCase):
                     dst_dir_fd=dst_dir_fd,
                 )
 
-            with patch("evidence_contract.os.replace", side_effect=race_replace):
-                result = self.run_tool(BOOTSTRAP, project, "--preset", "core")
+            import bootstrap_project  # noqa: E402
 
-            self.assertEqual(0, result.returncode, result.stderr)
+            with patch("evidence_contract.os.replace", side_effect=race_replace):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [str(BOOTSTRAP), str(project), "--preset", "core"],
+                ):
+                    self.assertEqual(0, bootstrap_project.main())
+
             self.assertTrue(race_triggered)
             skill = project / ".agents" / "skills" / "aegis-orchestrator" / "SKILL.md"
             self.assertFalse(skill.is_symlink())
