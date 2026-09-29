@@ -111,3 +111,8 @@ A readiness result is evidence, not a merge authorization. Protected-branch poli
 `tools/requirements_clarification.py` is the executable read-only boundary between intake and planning. It checks the canonical work-item format for a concrete title, intent, in-scope/out-of-scope boundaries, observable acceptance criteria, and verification plan. Missing dependencies or risks are reported as warnings because some tasks legitimately have none.
 
 A blocker result means the work item must not silently advance to `ready`. The tool emits deterministic questions rather than selecting the missing business or technical decision. This preserves user ownership of scope, acceptance, priorities, and commitments.
+
+
+## GitHub credential destination
+
+GitHub Issues lifecycle persistence sends bearer credentials only to the exact `https://api.github.com` API origin. Arbitrary HTTPS hosts are not accepted as API destinations.
