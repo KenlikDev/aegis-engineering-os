@@ -32,29 +32,21 @@ tools/promotion_snapshot.py is the write boundary.
 
 The operation is intentionally conservative:
 
-The snapshot mutation order is intentionally transactional at the branch-publication boundary:
-
-1. create the immutable snapshot commit with the exact target SHA, integration SHA, and integration tree;
-2. reread the protected target and require its SHA to remain unchanged;
-3. create the promotion branch directly at the snapshot commit SHA;
-4. verify the branch commit, parents, and tree.
-
-The branch is never intentionally published first at the protected target SHA. Therefore a snapshot-commit failure cannot leave an incomplete promotion branch that blocks a later retry.
-
-
 1. run the readiness gate;
-2. reread the source and target commit objects;
-3. verify that target is an ancestor of the source;
-4. create the short-lived branch ai/<work-item>-<target>-promotion from the exact target SHA;
-5. create one snapshot commit with:
-   - first parent = exact target SHA;
-   - second parent = exact ai/integration SHA;
-   - tree = exact ai/integration tree;
-6. move the promotion branch forward without force;
+2. capture the exact source and protected target commit snapshots returned by that readiness observation;
+3. verify that target is an ancestor of the validated source;
+4. create one immutable snapshot commit with:
+   - first parent = exact protected target SHA;
+   - second parent = exact validated ai/integration SHA;
+   - tree = exact tree of that validated source commit;
+5. reread both source and protected target branches and require their SHAs to remain equal to the validated readiness snapshot;
+6. create the short-lived branch ai/<work-item>-<target>-promotion directly at the snapshot commit SHA;
 7. verify the branch commit, parents, and tree;
-8. verify that the target branch did not change while preparing the snapshot;
-9. create or reuse one open pull request into the selected target;
-10. return structured metadata without credentials.
+8. create or reuse one open pull request into the selected target;
+9. return structured metadata without credentials.
+
+The branch is never intentionally published first at the protected target SHA. A source or target change during preparation therefore fails closed before the promotion branch is published. A snapshot commit is bound to the exact source revision for which promotion readiness verified Aegis Validation.
+
 
 The resulting commit represents the verified integration state as a target-based promotion artifact. Because the target is required to be an ancestor, no merge conflict needs to be resolved by Aegis.
 

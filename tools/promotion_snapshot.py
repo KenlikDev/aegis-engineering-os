@@ -17,6 +17,7 @@ from promotion_readiness import (
     DEFAULT_SOURCE_BRANCH,
     DEFAULT_WORKFLOW,
     GitHubPromotionProvider,
+    PromotionReadiness,
     PromotionReadinessError,
 )
 
@@ -46,7 +47,7 @@ class PromotionSnapshotProvider(Protocol):
         source_branch: str,
         target_branch: str,
         workflow: str,
-    ) -> None: ...
+    ) -> PromotionReadiness: ...
 
     def get_commit(self, ref: str) -> GitCommitSnapshot: ...
 
@@ -64,8 +65,6 @@ class PromotionSnapshotProvider(Protocol):
         target_sha: str,
         source_sha: str,
     ) -> str: ...
-
-    def update_ref(self, branch: str, sha: str) -> None: ...
 
     def list_open_pull_requests(
         self,
@@ -218,7 +217,7 @@ class GitHubPromotionSnapshotProvider:
         source_branch: str,
         target_branch: str,
         workflow: str,
-    ) -> None:
+    ) -> PromotionReadiness:
         result = self._readiness_provider().assess(
             source_branch=source_branch,
             target_branch=target_branch,
@@ -228,6 +227,7 @@ class GitHubPromotionSnapshotProvider:
             raise PromotionSnapshotError(
                 "Promotion readiness is blocked: " + "; ".join(result.blockers)
             )
+        return result
 
     def _request(
         self,
@@ -336,18 +336,6 @@ class GitHubPromotionSnapshotProvider:
                 f"Unable to create promotion snapshot commit; HTTP {status}."
             )
         return self._require_sha(data.get("sha"), "Promotion commit SHA")
-
-    def update_ref(self, branch: str, sha: str) -> None:
-        self._require_sha(sha, "Promotion reference SHA")
-        status, _ = self._request(
-            "PATCH",
-            f"/repos/{self.repository}/git/refs/heads/{quote(branch, safe='')}",
-            {"sha": sha, "force": False},
-        )
-        if status != 200:
-            raise PromotionSnapshotError(
-                f"Unable to update promotion branch {branch!r}; HTTP {status}."
-            )
 
     def list_open_pull_requests(
         self,
@@ -461,18 +449,19 @@ def _ensure_ready(
     provider: PromotionSnapshotProvider,
     request: PromotionSnapshotRequest,
 ) -> tuple[GitCommitSnapshot, GitCommitSnapshot]:
-    provider.assess_readiness(
+    readiness = provider.assess_readiness(
         source_branch=request.source_branch,
         target_branch=request.target_branch,
         workflow=request.workflow,
     )
 
-    source = provider.get_commit(request.source_branch)
-    target = provider.get_commit(request.target_branch)
+    source = provider.get_commit(readiness.source.sha)
+    target = provider.get_commit(readiness.target.sha)
 
-    # The provider reuses the read-only readiness evaluator. The ancestry check
-    # is intentionally performed after fresh commit reads so a target that moved
-    # during the readiness window cannot be silently accepted.
+    if source.sha != readiness.source.sha or target.sha != readiness.target.sha:
+        raise PromotionSnapshotError(
+            "Promotion readiness commit identity changed while loading the validated snapshot."
+        )
     if source.sha == target.sha:
         raise PromotionSnapshotError("Promotion contains no delta.")
     if not provider.is_ancestor(target.sha, source.sha):
@@ -515,7 +504,12 @@ def prepare_promotion_snapshot(
             source_sha=source.sha,
         )
 
+        current_source = provider.get_commit(request.source_branch)
         current_target = provider.get_commit(request.target_branch)
+        if current_source.sha != source.sha:
+            raise PromotionSnapshotError(
+                "ai/integration changed while the promotion snapshot was being prepared."
+            )
         if current_target.sha != target.sha:
             raise PromotionSnapshotError(
                 f"{request.target_branch} changed while the promotion snapshot was being prepared."
@@ -534,13 +528,6 @@ def prepare_promotion_snapshot(
         raise PromotionSnapshotError(
             "Promotion branch verification failed after snapshot creation."
         )
-
-    if not branch_reused:
-        current_target = provider.get_commit(request.target_branch)
-        if current_target.sha != target.sha:
-            raise PromotionSnapshotError(
-                f"{request.target_branch} changed after the promotion branch was published."
-            )
 
     existing_prs = provider.list_open_pull_requests(
         head=branch,
