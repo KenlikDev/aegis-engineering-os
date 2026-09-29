@@ -8,6 +8,8 @@ import json
 import re
 import sys
 import uuid
+
+from evidence_contract import EvidenceContractError, load_json_object, write_json_atomically
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -253,38 +255,33 @@ def _record_from_dict(data: Mapping[str, Any]) -> KnowledgeGapRecord:
 
 
 def _read_record(path: Path) -> KnowledgeGapRecord:
+    if path.is_symlink():
+        raise KnowledgeGapError(f"Candidate record must not be a symbolic link: {path}")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = load_json_object(path)
     except FileNotFoundError as exc:
         raise KnowledgeGapError(f"Candidate record does not exist: {path}") from exc
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise KnowledgeGapError(f"Unable to read candidate record: {path}") from exc
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        raise KnowledgeGapError(f"Unable to read candidate record: {path}: {exc}") from exc
     if not isinstance(data, Mapping):
         raise KnowledgeGapError("Knowledge-gap record must contain a top-level object.")
     return _record_from_dict(data)
 
 
 def _write_record(path: Path, record: KnowledgeGapRecord) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     payload = _record_to_dict(record)
     try:
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        write_json_atomically(
+            payload,
+            path,
+            error_type=KnowledgeGapError,
         )
-        temporary.replace(path)
-    except OSError as exc:
-        raise KnowledgeGapError(f"Unable to persist candidate record: {path}") from exc
-    finally:
-        try:
-            temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
+    except (KnowledgeGapError, OSError) as exc:
+        raise KnowledgeGapError(f"Unable to persist candidate record: {path}: {exc}") from exc
 
 
 def _resolve_candidate_path(value: str | Path) -> Path:
-    return Path(value).expanduser().resolve()
+    return Path(value).expanduser()
 
 
 def create_candidate(
