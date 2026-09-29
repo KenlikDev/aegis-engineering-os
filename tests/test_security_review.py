@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, str(ROOT / "tools"))
 
-from security_review import assess_repository  # noqa: E402
+from security_review import SecurityReviewError, assess_repository  # noqa: E402
 from evidence_contract import read_and_validate_evidence  # noqa: E402
 
 
@@ -205,6 +205,48 @@ class SecurityReviewTests(unittest.TestCase):
             self.assertTrue(
                 any(f.rule_id == "git.protected-direct-write" for f in result.findings)
             )
+
+    def test_blocks_symlinked_security_review_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            outside = root.parent / f"{root.name}-outside.py"
+            outside.write_text("SECRET = 'not-a-review-input'\n", encoding="utf-8")
+            link = tools / "linked.py"
+
+            try:
+                link.symlink_to(outside)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"Symbolic links are unavailable: {exc}")
+
+            self.addCleanup(outside.unlink, missing_ok=True)
+
+            with self.assertRaisesRegex(
+                SecurityReviewError,
+                "symbolic link",
+            ):
+                assess_repository(root)
+
+    def test_blocks_symlinked_review_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root.parent / f"{root.name}-tools"
+            outside.mkdir()
+            tools_link = root / "tools"
+
+            try:
+                tools_link.symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"Symbolic links are unavailable: {exc}")
+
+            self.addCleanup(outside.rmdir)
+
+            with self.assertRaisesRegex(
+                Exception,
+                "symbolic link",
+            ):
+                assess_repository(root)
 
     def test_blocks_github_api_without_explicit_version(self):
         with tempfile.TemporaryDirectory() as directory:
