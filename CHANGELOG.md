@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- enforce the canonical evidence 65,536-byte persisted JSON limit at construction and write time;
 - harden installed-project verification against ambiguous state JSON and symlinked Aegis state and skill paths;
 - reject ambiguous release metadata JSON in structural and release-readiness validation;
 - harden knowledge-gap record persistence with strict JSON parsing and anchored atomic writes;
