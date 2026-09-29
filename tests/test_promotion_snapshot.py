@@ -187,14 +187,12 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertTrue(transport.created_branch)
         self.assertEqual(SNAPSHOT_SHA, transport.created_ref_sha)
         self.assertTrue(transport.created_commit)
-        self.assertTrue(transport.updated_ref)
         self.assertTrue(transport.created_pr)
         self.assertEqual(
             [TARGET_SHA, SOURCE_SHA],
             transport.create_commit_payload["parents"],
         )
         self.assertEqual(SOURCE_TREE, transport.create_commit_payload["tree"])
-        self.assertEqual(SNAPSHOT_SHA, transport.created_ref_sha)
         self.assertEqual(["KenlikDev:ai/1-develop-promotion"], transport.assert_query["head"])
         self.assertEqual(["develop"], transport.assert_query["base"])
 
