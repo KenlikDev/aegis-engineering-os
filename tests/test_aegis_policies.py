@@ -359,6 +359,35 @@ class AegisPolicyTests(unittest.TestCase):
             self.assertFalse(list(external.iterdir()))
             self.assertTrue(state_root.is_symlink())
 
+    def test_bootstrap_install_does_not_use_path_based_destination_mkdir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+            destination_parent = (
+                project / ".agents" / "skills" / "aegis-orchestrator"
+            )
+            real_mkdir = Path.mkdir
+
+            def guarded_mkdir(self, *args, **kwargs):
+                if self == destination_parent:
+                    raise AssertionError(
+                        "managed skill installation must use the anchored atomic writer "
+                        "for destination-directory creation"
+                    )
+                return real_mkdir(self, *args, **kwargs)
+
+            with patch.object(Path, "mkdir", guarded_mkdir):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [str(BOOTSTRAP), str(project), "--preset", "core"],
+                ):
+                    self.assertEqual(0, bootstrap_project.main())
+
+            skill = destination_parent / "SKILL.md"
+            self.assertTrue(skill.is_file())
+            self.assertFalse(skill.is_symlink())
+
     def test_bootstrap_managed_skill_install_is_safe_against_destination_symlink_race(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"
