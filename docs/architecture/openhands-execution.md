@@ -33,6 +33,12 @@ The run trigger accepts the \`409 Conflict\` response documented by the installe
 
 Every OpenHands JSON response is bounded to 1 MiB before JSON parsing. A larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
 
+Event history retrieval is additionally bounded to 100 pages and 10,000 accumulated events. A history that exceeds either boundary is rejected rather than being returned as incomplete execution evidence.
+
+Event history retrieval is additionally bounded to 100 pages and 10,000 accumulated events. A history that exceeds either boundary is rejected rather than being returned as incomplete execution evidence.
+
+Every OpenHands JSON response is bounded to 1 MiB before JSON parsing. A larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
+
 ## State handling
 
 The OpenHands Agent Server defines \`finished\`, \`error\`, and \`stuck\` as terminal execution states.
