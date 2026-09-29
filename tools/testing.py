@@ -159,7 +159,11 @@ def run_testing(
                 "work_item": None,
             }
             if evidence_path is not None:
-                destination = Path(evidence_path).expanduser().resolve()
+                destination = Path(evidence_path).expanduser()
+                if destination.is_symlink():
+                    raise TestingWorkflowError(
+                        "Testing evidence output must not be a symbolic link."
+                    )
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text(
                     json.dumps(output, indent=2, sort_keys=True) + "\n",
@@ -186,13 +190,14 @@ def run_testing(
         from evidence_adapters import testing_evidence
         from evidence_contract import write_evidence
 
-        canonical_path = Path(canonical_evidence_path).expanduser().resolve()
+        canonical_path = Path(canonical_evidence_path).expanduser()
+        resolved_canonical_path = canonical_path.resolve()
         specialized_path = (
             Path(evidence_path).expanduser().resolve()
             if evidence_path is not None
             else None
         )
-        if specialized_path is not None and canonical_path == specialized_path:
+        if specialized_path is not None and resolved_canonical_path == specialized_path:
             raise TestingWorkflowError(
                 "Canonical evidence output must differ from the specialized testing evidence output."
             )
