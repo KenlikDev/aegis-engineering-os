@@ -212,6 +212,70 @@ class CIDiagnosisTests(unittest.TestCase):
         self.assertNotIn(secret, bounded)
         self.assertIn("[REDACTED]", _redact(text))
 
+
+    def test_http_job_log_download_is_bounded(self):
+        from ci_diagnosis import GitHubCIDiagnosisProvider, MAX_LOG_DOWNLOAD_BYTES
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, size=-1):
+                self.requested_size = size
+                return b"x" * (MAX_LOG_DOWNLOAD_BYTES + 1)
+
+        response = Response()
+        provider = GitHubCIDiagnosisProvider(
+            REPOSITORY,
+            "test-token",
+            transport=lambda method, url, headers, payload: (200, {}),
+        )
+
+        with patch.object(provider.__class__, "_default_transport"), patch(
+            "ci_diagnosis._LOG_HTTP_OPENER.open",
+            return_value=response,
+        ):
+            with self.assertRaisesRegex(
+                CIDiagnosisError,
+                "download limit",
+            ):
+                provider._download_job_log(101)
+
+        self.assertEqual(MAX_LOG_DOWNLOAD_BYTES + 1, response.requested_size)
+
+    def test_http_job_log_download_accepts_limit_sized_response(self):
+        from ci_diagnosis import GitHubCIDiagnosisProvider, MAX_LOG_DOWNLOAD_BYTES
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, size=-1):
+                self.requested_size = size
+                return b"x" * MAX_LOG_DOWNLOAD_BYTES
+
+        response = Response()
+        provider = GitHubCIDiagnosisProvider(
+            REPOSITORY,
+            "test-token",
+            transport=lambda method, url, headers, payload: (200, {}),
+        )
+
+        with patch(
+            "ci_diagnosis._LOG_HTTP_OPENER.open",
+            return_value=response,
+        ):
+            result = provider._download_job_log(101)
+
+        self.assertEqual(MAX_LOG_DOWNLOAD_BYTES, len(result.encode("utf-8")))
+        self.assertEqual(MAX_LOG_DOWNLOAD_BYTES + 1, response.requested_size)
+
     def test_invalid_log_limit_fails_closed(self):
         with self.assertRaisesRegex(CIDiagnosisError, "Log limit"):
             _bounded_excerpt("log", limit=0)
