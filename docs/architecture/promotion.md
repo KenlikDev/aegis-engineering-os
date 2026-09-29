@@ -45,14 +45,14 @@ The branch is never intentionally published first at the protected target SHA. T
 1. run the readiness gate;
 2. reread the source and target commit objects;
 3. verify that target is an ancestor of the source;
-4. create the short-lived branch ai/<work-item>-<target>-promotion from the exact target SHA;
-5. create one snapshot commit with:
-   - first parent = exact target SHA;
-   - second parent = exact ai/integration SHA;
-   - tree = exact ai/integration tree;
-6. move the promotion branch forward without force;
+4. create one immutable snapshot commit with:
+   - first parent = exact protected target SHA;
+   - second parent = exact validated ai/integration SHA from the readiness result;
+   - tree = exact tree of that validated source commit;
+5. reread both source and protected target branches and require their SHAs to remain equal to the readiness snapshot;
+6. create the short-lived branch ai/<work-item>-<target>-promotion directly at the snapshot commit SHA;
 7. verify the branch commit, parents, and tree;
-8. verify that the target branch did not change while preparing the snapshot;
+8. verify that the validated source revision and protected target revision did not change before branch publication;
 9. create or reuse one open pull request into the selected target;
 10. return structured metadata without credentials.
 
