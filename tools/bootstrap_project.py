@@ -654,7 +654,6 @@ def main() -> int:
         for name in sorted(selected):
             staged = stage_root / name / "SKILL.md"
             destination = target_root / name / "SKILL.md"
-            destination.parent.mkdir(parents=True, exist_ok=True)
             copy_file_atomically(
                 staged,
                 destination,
