@@ -72,6 +72,28 @@ class GitHubHttpSecurityTests(unittest.TestCase):
                 self.assertNotIn("response.read()", source)
                 self.assertNotIn("exc.read()", source)
 
+    def test_github_adapters_use_shared_baseline_headers(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        adapters = (
+            "tools/delivery.py",
+            "tools/integration_merge.py",
+            "tools/promotion_snapshot.py",
+            "tools/promotion_readiness.py",
+            "tools/promotion_sync.py",
+            "tools/work_item_lifecycle.py",
+            "tools/release_readiness.py",
+            "tools/ci_diagnosis.py",
+        )
+
+        for relative_path in adapters:
+            with self.subTest(adapter=relative_path):
+                source = (root / relative_path).read_text(encoding="utf-8")
+                self.assertIn("github_api_headers()", source)
+                self.assertNotIn('"X-GitHub-Api-Version":', source)
+                self.assertNotIn('GITHUB_API_VERSION =', source)
+
     def test_bounds_response_reads(self):
         from github_http_security import MAX_GITHUB_JSON_BYTES, read_bounded_response
 
