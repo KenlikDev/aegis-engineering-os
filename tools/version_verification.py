@@ -182,6 +182,10 @@ def record_version_evidence(
     )
 
     destination = Path(output_path).expanduser()
+    if destination.is_symlink():
+        raise VersionVerificationError(
+            "Version evidence output must not be a symbolic link."
+        )
     if not destination.is_absolute():
         destination = root / destination
     destination = destination.resolve()
