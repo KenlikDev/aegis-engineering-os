@@ -20,6 +20,18 @@ class ValidationWorkflowContractTests(unittest.TestCase):
             self.workflow,
         )
 
+    def test_checks_out_exact_pull_request_head_for_open_events(self):
+        self.assertIn(
+            "github.event.pull_request.head.sha ||",
+            self.workflow,
+        )
+
+    def test_verifies_exact_pull_request_head_checkout(self):
+        self.assertIn(
+            'test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"',
+            self.workflow,
+        )
+
     def test_checks_out_actual_merge_commit_for_closed_merged_pr(self):
         self.assertIn(
             "github.event.pull_request.merge_commit_sha || github.sha",
