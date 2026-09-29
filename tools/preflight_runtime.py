@@ -17,6 +17,7 @@ from validate_ai_config import load_registry, validate_profile_config
 
 
 DEFAULT_TIMEOUT_SECONDS = 5
+MAX_JSON_RESPONSE_BYTES = 1024 * 1024
 
 
 class RuntimePreflightError(RuntimeError):
