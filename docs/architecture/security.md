@@ -65,6 +65,12 @@ The read-only CI diagnosis GitHub adapter follows the same credential destinatio
 Release readiness follows the same GitHub credential destination policy as the other GitHub adapters: bearer credentials are restricted to the exact `https://api.github.com` origin.
 
 
+## Security-review executable API-header check
+
+For Python sources, the GitHub API-version rule is evaluated after AST parsing. A shared-header exemption is valid only when `github_api_headers()` appears as an executable call node; comments, docstrings, and string literals do not satisfy the control.
+
+The explicit `X-GitHub-Api-Version` path remains supported for code that constructs its request headers directly.
+
 ## GitHub REST transport baseline headers
 
 All credential-bearing GitHub REST adapters use the shared `tools/github_http_security.py::github_api_headers()` helper for the mandatory API media type and explicit GitHub API version. Adapter-specific headers such as `Authorization` and `Content-Type` remain local to the request boundary.
