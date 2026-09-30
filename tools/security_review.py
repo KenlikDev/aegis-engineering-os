@@ -322,7 +322,7 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                     return True
         return False
 
-    header_assignments: dict[str, tuple[int, bool]] = {}
+    header_assignments: dict[str, list[tuple[int, bool]]] = {}
     for node in sorted(
         (candidate for candidate in ast.walk(tree) if isinstance(candidate, ast.Assign)),
         key=lambda candidate: candidate.lineno,
@@ -330,15 +330,21 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
         compliant = contains_api_version_header(node.value)
         for target in node.targets:
             if isinstance(target, ast.Name):
-                header_assignments[target.id] = (node.lineno, compliant)
+                header_assignments.setdefault(target.id, []).append(
+                    (node.lineno, compliant)
+                )
 
     def request_headers_are_compliant(expression: ast.AST | None, line: int) -> bool:
         if expression is None:
             return False
         for child in ast.walk(expression):
             if isinstance(child, ast.Name):
-                assignment = header_assignments.get(child.id)
-                if assignment is not None and assignment[0] < line and assignment[1]:
+                assignments = [
+                    compliant
+                    for assignment_line, compliant in header_assignments.get(child.id, [])
+                    if assignment_line < line
+                ]
+                if assignments and all(assignments):
                     return True
             if contains_api_version_header(child):
                 return True
