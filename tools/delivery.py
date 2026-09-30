@@ -287,6 +287,15 @@ class GitHubPullRequestProvider:
             base_repository=base_repo["full_name"],
         )
 
+    def _validate_repository_origin(self, pull_request: PullRequest) -> None:
+        if (
+            pull_request.head_repository != self.repository
+            or pull_request.base_repository != self.repository
+        ):
+            raise DeliveryError(
+                "GitHub pull-request head and base repositories must match the configured repository."
+            )
+
     def get(self, pull_request_number: int) -> PullRequest:
         status, data = self._request(
             "GET",
