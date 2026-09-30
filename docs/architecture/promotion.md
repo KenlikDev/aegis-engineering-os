@@ -17,7 +17,7 @@ Before any promotion write, Aegis verifies:
 - both branches are protected;
 - the current source and target SHAs are captured;
 - the source has successful Aegis Validation evidence for that exact source SHA; an exact integration push run is preferred, while a successful merged-PR validation may be accepted only when its actual merge commit equals the current source SHA;
-- the source contains a positive promotable delta beyond the target, including at least one changed file; `ahead` is the normal ancestry shape, while `diverged` is expected after squash-based human promotion. History-only divergence with zero changed files is not a promotable delta;
+- the source contains a positive promotable delta beyond the target, including at least one changed file; the GitHub compare relationship must also be internally consistent (`ahead`, `behind`, `diverged`, or `identical` must agree with their commit counts);
 - optional expected SHAs still match the fresh state.
 
 A readiness result is evidence, not permission to merge.
@@ -34,7 +34,7 @@ The operation is intentionally conservative:
 
 1. run the readiness gate;
 2. capture the exact source and protected target commit snapshots returned by that readiness observation;
-3. verify that the source contains a positive promotable delta beyond the target, including at least one changed file; an ancestry `diverged` result is allowed after squash-based human promotion;
+3. verify that the source contains a positive promotable delta beyond the target, including at least one changed file, and that the compare response has a consistent relationship status and commit counts; an ancestry `diverged` result is allowed after squash-based human promotion;
 4. create one immutable snapshot commit with:
    - first parent = exact protected target SHA;
    - second parent = exact validated ai/integration SHA;

@@ -207,6 +207,34 @@ class GitHubPromotionProvider:
             or any(not isinstance(data.get(field), int) for field in fields[1:])
         ):
             raise PromotionReadinessError("GitHub compare response is malformed.")
+
+        ahead_by = data["ahead_by"]
+        behind_by = data["behind_by"]
+        total_commits = data["total_commits"]
+        if ahead_by < 0 or behind_by < 0 or total_commits < 0:
+            raise PromotionReadinessError("GitHub compare response contains negative commit counts.")
+
+        status = data["status"]
+        relationship_valid = (
+            (status == "identical" and ahead_by == 0 and behind_by == 0)
+            or (status == "ahead" and ahead_by > 0 and behind_by == 0)
+            or (status == "behind" and ahead_by == 0 and behind_by > 0)
+            or (status == "diverged" and ahead_by > 0 and behind_by > 0)
+        )
+        if not relationship_valid:
+            raise PromotionReadinessError(
+                "GitHub compare response has an inconsistent status and commit-count relationship."
+            )
+
+        if total_commits == 0 and status != "identical":
+            raise PromotionReadinessError(
+                "GitHub compare response has zero total commits for a non-identical relationship."
+            )
+        if total_commits > 0 and status == "identical":
+            raise PromotionReadinessError(
+                "GitHub compare response reports commits for an identical relationship."
+            )
+
         files = data.get("files", [])
         if not isinstance(files, list):
             raise PromotionReadinessError("GitHub compare files response is malformed.")
