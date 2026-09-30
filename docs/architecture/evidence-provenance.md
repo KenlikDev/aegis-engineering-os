@@ -1,5 +1,13 @@
 # Evidence Provenance Architecture
 
+## Pull-request origin provenance
+
+For integration and promotion evidence that is reported as `verified`, the canonical result preserves the GitHub pull-request source and target repository identities.
+
+The adapters require both identities to equal the configured repository. This keeps repository ownership verification visible to downstream consumers instead of reducing the observation to branch names and commit SHAs alone.
+
+A missing or foreign repository identity fails canonicalization for verified evidence. Non-merged observations remain `unknown` and do not require a successful promotion or integration ownership claim.
+
 ## Purpose
 
 Aegis needs a provider-neutral way to persist material observations without confusing an observation with the operation that produced it.
