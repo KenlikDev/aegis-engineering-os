@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
+import stat
 import sys
 from pathlib import Path
 
-from evidence_contract import EvidenceContractError, load_json_object
+from evidence_contract import EvidenceContractError, parse_json_object
 
 
 STATE_SCHEMA_VERSION = 2
@@ -23,11 +25,88 @@ def fail(message: str) -> int:
     return 1
 
 
+def _open_regular_file_no_follow(path: Path) -> int:
+    """Open one regular file through no-follow directory file descriptors."""
+    if (
+        os.name != "posix"
+        or not hasattr(os, "O_DIRECTORY")
+        or not hasattr(os, "O_NOFOLLOW")
+    ):
+        raise OSError(
+            "Secure verifier reads require POSIX directory-FD and no-follow support."
+        )
+
+    absolute = Path(os.path.abspath(path))
+    if absolute == Path(absolute.anchor):
+        raise OSError(f"Verifier input must identify a file path: {path}")
+
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    directory_fd = os.open(absolute.anchor, flags)
+    try:
+        for component in absolute.parent.parts:
+            if component == absolute.anchor:
+                continue
+            next_fd = os.open(component, flags, dir_fd=directory_fd)
+            os.close(directory_fd)
+            directory_fd = next_fd
+
+        file_fd = os.open(
+            absolute.name,
+            os.O_RDONLY | os.O_NOFOLLOW,
+            dir_fd=directory_fd,
+        )
+        file_stat = os.fstat(file_fd)
+        if not stat.S_ISREG(file_stat.st_mode):
+            os.close(file_fd)
+            raise OSError(f"Verifier input must be a regular file: {path}")
+        return file_fd
+    except Exception:
+        os.close(directory_fd)
+        raise
+    finally:
+        if "file_fd" in locals() and file_fd >= 0:
+            os.close(directory_fd)
+
+
+def _read_regular_file_no_follow(
+    path: Path,
+    *,
+    max_bytes: int | None = None,
+) -> bytes:
+    """Read one regular file through an anchored no-follow descriptor."""
+    if max_bytes is not None and (not isinstance(max_bytes, int) or max_bytes <= 0):
+        raise ValueError("Maximum verifier input size must be positive.")
+
+    file_fd = _open_regular_file_no_follow(path)
+    try:
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(file_fd, 1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if max_bytes is not None and total > max_bytes:
+                raise OSError(
+                    f"Verifier input exceeds the {max_bytes}-byte limit: {path}"
+                )
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(file_fd)
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+    file_fd = _open_regular_file_no_follow(path)
+    try:
+        while True:
+            chunk = os.read(file_fd, 1024 * 1024)
+            if not chunk:
+                break
             digest.update(chunk)
+    finally:
+        os.close(file_fd)
     return digest.hexdigest()
 
 
@@ -57,8 +136,11 @@ def main() -> int:
         return fail(f"Aegis state file is missing: {state_path}")
 
     try:
-        state = load_json_object(state_path)
-    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        state = parse_json_object(
+            _read_regular_file_no_follow(state_path, max_bytes=65536),
+            label="Aegis state JSON",
+        )
+    except (EvidenceContractError, OSError, UnicodeDecodeError, ValueError) as exc:
         return fail(f"Aegis state file is not valid strict JSON: {exc}")
 
     required = (
