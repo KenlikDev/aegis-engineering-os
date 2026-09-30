@@ -28,6 +28,7 @@ REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 SOURCE_RE = re.compile(r"^ai/integration$")
 TARGETS = frozenset({"develop", "main"})
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+COMPARE_STATUSES = frozenset({"ahead", "behind", "diverged", "identical"})
 
 
 class PromotionReadinessError(RuntimeError):
@@ -200,8 +201,10 @@ class GitHubPromotionProvider:
                 f"Unable to compare promotion refs; HTTP {status}."
             )
         fields = ("status", "ahead_by", "behind_by", "total_commits")
-        if not isinstance(data.get("status"), str) or any(
-            not isinstance(data.get(field), int) for field in fields[1:]
+        if (
+            not isinstance(data.get("status"), str)
+            or data["status"] not in COMPARE_STATUSES
+            or any(not isinstance(data.get(field), int) for field in fields[1:])
         ):
             raise PromotionReadinessError("GitHub compare response is malformed.")
         files = data.get("files", [])
@@ -478,11 +481,11 @@ class GitHubPromotionProvider:
             blockers.append(f"{target_branch} changed since the promotion snapshot.")
 
         comparison = self.compare(target.sha, source.sha)
-        if comparison.behind_by != 0:
+        if comparison.status == "behind":
             blockers.append(
                 f"ai/integration is behind {target_branch} by {comparison.behind_by} commit(s)."
             )
-        if comparison.ahead_by == 0:
+        elif comparison.ahead_by == 0:
             blockers.append("Promotion contains no commits beyond the target branch.")
         validation = self.latest_successful_validation(workflow, source.sha)
         if validation is None:
