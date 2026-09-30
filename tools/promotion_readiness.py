@@ -487,6 +487,8 @@ class GitHubPromotionProvider:
             )
         elif comparison.ahead_by == 0:
             blockers.append("Promotion contains no commits beyond the target branch.")
+        elif comparison.changed_files_reported == 0:
+            blockers.append("Promotion contains history-only divergence with no changed files.")
         validation = self.latest_successful_validation(workflow, source.sha)
         if validation is None:
             blockers.append(
