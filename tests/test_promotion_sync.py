@@ -250,7 +250,7 @@ class PromotionSyncTests(unittest.TestCase):
         ):
             sync_promotion_merge(
                 provider,
-                WorkItemProvider(),
+                FakeWorkItemProvider(),
                 "1",
                 PROMOTION_PR,
                 target_branch="main",
