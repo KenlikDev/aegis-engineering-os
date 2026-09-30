@@ -36,6 +36,7 @@ class FakeTransport:
         self.calls: list[tuple[str, str]] = []
         self.target_behind = target_behind
         self.compare_status = compare_status or ("ahead" if target_behind == 0 else "behind")
+        self.changed_files = changed_files
         self.validation_conclusion = validation_conclusion
         self.validation_sha = validation_sha
         self.source_protected = source_protected
@@ -69,7 +70,10 @@ class FakeTransport:
                 "ahead_by": 2 if self.compare_status in {"ahead", "diverged"} else 0,
                 "behind_by": self.target_behind,
                 "total_commits": 2,
-                "files": [{"filename": "one.txt"}, {"filename": "two.txt"}],
+                "files": [
+                    {"filename": f"file-{index}.txt"}
+                    for index in range(self.changed_files)
+                ],
             }
 
         workflow_path_prefix = (
@@ -213,6 +217,22 @@ class PromotionReadinessTests(unittest.TestCase):
         self.assertGreater(result.compare.ahead_by, 0)
         self.assertEqual((), result.blockers)
 
+    def test_history_only_divergence_without_file_delta_blocks(self) -> None:
+        result = self._provider(
+            target_behind=5,
+            compare_status="diverged",
+            changed_files=0,
+        ).assess(
+            source_branch="ai/integration",
+            target_branch="develop",
+            workflow=".github/workflows/validate.yml",
+        )
+
+        self.assertFalse(result.ready)
+        self.assertIn(
+            "history-only divergence with no changed files",
+            result.blockers,
+        )
     def test_source_behind_target_blocks(self) -> None:
         result = self._provider(target_behind=1).assess(
             source_branch="ai/integration",
