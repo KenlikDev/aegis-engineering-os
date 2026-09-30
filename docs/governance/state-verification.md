@@ -54,6 +54,14 @@ Project verification is an independent trust boundary. `tools/verify_project.py`
 
 The verifier does not assume bootstrap created the state safely. It validates the filesystem topology first and then validates the strict state schema and recorded checksums.
 
+## Secure installed-project reads
+
+`tools/verify_project.py` treats filesystem topology checks as a TOCTOU-sensitive boundary. Managed state, skill files, and managed `AGENTS.md` are read through anchored directory file descriptors with `O_NOFOLLOW`, and the final object is verified as a regular file from the opened descriptor.
+
+The earlier `is_symlink()` checks remain useful for deterministic diagnostics but are not the security primitive by themselves. A concurrent path substitution cannot redirect the verified read through a symlinked file or ancestor directory.
+
+
+
 ## Mutation verification
 
 A successful write response is not sufficient proof that the intended state now exists when the system supports read-after-write verification.
