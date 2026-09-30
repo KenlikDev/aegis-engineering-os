@@ -123,7 +123,7 @@ def _default_transport(
         except (UnicodeDecodeError, json.JSONDecodeError):
             data = {}
         return exc.code, data
-    except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
         raise PromotionReadinessError(
             "Unable to communicate with GitHub API."
         ) from exc
