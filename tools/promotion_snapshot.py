@@ -174,7 +174,7 @@ def _default_transport(
         raw = read_bounded_response(exc)
         try:
             data = parse_github_json(raw) if raw else {}
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except ValueError:
             data = {}
         return exc.code, data
     except (URLError, TimeoutError, OSError, ValueError) as exc:

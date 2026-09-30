@@ -1,4 +1,14 @@
+import importlib
+import io
+import sys
 import unittest
+from pathlib import Path
+from urllib.error import HTTPError
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
 
 
 class GitHubHttpSecurityTests(unittest.TestCase):
@@ -93,6 +103,91 @@ class GitHubHttpSecurityTests(unittest.TestCase):
                 self.assertIn("github_api_headers()", source)
                 self.assertNotIn('"X-GitHub-Api-Version":', source)
                 self.assertNotIn('GITHUB_API_VERSION =', source)
+
+    def test_http_error_bodies_with_strict_parse_failures_preserve_status(self):
+        adapters = (
+            "delivery",
+            "integration_merge",
+            "promotion_readiness",
+            "promotion_snapshot",
+            "promotion_sync",
+            "release_readiness",
+            "ci_diagnosis",
+        )
+        bodies = (
+            b"<html>upstream gateway error</html>",
+            b'{"message":"bad","message":"worse"}',
+        )
+
+        for module_name in adapters:
+            with self.subTest(adapter=module_name):
+                module = importlib.import_module(module_name)
+                for body in bodies:
+                    with self.subTest(body=body):
+                        error = HTTPError(
+                            "https://api.github.com/repos/KenlikDev/aegis-engineering-os",
+                            502,
+                            "Bad Gateway",
+                            {},
+                            io.BytesIO(body),
+                        )
+                        with patch.object(
+                            module._HTTP_OPENER,
+                            "open",
+                            side_effect=error,
+                        ):
+                            if module_name == "release_readiness":
+                                result = module._default_transport(
+                                    "GET",
+                                    "https://api.github.com/repos/KenlikDev/aegis-engineering-os",
+                                    {},
+                                )
+                            elif module_name == "ci_diagnosis":
+                                provider = module.GitHubCIDiagnosisProvider(
+                                    "KenlikDev/aegis-engineering-os",
+                                    "secret-token",
+                                )
+                                result = provider._default_transport(
+                                    "GET",
+                                    "https://api.github.com/repos/KenlikDev/aegis-engineering-os",
+                                    {},
+                                    None,
+                                )
+                            else:
+                                result = module._default_transport(
+                                    "GET",
+                                    "https://api.github.com/repos/KenlikDev/aegis-engineering-os",
+                                    {},
+                                    None,
+                                )
+
+                        self.assertEqual((502, {}), result)
+
+    def test_work_item_lifecycle_fails_closed_on_strict_http_error_parse_failure(self):
+        from http.client import HTTPMessage
+
+        module = importlib.import_module("work_item_lifecycle")
+        error = HTTPError(
+            "https://api.github.com/repos/KenlikDev/aegis-engineering-os",
+            502,
+            "Bad Gateway",
+            HTTPMessage(),
+            io.BytesIO(b"<html>upstream gateway error</html>"),
+        )
+        provider = module.GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "secret-token",
+        )
+
+        with patch.object(module._HTTP_OPENER, "open", side_effect=error):
+            with self.assertRaisesRegex(
+                module.WorkItemLifecycleError,
+                "invalid JSON error response",
+            ):
+                provider._request(
+                    "GET",
+                    "/repos/KenlikDev/aegis-engineering-os/issues/1",
+                )
 
     def test_parses_strict_github_json(self):
         from github_http_security import parse_github_json
