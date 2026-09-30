@@ -426,16 +426,7 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                     line=node.lineno,
                 )
 
-        if not github_request_sinks and not any(
-            request_headers_are_compliant(
-                next(
-                    (keyword.value for keyword in node.keywords if keyword.arg == "headers"),
-                    None,
-                ),
-                node.lineno,
-            )
-            for node, _ in request_sinks
-        ):
+        if not github_request_sinks:
             _finding(
                 findings,
                 rule_id="github.api-version",
@@ -456,17 +447,25 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
 
         if owner_name == "subprocess":
             for keyword in node.keywords:
-                if keyword.arg == "shell" and isinstance(keyword.value, ast.Constant):
-                    if keyword.value.value is True:
-                        _finding(
-                            findings,
-                            rule_id="python.subprocess-shell",
-                            severity=HIGH,
-                            path=path,
-                            root=root,
-                            message="subprocess execution with shell=True crosses the command-injection boundary.",
-                            line=node.lineno,
-                        )
+                if keyword.arg != "shell":
+                    continue
+                shell_is_literal_false = (
+                    isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value is False
+                )
+                if not shell_is_literal_false:
+                    _finding(
+                        findings,
+                        rule_id="python.subprocess-shell",
+                        severity=HIGH,
+                        path=path,
+                        root=root,
+                        message=(
+                            "subprocess shell execution must be statically proven false; "
+                            "dynamic or truthy shell settings cross the command-injection boundary."
+                        ),
+                        line=node.lineno,
+                    )
 
             constants = [
                 child.value
