@@ -47,6 +47,8 @@ def work_items(state=LifecycleState.REVIEW):
 
 
 class FakePullRequestProvider:
+    repository = REPOSITORY
+
     def __init__(self):
         self.created = []
         self.pull_request = PullRequest(
@@ -299,6 +301,8 @@ class IntegrationDeliveryTests(unittest.TestCase):
                     draft=value.draft,
                     mergeable_state=value.mergeable_state,
                     merge_commit_sha=value.merge_commit_sha,
+                    head_repository=REPOSITORY,
+                    base_repository=REPOSITORY,
                 )
             return value
 
@@ -325,6 +329,8 @@ class IntegrationDeliveryTests(unittest.TestCase):
             draft=False,
             mergeable_state="unknown",
             merge_commit_sha=MERGE,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
 
         result = deliver_to_integration(
