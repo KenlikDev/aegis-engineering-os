@@ -38,6 +38,7 @@ class FakeTransport:
         self.target_behind = target_behind
         self.compare_status = compare_status or ("ahead" if target_behind == 0 else "behind")
         self.changed_files = changed_files
+        self.ahead_by = 2 if self.compare_status in {"ahead", "diverged"} else 0
         self.validation_conclusion = validation_conclusion
         self.validation_sha = validation_sha
         self.source_protected = source_protected
@@ -68,7 +69,7 @@ class FakeTransport:
         if path == f"/repos/{REPOSITORY}/compare/{TARGET_SHA}...{SOURCE_SHA}":
             return 200, {
                 "status": self.compare_status,
-                "ahead_by": 2 if self.compare_status in {"ahead", "diverged"} else 0,
+                "ahead_by": self.ahead_by,
                 "behind_by": self.target_behind,
                 "total_commits": 2,
                 "files": [
@@ -234,6 +235,68 @@ class PromotionReadinessTests(unittest.TestCase):
             "Promotion contains history-only divergence with no changed files.",
             result.blockers,
         )
+    def test_rejects_inconsistent_identical_compare(self) -> None:
+        provider = self._provider()
+        original = provider._transport
+
+        def inconsistent_transport(method, url, headers, payload):  # noqa: ANN001
+            path = url.removeprefix("https://api.github.com")
+            if path == f"/repos/{REPOSITORY}/compare/{TARGET_SHA}...{SOURCE_SHA}":
+                return 200, {
+                    "status": "identical",
+                    "ahead_by": 1,
+                    "behind_by": 0,
+                    "total_commits": 1,
+                    "files": [{"filename": "one.txt"}],
+                }
+            return original(method, url, headers, payload)
+
+        provider = GitHubPromotionProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=inconsistent_transport,
+        )
+        with self.assertRaisesRegex(
+            PromotionReadinessError,
+            "inconsistent status and commit-count relationship",
+        ):
+            provider.assess(
+                source_branch="ai/integration",
+                target_branch="develop",
+                workflow=".github/workflows/validate.yml",
+            )
+
+    def test_rejects_negative_compare_counts(self) -> None:
+        provider = self._provider()
+        original = provider._transport
+
+        def invalid_transport(method, url, headers, payload):  # noqa: ANN001
+            path = url.removeprefix("https://api.github.com")
+            if path == f"/repos/{REPOSITORY}/compare/{TARGET_SHA}...{SOURCE_SHA}":
+                return 200, {
+                    "status": "ahead",
+                    "ahead_by": -1,
+                    "behind_by": 0,
+                    "total_commits": 1,
+                    "files": [{"filename": "one.txt"}],
+                }
+            return original(method, url, headers, payload)
+
+        provider = GitHubPromotionProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=invalid_transport,
+        )
+        with self.assertRaisesRegex(
+            PromotionReadinessError,
+            "negative commit counts",
+        ):
+            provider.assess(
+                source_branch="ai/integration",
+                target_branch="develop",
+                workflow=".github/workflows/validate.yml",
+            )
+
     def test_source_behind_target_blocks(self) -> None:
         result = self._provider(target_behind=1).assess(
             source_branch="ai/integration",
