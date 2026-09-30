@@ -12,14 +12,14 @@ tools/release_readiness.py checks:
 
 1. main is the explicit release target;
 2. main is protected;
-3. the current main SHA has a successful Aegis Validation run;
+3. the captured main SHA has a successful Aegis Validation run;
 4. VERSION contains an accepted semantic release version;
 5. VERSION matches aegis-manifest.json;
 6. VERSION matches skills/registry.json;
 7. CHANGELOG.md contains a populated section for the current version;
 8. CHANGELOG.md has no non-empty Unreleased section still awaiting release handling.
 
-The tool reports the exact observed SHA, validation evidence, version values, changelog state, and blockers.
+The tool reports the exact observed SHA, validation evidence, version values, changelog state, and blockers. All release metadata files are read from that exact captured SHA, not from the mutable branch name, and the protected main ref is re-read before the assessment is returned. A branch SHA or protection-state change during the assessment is a hard evaluation failure.
 
 With `--evidence-output`, the same assessment can be persisted through the canonical evidence provenance adapter without changing the existing stdout schema.
 

@@ -262,10 +262,21 @@ def assess_release_readiness(
             "No successful Aegis Validation run exists for the exact main SHA."
         )
 
-    version_text = provider.get_file(VERSION_PATH, target_branch).strip()
-    manifest_text = provider.get_file(MANIFEST_PATH, target_branch)
-    registry_text = provider.get_file(REGISTRY_PATH, target_branch)
-    changelog_text = provider.get_file(CHANGELOG_PATH, target_branch)
+    version_text = provider.get_file(VERSION_PATH, target.sha).strip()
+    manifest_text = provider.get_file(MANIFEST_PATH, target.sha)
+    registry_text = provider.get_file(REGISTRY_PATH, target.sha)
+    changelog_text = provider.get_file(CHANGELOG_PATH, target.sha)
+
+    final_target = provider.get_branch(target_branch)
+    if final_target.sha != target.sha:
+        raise ReleaseReadinessError(
+            f"main changed during release-readiness assessment: "
+            f"observed {final_target.sha}, expected {target.sha}."
+        )
+    if final_target.protected != target.protected:
+        raise ReleaseReadinessError(
+            "main protection state changed during release-readiness assessment."
+        )
 
     try:
         manifest = parse_json_object(
