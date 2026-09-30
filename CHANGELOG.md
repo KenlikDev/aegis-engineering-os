@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- align promotion documentation with the executable squash-divergence readiness contract;
 - harden verifier file-descriptor cleanup so validation errors are preserved deterministically;
 - support repeated squash-based human promotion without treating divergent Git ancestry as an automatic readiness blocker;
 - define human promotion checkpoints for completed engineering stages on develop and release checkpoints on main;

@@ -81,7 +81,7 @@ The snapshot tool never:
 
 Promotion branch writes are followed by read-back verification.
 
-A target that is behind or diverged from ai/integration is intentionally not auto-reconciled. The owner must reconcile that protected branch through the normal protected-branch workflow before another snapshot can be prepared.
+A target that is strictly behind ai/integration is blocked automatically because the source does not contain the full target history. A diverged target is allowed when the source has a positive promotable delta; this is expected after squash-based human promotion. Aegis does not reconcile the protected branch automatically, and the exact target/source diff remains a human review boundary.
 
 ## GitHub API contract
 
