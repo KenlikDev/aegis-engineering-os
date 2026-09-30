@@ -458,6 +458,13 @@ def sync_merged_pull_request(
     pull_request = provider.get(pull_request_number)
     if pull_request.head != expected_head:
         raise DeliveryError("Pull request head does not match the expected Aegis task branch.")
+    if (
+        pull_request.head_repository != getattr(provider, "repository", None)
+        or pull_request.base_repository != getattr(provider, "repository", None)
+    ):
+        raise DeliveryError(
+            "Pull request head and base repositories must match the configured repository."
+        )
     if pull_request.base != integration_branch:
         raise DeliveryError("Pull request base does not match the configured integration branch.")
     if not pull_request.merged or pull_request.state != "closed":
