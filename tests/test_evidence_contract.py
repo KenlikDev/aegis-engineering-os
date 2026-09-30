@@ -167,8 +167,7 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             root = Path(temp)
             external = root / "external"
             external.mkdir()
-            (external / "source.txt").write_text("outside
-", encoding="utf-8")
+            (external / "source.txt").write_text("outside\n", encoding="utf-8")
 
             source_root = root / "source"
             source_root.symlink_to(external, target_is_directory=True)
