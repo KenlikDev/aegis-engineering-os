@@ -29,19 +29,19 @@ A candidate can move from candidate to validated only when:
 - at least one HTTPS evidence reference is supplied;
 - the validation outcome is passed.
 
-Validation evidence is sanitized before storage. Secret-like values are rejected in the original candidate and redacted from validation evidence. The stored validation payload has its own SHA-256 hash so later edits fail closed.
+Validation evidence is sanitized before storage. Secret-like values are rejected in the original candidate and redacted from validation evidence. The stored validation payload has its own SHA-256 hash so later edits fail closed. The persisted lifecycle transition history has an independent SHA-256 hash as well.
 
 ## Persistence integrity
 
 Knowledge-gap records use the shared bounded strict JSON loader, which rejects duplicate keys and non-standard JSON constants before state interpretation. Record writes use the shared anchored atomic JSON writer, including no-follow directory traversal and same-directory replacement, so a failed or redirected write cannot publish a partial record or follow a symlinked destination path.
 
-This persistence contract is separate from the knowledge lifecycle contract: it protects the stored record without changing candidate, validation, or rejection semantics.
+This persistence contract is separate from the knowledge lifecycle contract: it protects the stored record without changing candidate, validation, or rejection semantics. Transition entries are schema-checked, their `from -> to` chain must be continuous, and the final transition must match the persisted record state. Legacy records that predate `transitions_sha256` remain readable, but canonical provenance marks their transition-history integrity as unknown until the record is rewritten.
 
 ## Canonical provenance
 
 Knowledge-gap records can be adapted into canonical evidence through the `knowledge_gap_evidence` adapter.
 
-The adapter preserves candidate identity, scope, capability, problem, proposed change, original candidate SHA-256, validation metadata, redacted validation evidence, and lifecycle transitions.
+The adapter preserves candidate identity, scope, capability, problem, original candidate SHA-256, validation metadata, redacted validation evidence, lifecycle transitions, and the transition-history SHA-256 when available.
 
 Canonical status mapping is explicit:
 
