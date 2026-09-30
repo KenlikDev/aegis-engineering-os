@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind Python GitHub API-version security findings to the executable GitHub request sink so compliant requests cannot mask unsafe ones;
 - centralize strict parsing for credential-bearing GitHub REST JSON responses;
 - reject ambiguous JSON responses from local Ollama and OpenHands runtime trust boundaries;
 - enforce the canonical evidence 65,536-byte persisted JSON limit at construction and write time;

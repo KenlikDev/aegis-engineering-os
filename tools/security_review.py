@@ -301,34 +301,100 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                 return True
         return False
 
-    request_has_compliant_headers = any(
-        isinstance(node, ast.Call)
-        and (
+    def expression_contains_github_url(
+        expression: ast.AST | None,
+        github_url_names: set[str],
+    ) -> bool:
+        if expression is None:
+            return False
+        for child in ast.walk(expression):
+            if isinstance(child, ast.Constant) and isinstance(child.value, str):
+                if GITHUB_API_RE.search(child.value):
+                    return True
+            if isinstance(child, ast.Name) and child.id in github_url_names:
+                return True
+        return False
+
+    github_url_names: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
+                continue
+            if not expression_contains_github_url(node.value, github_url_names):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id not in github_url_names:
+                    github_url_names.add(target.id)
+                    changed = True
+
+    request_sinks: list[tuple[ast.Call, bool]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        is_request = (
             (isinstance(node.func, ast.Name) and node.func.id == "Request")
             or (isinstance(node.func, ast.Attribute) and node.func.attr == "Request")
         )
-        and request_headers_are_compliant(
-            next((keyword.value for keyword in node.keywords if keyword.arg == "headers"), None),
-            node.lineno,
+        if not is_request:
+            continue
+        url_expression = node.args[0] if node.args else next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "url"),
+            None,
         )
-        for node in ast.walk(tree)
-    )
+        request_sinks.append(
+            (
+                node,
+                expression_contains_github_url(url_expression, github_url_names),
+            )
+        )
 
     relative_path = path.relative_to(root).as_posix()
     is_shared_header_policy_module = relative_path == "tools/github_http_security.py"
-    if (
-        GITHUB_API_RE.search(text)
-        and not is_shared_header_policy_module
-        and not request_has_compliant_headers
-    ):
-        _finding(
-            findings,
-            rule_id="github.api-version",
-            severity=HIGH,
-            path=path,
-            root=root,
-            message="GitHub API usage must send the explicit API-version header.",
-        )
+    if GITHUB_API_RE.search(text) and not is_shared_header_policy_module:
+        github_request_sinks = [
+            (node, request_headers_are_compliant(
+                next(
+                    (keyword.value for keyword in node.keywords if keyword.arg == "headers"),
+                    None,
+                ),
+                node.lineno,
+            ))
+            for node, is_github in request_sinks
+            if is_github
+        ]
+
+        for node, compliant in github_request_sinks:
+            if not compliant:
+                _finding(
+                    findings,
+                    rule_id="github.api-version",
+                    severity=HIGH,
+                    path=path,
+                    root=root,
+                    message="GitHub API request must send the explicit API-version header.",
+                    line=node.lineno,
+                )
+
+        if not github_request_sinks and not any(
+            request_headers_are_compliant(
+                next(
+                    (keyword.value for keyword in node.keywords if keyword.arg == "headers"),
+                    None,
+                ),
+                node.lineno,
+            )
+            for node, _ in request_sinks
+        ):
+            _finding(
+                findings,
+                rule_id="github.api-version",
+                severity=HIGH,
+                path=path,
+                root=root,
+                message="GitHub API usage must send the explicit API-version header.",
+            )
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
