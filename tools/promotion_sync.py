@@ -186,8 +186,8 @@ class GitHubPromotionSyncProvider:
         url = data.get("html_url")
         state = data.get("state")
         merged_at = data.get("merged_at")
-        head_repo = head.get("repo")
-        base_repo = base.get("repo")
+        head_repo = head.get("repo") if isinstance(head, Mapping) else None
+        base_repo = base.get("repo") if isinstance(base, Mapping) else None
         if (
             not isinstance(url, str)
             or not HTTPS_URL_RE.fullmatch(url)
