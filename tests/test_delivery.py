@@ -48,8 +48,14 @@ class FakeGitHubTransport:
                 "number": number,
                 "title": payload["title"],
                 "body": payload["body"],
-                "head": {"ref": payload["head"]},
-                "base": {"ref": payload["base"]},
+                "head": {
+                    "ref": payload["head"],
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": payload["base"],
+                    "repo": {"full_name": REPOSITORY},
+                },
                 "state": "open",
                 "merged_at": None,
                 "draft": payload.get("draft", False),
