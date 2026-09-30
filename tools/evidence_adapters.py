@@ -722,13 +722,12 @@ def integration_merge_evidence(
                 f"Integration merge {field} must be a valid 40-character hexadecimal revision."
             )
 
-    if (
-        head_repository != repository
-        or base_repository != repository
-        or base != "ai/integration"
-        or state != "closed"
-        or merged is not True
-    ):
+    if head_repository != repository or base_repository != repository:
+        raise EvidenceContractError(
+            "Verified integration merge pull-request repositories must match the configured repository."
+        )
+
+    if base != "ai/integration" or state != "closed" or merged is not True:
         raise EvidenceContractError(
             "Verified integration merge pull-request identity or merged state is invalid."
         )
