@@ -27,13 +27,13 @@ A stage is complete for promotion when:
 3. the applicable implementation, testing, security, architecture, and documentation checks have passed;
 4. canonical provenance and lifecycle evidence is internally consistent;
 5. the exact current `ai/integration` SHA has a successful Aegis Validation run;
-6. promotion readiness confirms the exact protected target state and ancestry;
+6. promotion readiness confirms the exact protected target state and a positive promotable delta;
 7. a deterministic promotion snapshot is created from the exact source and target SHAs;
 8. the resulting promotion pull request contains a bounded description of the stage and its exact source/target identities.
 
 Aegis does not merge, approve, or otherwise authorize the resulting `develop` pull request.
 
-The human reviewer makes the protected-branch decision from the bounded promotion artifact, the exact diff, the validation evidence, and the documented scope.
+The human reviewer makes the protected-branch decision from the bounded promotion artifact, the exact diff, the validation evidence, and the documented scope. Because protected branches use squash merges, Git ancestry may legitimately be `diverged` even when the target already contains earlier promoted trees; Aegis records that as a review condition rather than treating it as proof of failure.
 
 ### Develop merge completion
 

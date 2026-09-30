@@ -52,7 +52,7 @@ The promotion pull request is still open or has not actually merged. No work-ite
 
 ### Error
 
-The promotion identity, target protection, merge commit, or target ancestry cannot be verified.
+The promotion identity, target protection, merge commit, exact target comparison, or post-compare target identity cannot be verified.
 
 ## Implementation
 

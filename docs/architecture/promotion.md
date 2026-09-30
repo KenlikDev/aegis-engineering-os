@@ -17,7 +17,7 @@ Before any promotion write, Aegis verifies:
 - both branches are protected;
 - the current source and target SHAs are captured;
 - the source has successful Aegis Validation evidence for that exact source SHA; an exact integration push run is preferred, while a successful merged-PR validation may be accepted only when its actual merge commit equals the current source SHA;
-- the source is ahead of the target and not behind it;
+- the source contains a positive promotable delta beyond the target; `ahead` is the normal ancestry shape, while `diverged` is expected after squash-based human promotion;
 - optional expected SHAs still match the fresh state.
 
 A readiness result is evidence, not permission to merge.
@@ -34,7 +34,7 @@ The operation is intentionally conservative:
 
 1. run the readiness gate;
 2. capture the exact source and protected target commit snapshots returned by that readiness observation;
-3. verify that target is an ancestor of the validated source;
+3. verify that the source contains a positive promotable delta beyond the target; an ancestry `diverged` result is allowed after squash-based human promotion;
 4. create one immutable snapshot commit with:
    - first parent = exact protected target SHA;
    - second parent = exact validated ai/integration SHA;
@@ -48,7 +48,7 @@ The operation is intentionally conservative:
 The branch is never intentionally published first at the protected target SHA. A source or target change during preparation therefore fails closed before the promotion branch is published. Once a new promotion branch is published, later pull-request or verification failures never trigger automatic branch deletion because the GitHub delete-reference API has no expected-SHA compare-and-delete condition. A valid newly published snapshot branch is retained for safe idempotent retry; a missing or changed branch is treated as an explicit recovery boundary and Aegis never overwrites or deletes it automatically. A snapshot commit is bound to the exact source revision for which promotion readiness verified Aegis Validation.
 
 
-The resulting commit represents the verified integration state as a target-based promotion artifact. Because the target is required to be an ancestor, no merge conflict needs to be resolved by Aegis.
+The resulting commit represents the verified integration state as a target-based promotion artifact. Aegis does not resolve protected-target merge conflicts; the exact target/source diff remains part of the human promotion review.
 
 ## Idempotency
 

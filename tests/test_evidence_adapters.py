@@ -588,6 +588,36 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual((), evidence.uncertainty)
         self.assertEqual(evidence.evidence_id, evidence.evidence_sha256)
 
+    def test_promotion_diverged_history_is_explicit_uncertainty(self):
+        result = PromotionReadiness(
+            repository=REPOSITORY,
+            source=BranchSnapshot("ai/integration", SOURCE_SHA, True),
+            target=BranchSnapshot("develop", TARGET_SHA, True),
+            compare=CompareSnapshot("diverged", 2, 5, 7, 7, True),
+            validation=ValidationRun(
+                id=201,
+                workflow=".github/workflows/validate.yml",
+                status="completed",
+                conclusion="success",
+                head_sha=SOURCE_SHA,
+                url="https://github.com/example/actions/runs/201",
+                evidence_type="branch-push",
+                validated_sha=SOURCE_SHA,
+            ),
+            blockers=(),
+        )
+
+        evidence = promotion_readiness_evidence(
+            result,
+            observed_at="2026-09-30T18:00:00Z",
+        )
+
+        self.assertEqual("verified", evidence.status)
+        self.assertEqual(1, len(evidence.uncertainty))
+        self.assertIn("diverge", evidence.uncertainty[0].lower())
+        self.assertIn("squash", evidence.uncertainty[0].lower())
+        self.assertIn("human review", evidence.uncertainty[0].lower())
+
     def test_promotion_fallback_is_explicit_uncertainty(self):
         result = PromotionReadiness(
             repository=REPOSITORY,

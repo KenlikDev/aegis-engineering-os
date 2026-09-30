@@ -57,7 +57,7 @@ class PromotionSnapshotProvider(Protocol):
 
     def get_commit(self, ref: str) -> GitCommitSnapshot: ...
 
-    def is_ancestor(self, target_sha: str, source_sha: str) -> bool: ...
+    def is_promotable_relationship(self, target_sha: str, source_sha: str) -> bool: ...
 
     def get_ref_commit(self, branch: str) -> GitCommitSnapshot | None: ...
 
@@ -278,13 +278,9 @@ class GitHubPromotionSnapshotProvider:
             parents=tuple(parents),
         )
 
-    def is_ancestor(self, target_sha: str, source_sha: str) -> bool:
+    def is_promotable_relationship(self, target_sha: str, source_sha: str) -> bool:
         comparison = self._readiness_provider().compare(target_sha, source_sha)
-        return (
-            comparison.status == "ahead"
-            and comparison.behind_by == 0
-            and comparison.ahead_by > 0
-        )
+        return comparison.status in {"ahead", "diverged"} and comparison.ahead_by > 0
 
     def get_ref_commit(self, branch: str) -> GitCommitSnapshot | None:
         status, data = self._request(
@@ -466,9 +462,9 @@ def _ensure_ready(
         )
     if source.sha == target.sha:
         raise PromotionSnapshotError("Promotion contains no delta.")
-    if not provider.is_ancestor(target.sha, source.sha):
+    if not provider.is_promotable_relationship(target.sha, source.sha):
         raise PromotionSnapshotError(
-            "Promotion target is not an ancestor of ai/integration."
+            f"Promotion source does not contain a promotable delta beyond {request.target_branch}."
         )
     return source, target
 
