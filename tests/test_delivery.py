@@ -222,6 +222,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -261,6 +263,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -299,6 +303,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
         with self.assertRaises(DeliveryError):
@@ -324,6 +330,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -447,6 +455,8 @@ class DeliveryTests(unittest.TestCase):
             mergeable=True,
             mergeable_state="clean",
             url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
         )
         pr_provider = FakePullRequestProvider(pr)
 
@@ -475,6 +485,8 @@ class DeliveryTests(unittest.TestCase):
             mergeable=True,
             mergeable_state="clean",
             url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
         )
         pr_provider = FakePullRequestProvider(pr)
 
@@ -514,6 +526,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -547,6 +561,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
         with self.assertRaises(DeliveryError):
