@@ -3,6 +3,8 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- preserve pull request head and base repository origin in verified integration and promotion provenance;
+
 - make GitHub API-version security review fail closed when unsafe header assignments can be masked by later compliant assignments;
 - bind workflow GitHub API-version findings to executable run blocks so unrelated YAML text cannot mask missing request headers;
 - reject fork-origin pull requests at autonomous integration, delivery, and promotion synchronization boundaries;

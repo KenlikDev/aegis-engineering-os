@@ -77,7 +77,9 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "number": 158,
                 "url": "https://github.com/KenlikDev/aegis-engineering-os/pull/158",
                 "head": "ai/158-main-promotion",
+                "head_repository": REPOSITORY,
                 "base": "main",
+                "base_repository": REPOSITORY,
                 "merged": True,
                 "merge_commit_sha": TARGET_SHA,
             },
@@ -119,7 +121,9 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "number": 158,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/158",
                 "head": "ai/158-develop-promotion",
+                "head_repository": REPOSITORY,
                 "base": "develop",
+                "base_repository": REPOSITORY,
                 "merged": False,
                 "state": "open",
             },
@@ -170,6 +174,125 @@ class EvidenceAdapterTests(unittest.TestCase):
                 observed_at="2026-09-28T18:00:00Z",
             )
 
+    def test_verified_promotion_sync_rejects_missing_repository_origin(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "158",
+            "target_branch": "main",
+            "pull_request": {
+                "number": 158,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/158",
+                "head": "ai/158-main-promotion",
+                "base": "main",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "target": {
+                "branch": "main",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "traceability_verified": True,
+            "work_item": {
+                "state_after": "done",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "pull-request repositories",
+        ):
+            promotion_sync_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+    def test_verified_integration_delivery_rejects_foreign_repository_origin(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "150",
+            "traceability_verified": True,
+            "pull_request": {
+                "number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/150",
+                "head": "ai/feature/150-integration-delivery-provenance",
+                "head_repository": "attacker/example-fork",
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "base_repository": REPOSITORY,
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "validation": {
+                "id": 1500,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": SOURCE_SHA,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "pull-request repositories",
+        ):
+            integration_delivery_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+    def test_verified_integration_merge_rejects_foreign_repository_origin(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "143",
+            "validation_head_sha": SOURCE_SHA,
+            "pull_request": {
+                "number": 143,
+                "url": "https://github.com/example/pull/143",
+                "head": "ai/feature/143-integration-merge-provenance",
+                "head_repository": REPOSITORY,
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "base_repository": "attacker/example-fork",
+                "state": "closed",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "traceability_verified": True,
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "pull-request repositories",
+        ):
+            integration_merge_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
     def test_integration_delivery_verified_result_preserves_exact_chain(self):
         result = {
             "status": "verified",
@@ -179,8 +302,10 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "number": 150,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/150",
                 "head": "ai/feature/150-integration-delivery-provenance",
+                "head_repository": REPOSITORY,
                 "head_sha": SOURCE_SHA,
                 "base": "ai/integration",
+                "base_repository": REPOSITORY,
                 "merged": True,
                 "merge_commit_sha": TARGET_SHA,
             },
@@ -214,6 +339,8 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual("work-item:150", canonical.subject)
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation"]["head_sha"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["head_repository"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["base_repository"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
         self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
 
@@ -231,8 +358,10 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "number": 163,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/163",
                 "head": "ai/feature/163-already-merged-provenance",
+                "head_repository": REPOSITORY,
                 "head_sha": SOURCE_SHA,
                 "base": "ai/integration",
+                "base_repository": REPOSITORY,
                 "merged": True,
                 "merge_commit_sha": TARGET_SHA,
             },
@@ -269,8 +398,10 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "number": 163,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/163",
                 "head": "ai/feature/163-already-merged-provenance",
+                "head_repository": REPOSITORY,
                 "head_sha": SOURCE_SHA,
                 "base": "ai/integration",
+                "base_repository": REPOSITORY,
                 "merged": True,
                 "merge_commit_sha": TARGET_SHA,
             },
@@ -1194,8 +1325,10 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "number": 143,
                 "url": "https://github.com/example/pull/143",
                 "head": "ai/feature/143-integration-merge-provenance",
+                "head_repository": REPOSITORY,
                 "head_sha": SOURCE_SHA,
                 "base": "ai/integration",
+                "base_repository": REPOSITORY,
                 "state": "closed",
                 "merged": True,
                 "merge_commit_sha": TARGET_SHA,
@@ -1223,6 +1356,8 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual("work-item:143", canonical.subject)
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation_head_sha"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["head_repository"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["base_repository"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
         self.assertTrue(canonical.result["work_item"]["transition_verified"])
         self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)

@@ -148,6 +148,13 @@ def promotion_sync_evidence(
         raise EvidenceContractError(
             "Promotion synchronization pull request does not describe the verified promotion merge."
         )
+    if (
+        pull_request.get("head_repository") != repository
+        or pull_request.get("base_repository") != repository
+    ):
+        raise EvidenceContractError(
+            "Promotion synchronization pull-request repositories must match the configured repository."
+        )
     if result.get("traceability_verified") is not True:
         raise EvidenceContractError(
             "Promotion synchronization traceability is not read-after-write verified."
@@ -269,6 +276,13 @@ def integration_delivery_evidence(
             raise EvidenceContractError(
                 "Integration delivery pull request base must be ai/integration."
             )
+        if (
+            pull_request.get("head_repository") != repository
+            or pull_request.get("base_repository") != repository
+        ):
+            raise EvidenceContractError(
+                "Integration delivery pull-request repositories must match the configured repository."
+            )
         if merge_sha != integration_sha:
             raise EvidenceContractError(
                 "Integration delivery merge commit does not match the post-merge integration SHA."
@@ -287,8 +301,10 @@ def integration_delivery_evidence(
         "number": pull_request.get("number"),
         "url": pull_request.get("url"),
         "head": pull_request.get("head"),
+        "head_repository": pull_request.get("head_repository"),
         "head_sha": pull_request.get("head_sha"),
         "base": pull_request.get("base"),
+        "base_repository": pull_request.get("base_repository"),
         "merged": pull_request.get("merged"),
         "merge_commit_sha": pull_request.get("merge_commit_sha"),
     }
@@ -639,6 +655,14 @@ def integration_merge_evidence(
         raise EvidenceContractError("Integration merge integration result is malformed.")
     if not isinstance(work_item, Mapping):
         raise EvidenceContractError("Integration merge work_item result is malformed.")
+
+    if canonical_status == "verified" and (
+        pull_request.get("head_repository") != repository
+        or pull_request.get("base_repository") != repository
+    ):
+        raise EvidenceContractError(
+            "Integration merge pull-request repositories must match the configured repository."
+        )
 
     revision = integration.get("sha") if canonical_status == "verified" else None
     if revision is not None and (

@@ -61,6 +61,12 @@ When the branch already exists, its commit must exactly match the expected targe
 
 Open pull requests are searched by exact repository owner, head branch, and base branch. More than one matching open pull request is a hard failure.
 
+## Pull-request repository origin
+
+Promotion synchronization requires the promotion PR head and base repository identities to equal the configured repository. The repository-origin check is performed before protected-target synchronization and is preserved in canonical `promotion-sync` evidence.
+
+This is separate from branch-name, commit-SHA, target-protection, and lifecycle verification. A matching branch name or commit SHA alone is not treated as proof that the PR originates from the configured repository.
+
 ## Safety boundary
 
 The snapshot tool never:
