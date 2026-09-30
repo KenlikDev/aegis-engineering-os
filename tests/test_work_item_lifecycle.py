@@ -28,6 +28,7 @@ ISSUE_URL = "https://github.com/KenlikDev/aegis-engineering-os/issues/53"
 class FakeGitHubTransport:
     def __init__(self) -> None:
         self.state = "open"
+        self.state_reason = None
         self.labels: set[str] = set()
         self.comments: dict[int, str] = {}
         self.next_comment_id = 100
@@ -43,6 +44,7 @@ class FakeGitHubTransport:
                     "number": 53,
                     "title": "test work item",
                     "state": self.state,
+                    "state_reason": self.state_reason,
                     "html_url": ISSUE_URL,
                     "labels": [{"name": name} for name in sorted(self.labels)],
                 }
@@ -169,16 +171,20 @@ class WorkItemLifecycleTests(unittest.TestCase):
         self.assertEqual("github-issues", item.provider)
         self.assertEqual(ISSUE_URL, item.provider_url)
 
-    def test_github_get_closed_unlabeled_issue_as_done(self) -> None:
+    def test_github_get_rejects_closed_unlabeled_issue(self) -> None:
         transport = FakeGitHubTransport()
         transport.state = "closed"
+        transport.state_reason = "completed"
         provider = GitHubIssuesProvider(
             "KenlikDev/aegis-engineering-os",
             "test-token",
             transport=transport,
         )
-        item = provider.get("53")
-        self.assertEqual(LifecycleState.DONE, item.state)
+        with self.assertRaisesRegex(
+            WorkItemLifecycleError,
+            "closed without an Aegis status label",
+        ):
+            provider.get("53")
 
     def test_github_transition_creates_and_verifies_status_label(self) -> None:
         transport = FakeGitHubTransport()
