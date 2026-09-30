@@ -1,3 +1,9 @@
+## Flow-sensitive limitations
+
+The Python GitHub API-version review is intentionally conservative when headers are assigned through variables. Every executable assignment observed before a request sink must be compliant; an unknown or conditionally non-compliant assignment prevents the request from being treated as verified.
+
+The review does not attempt to prove arbitrary Python control flow. This avoids allowing a later compliant assignment to mask an earlier reachable unsafe assignment.
+
 ## Workflow API-version sink boundary
 
 For GitHub API calls implemented through executable GitHub Actions `run` blocks, the API-version header requirement is evaluated within the same `run` scalar as the API URL. An unrelated header string in another YAML field does not satisfy the request-level security rule.

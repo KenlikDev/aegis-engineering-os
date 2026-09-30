@@ -486,6 +486,28 @@ class SecurityReviewTests(unittest.TestCase):
                 any(f.rule_id == "github.api-version" for f in result.findings)
             )
 
+    def test_rejects_branch_masked_api_header_assignment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import github_api_headers\n"
+                "API = 'https://api.github.com'\n"
+                "HEADERS = {}\n"
+                "if True:\n"
+                "    HEADERS = github_api_headers()\n"
+                "REQUEST = Request(API, headers=HEADERS)\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_compliant_request_does_not_mask_unsafe_github_request(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
