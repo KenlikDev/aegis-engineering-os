@@ -271,26 +271,7 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
                 message="GitHub API usage in an executable run block must send the explicit API-version header.",
             )
 
-    run_api_urls = any(GITHUB_API_RE.search(block) for block in run_blocks)
-    non_run_api_lines = [
-        line
-        for line in workflow_text.splitlines()
-        if GITHUB_API_RE.search(line)
-        and not re.match(r"^\s*(?:-\s+)?run:\s*", line)
-    ]
-    if (
-        non_run_api_lines
-        and any(API_VERSION_HEADER not in line for line in non_run_api_lines)
-    ):
-        _finding(
-            findings,
-            rule_id="github.api-version",
-            severity=HIGH,
-            path=path,
-            root=root,
-            message="GitHub API usage outside an executable run block must declare the explicit API-version header in the same YAML value.",
-        )
-    elif not run_api_urls and GITHUB_API_RE.search(workflow_text) and API_VERSION_HEADER not in workflow_text:
+    if not run_blocks and GITHUB_API_RE.search(workflow_text) and API_VERSION_HEADER not in workflow_text:
         _finding(
             findings,
             rule_id="github.api-version",
@@ -299,6 +280,7 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
             root=root,
             message="GitHub API usage must send the explicit API-version header.",
         )
+
 
 
 def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
