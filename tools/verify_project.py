@@ -55,17 +55,16 @@ def _open_regular_file_no_follow(path: Path) -> int:
             os.O_RDONLY | os.O_NOFOLLOW,
             dir_fd=directory_fd,
         )
-        file_stat = os.fstat(file_fd)
-        if not stat.S_ISREG(file_stat.st_mode):
+        try:
+            file_stat = os.fstat(file_fd)
+            if not stat.S_ISREG(file_stat.st_mode):
+                raise OSError(f"Verifier input must be a regular file: {path}")
+            return file_fd
+        except Exception:
             os.close(file_fd)
-            raise OSError(f"Verifier input must be a regular file: {path}")
-        return file_fd
-    except Exception:
-        os.close(directory_fd)
-        raise
+            raise
     finally:
-        if "file_fd" in locals() and file_fd >= 0:
-            os.close(directory_fd)
+        os.close(directory_fd)
 
 
 def _read_regular_file_no_follow(
