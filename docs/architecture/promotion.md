@@ -89,6 +89,18 @@ The implementation uses the versioned GitHub REST API with explicit API version 
 
 The Git database commit API accepts multiple parent SHAs, which is used to model the snapshot commit. The pull-request API is used only to create or inspect the prepared promotion artifact.
 
+## Human promotion checkpoints
+
+The autonomous engineering boundary ends at `ai/integration`. Aegis prepares a promotion pull request for `develop` only after a declared engineering stage has completed its applicable implementation, testing, security, architecture, documentation, provenance, and exact-SHA validation gates.
+
+The unit of promotion is the stage, not the number of commits or issues. Unrelated unfinished work is not silently accumulated into a protected-branch promotion.
+
+The resulting `develop` pull request is a human decision boundary. Aegis creates and verifies the promotion artifact but never approves or merges the protected branch. After a human merge, Aegis verifies the exact merge commit, the protected target read-back, and the applicable post-merge validation before lifecycle synchronization.
+
+Main promotion is prepared only for a release candidate or another explicitly declared release checkpoint after the required develop validation and release-readiness evidence is complete.
+
+The detailed cadence is defined in `docs/governance/promotion-checkpoints.md`.
+
 ## Lifecycle
 
 The overall delivery path is:
