@@ -56,6 +56,8 @@ class IntegrationPullRequest:
     draft: bool
     mergeable_state: str | None
     merge_commit_sha: str | None
+    head_repository: str | None = None
+    base_repository: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
