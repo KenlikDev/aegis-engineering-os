@@ -72,6 +72,8 @@ class PullRequest:
     mergeable: bool | None
     mergeable_state: str | None
     url: str
+    head_repository: str | None = None
+    base_repository: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
