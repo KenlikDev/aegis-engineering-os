@@ -511,6 +511,11 @@ def promotion_readiness_evidence(
                 "CI evidence uses merged-pull-request validation fallback rather than direct branch-push validation."
             )
 
+    if result.compare.status == "diverged":
+        uncertainty.append(
+            "Source and protected target histories diverge; this is expected after squash-based human promotion and requires human review of the exact target/source diff."
+        )
+
     if not result.compare.changed_files_complete:
         uncertainty.append(
             "GitHub compare reported an incomplete changed-file list."
