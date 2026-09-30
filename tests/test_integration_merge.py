@@ -187,7 +187,7 @@ class FakeGitHubTransport:
                 "head": {
                     "ref": "ai/feature/75-integration-merge",
                     "sha": HEAD_SHA,
-                    "repo": {"full_name": REPOSITORY},
+                    "repo": {"full_name": self.head_repository},
                 },
                 "base": {
                     "ref": "ai/integration",
