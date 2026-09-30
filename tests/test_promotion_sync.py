@@ -208,6 +208,34 @@ class FakeGitHubTransport:
             self.assertEqual("promotion:1->main", canonical.subject)
 
 class PromotionSyncTests(unittest.TestCase):
+    def test_rejects_fork_origin_before_lifecycle_transition(self):
+        provider = FakePromotionProvider()
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head=provider.pull_request.head,
+            head_sha=provider.pull_request.head_sha,
+            base=provider.pull_request.base,
+            base_sha=provider.pull_request.base_sha,
+            state=provider.pull_request.state,
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository="attacker/example-fork",
+            base_repository=REPOSITORY,
+        )
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "head and base repositories must match",
+        ):
+            sync_promotion_merge(
+                provider,
+                WorkItemProvider(),
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
     def test_github_provider_requires_identical_compare(self):
         transport = FakeGitHubTransport()
         provider = GitHubPromotionSyncProvider(
