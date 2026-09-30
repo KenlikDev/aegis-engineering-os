@@ -158,6 +158,50 @@ class SecurityReviewTests(unittest.TestCase):
                 any(f.rule_id == "github.api-version" for f in result.findings)
             )
 
+    def test_header_in_unrelated_yaml_value_does_not_mask_unsafe_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "api.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: api\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "env:\n"
+                "  API_HEADER_NOTE: 'X-GitHub-Api-Version: 2026-03-10'\n"
+                "steps:\n"
+                "  - run: curl https://api.github.com\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
+    def test_accepts_multiline_run_with_api_url_and_explicit_header(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow = root / ".github" / "workflows" / "api.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "name: api\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "steps:\n"
+                "  - run: |\n"
+                "      curl -H 'X-GitHub-Api-Version: 2026-03-10' \\\n"
+                "        https://api.github.com\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertFalse(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_preserves_quoted_hash_in_workflow_api_version_check(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
