@@ -42,8 +42,6 @@ class FakeTransport:
         self.created_ref_sha = None
         self.created_commit = False
         self.created_pr = False
-        self.deleted_branch = False
-        self.cleanup_failure = False
         self.target_reads = 0
         self.create_commit_payload = None
         self.advance_source_after_snapshot = False
@@ -114,12 +112,6 @@ class FakeTransport:
             self.created_branch = True
             self.created_ref_sha = payload["sha"]
             return 201, {"ref": "refs/heads/ai/1-develop-promotion"}
-        if method == "DELETE" and path == f"/repos/{REPOSITORY}/git/ref/heads/ai%2F1-develop-promotion":
-            if self.cleanup_failure:
-                return 500, {}
-            self.deleted_branch = True
-            self.created_branch = False
-            return 204, {}
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/commits":
             self.created_commit = True
             self.create_commit_payload = payload
@@ -247,7 +239,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertFalse(transport.created_pr)
 
 
-    def test_cleans_up_new_branch_when_pull_request_creation_fails(self):
+    def test_preserves_new_branch_when_pull_request_creation_fails(self):
         transport = FakeTransport()
 
         def failing_pr(method, url, headers, payload):  # noqa: ANN001
@@ -267,10 +259,10 @@ class PromotionSnapshotTests(unittest.TestCase):
         ):
             prepare_promotion_snapshot(provider, self._request())
 
-        self.assertTrue(transport.deleted_branch)
-        self.assertFalse(transport.created_branch)
+        self.assertTrue(transport.created_branch)
+        self.assertEqual(SNAPSHOT_SHA, transport.created_ref_sha)
 
-    def test_does_not_delete_reused_existing_branch_on_late_failure(self):
+    def test_preserves_existing_branch_on_late_failure(self):
         transport = FakeTransport(existing_branch=SNAPSHOT_SHA)
 
         def failing_lookup(method, url, headers, payload):  # noqa: ANN001
@@ -287,30 +279,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(PromotionSnapshotError, "pull request lookup failed"):
             prepare_promotion_snapshot(provider, self._request())
 
-        self.assertFalse(transport.deleted_branch)
-
-    def test_fails_closed_when_cleanup_cannot_remove_new_branch(self):
-        transport = FakeTransport()
-        transport.cleanup_failure = True
-
-        def failing_pr(method, url, headers, payload):  # noqa: ANN001
-            if method == "POST" and url.endswith("/pulls"):
-                return 500, {}
-            return transport(method, url, headers, payload)
-
-        provider = GitHubPromotionSnapshotProvider(
-            REPOSITORY,
-            "secret-token",
-            transport=failing_pr,
-        )
-
-        with self.assertRaisesRegex(
-            PromotionSnapshotError,
-            "cleanup of the newly published branch also failed",
-        ):
-            prepare_promotion_snapshot(provider, self._request())
-
-        self.assertTrue(transport.created_branch)
+        self.assertFalse(transport.created_branch)
 
     def test_reuses_matching_snapshot_and_pr(self):
         transport = FakeTransport(
