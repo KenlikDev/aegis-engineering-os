@@ -634,55 +634,140 @@ def integration_merge_evidence(
     repository: str,
     observed_at: datetime | str,
 ) -> EvidenceRecord:
-    """Convert an integration-merge result into canonical provenance evidence."""
+    """Convert a verified integration merge result into canonical provenance evidence."""
     status = result.get("status")
-    if status == "verified":
-        canonical_status = "verified"
-        uncertainty: list[str] = []
-    elif status == "not-merged":
-        canonical_status = "unknown"
-        uncertainty = ["The integration pull request was not merged."]
-    else:
+    if status == "not-merged":
+        return build_evidence(
+            {
+                "schema_version": 1,
+                "kind": "integration-merge",
+                "source": f"github:{repository}",
+                "subject": f"work-item:{result.get('work_item_id')}",
+                "revision": None,
+                "observed_at": _timestamp(observed_at),
+                "status": "unknown",
+                "result": _canonical_safe(dict(result)),
+                "uncertainty": ["The integration pull request was not merged."],
+                "references": [],
+                "artifact_sha256": None,
+            }
+        )
+    if status != "verified":
         raise EvidenceContractError(
             f"Unsupported integration merge status: {status!r}."
         )
 
     work_item_id = result.get("work_item_id")
-    if not isinstance(work_item_id, str) or not work_item_id:
-        raise EvidenceContractError("Integration merge work_item_id is required.")
-
     pull_request = result.get("pull_request")
     integration = result.get("integration")
     work_item = result.get("work_item")
+
+    if not isinstance(work_item_id, str) or not work_item_id:
+        raise EvidenceContractError("Integration merge work_item_id is required.")
     if not isinstance(pull_request, Mapping):
-        raise EvidenceContractError("Integration merge pull_request result is malformed.")
+        raise EvidenceContractError(
+            "Verified integration merge pull_request result is malformed."
+        )
     if not isinstance(integration, Mapping):
-        raise EvidenceContractError("Integration merge integration result is malformed.")
+        raise EvidenceContractError(
+            "Verified integration merge integration result is malformed."
+        )
     if not isinstance(work_item, Mapping):
-        raise EvidenceContractError("Integration merge work_item result is malformed.")
-
-    if canonical_status == "verified" and (
-        pull_request.get("head_repository") != repository
-        or pull_request.get("base_repository") != repository
-    ):
         raise EvidenceContractError(
-            "Integration merge pull-request repositories must match the configured repository."
+            "Verified integration merge work_item result is malformed."
         )
 
-    revision = integration.get("sha") if canonical_status == "verified" else None
-    if revision is not None and (
-        not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)
-    ):
-        raise EvidenceContractError(
-            "Integration merge integration SHA must be a 40-character hexadecimal revision."
-        )
-
+    number = pull_request.get("number")
     pull_request_url = pull_request.get("url")
-    if not isinstance(pull_request_url, str) or not pull_request_url.startswith(
-        "https://"
-    ):
+    head = pull_request.get("head")
+    head_sha = pull_request.get("head_sha")
+    head_repository = pull_request.get("head_repository")
+    base = pull_request.get("base")
+    base_repository = pull_request.get("base_repository")
+    state = pull_request.get("state")
+    merged = pull_request.get("merged")
+    merge_commit_sha = pull_request.get("merge_commit_sha")
+
+    integration_branch = integration.get("branch")
+    integration_sha = integration.get("sha")
+    integration_protected = integration.get("protected")
+
+    transition_state = work_item.get("state_after")
+    transition_verified = work_item.get("transition_verified")
+    traceability_verified = result.get("traceability_verified")
+
+    if not isinstance(number, int) or number <= 0:
+        raise EvidenceContractError("Integration merge pull-request number must be positive.")
+    if not isinstance(pull_request_url, str) or not pull_request_url.startswith("https://"):
         raise EvidenceContractError(
             "Integration merge pull-request URL must be HTTPS."
+        )
+    if (
+        not isinstance(head, str)
+        or not re.fullmatch(
+            rf"ai/(feature|fix|refactor|chore)/{re.escape(work_item_id)}-[A-Za-z0-9._-]+",
+            head,
+        )
+    ):
+        raise EvidenceContractError(
+            "Integration merge pull-request head is not the Aegis task branch for the work item."
+        )
+    for field, value in (
+        ("pull-request head SHA", head_sha),
+        ("merge commit SHA", merge_commit_sha),
+        ("integration SHA", integration_sha),
+    ):
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
+            raise EvidenceContractError(
+                f"Integration merge {field} must be a valid 40-character hexadecimal revision."
+            )
+
+    if (
+        head_repository != repository
+        or base_repository != repository
+        or base != "ai/integration"
+        or state != "closed"
+        or merged is not True
+    ):
+        raise EvidenceContractError(
+            "Verified integration merge pull-request identity or merged state is invalid."
+        )
+
+    if integration_branch != "ai/integration" or integration_protected is not True:
+        raise EvidenceContractError(
+            "Verified integration merge branch identity or protection state is invalid."
+        )
+
+    if merge_commit_sha != integration_sha:
+        raise EvidenceContractError(
+            "Integration merge commit does not match the observed integration SHA."
+        )
+
+    validation_head_sha = result.get("validation_head_sha")
+    uncertainty: list[str] = []
+    if validation_head_sha is None:
+        uncertainty.append(
+            "No new validation run was required because the integration pull request was already merged."
+        )
+    else:
+        if not isinstance(validation_head_sha, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", validation_head_sha
+        ):
+            raise EvidenceContractError(
+                "Integration merge validation_head_sha must be a valid 40-character hexadecimal revision."
+            )
+        if validation_head_sha != head_sha:
+            raise EvidenceContractError(
+                "Integration merge validation head does not match the pull-request head SHA."
+            )
+
+    if traceability_verified is not True:
+        raise EvidenceContractError(
+            "Integration merge traceability must be read-after-write verified."
+        )
+    if transition_state != "integration" or transition_verified is not True:
+        raise EvidenceContractError(
+            "Integration merge lifecycle transition must be read-after-write verified to integration."
         )
 
     safe_result = _canonical_safe(dict(result))
@@ -692,16 +777,15 @@ def integration_merge_evidence(
             "kind": "integration-merge",
             "source": f"github:{repository}",
             "subject": f"work-item:{work_item_id}",
-            "revision": revision,
+            "revision": integration_sha,
             "observed_at": _timestamp(observed_at),
-            "status": canonical_status,
+            "status": "verified",
             "result": safe_result,
             "uncertainty": uncertainty,
             "references": [pull_request_url, _repository_reference(repository)],
             "artifact_sha256": None,
         }
     )
-
 
 def version_verification_evidence(
     evidence: VersionEvidence,
