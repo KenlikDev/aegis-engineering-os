@@ -94,6 +94,61 @@ class GitHubHttpSecurityTests(unittest.TestCase):
                 self.assertNotIn('"X-GitHub-Api-Version":', source)
                 self.assertNotIn('GITHUB_API_VERSION =', source)
 
+    def test_parses_strict_github_json(self):
+        from github_http_security import parse_github_json
+
+        self.assertEqual(
+            {"items": [1, 2, 3]},
+            parse_github_json(b'{"items":[1,2,3]}'),
+        )
+        self.assertEqual(
+            [1, 2, 3],
+            parse_github_json(b"[1,2,3]"),
+        )
+
+        with self.assertRaisesRegex(ValueError, "Duplicate JSON key"):
+            parse_github_json(b'{"status":"ok","status":"verified"}')
+
+        with self.assertRaisesRegex(ValueError, "unsupported constant"):
+            parse_github_json(b'{"value":NaN}')
+
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            parse_github_json(b'{"value":')
+
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            parse_github_json(b"\xff\xfe")
+
+        self.assertIsNone(parse_github_json(b"null"))
+        self.assertTrue(parse_github_json(b"true"))
+        self.assertEqual("ok", parse_github_json(b'"ok"'))
+
+    def test_rejects_empty_github_json_response(self):
+        from github_http_security import parse_github_json
+
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            parse_github_json(b"")
+
+    def test_github_adapters_use_shared_strict_json_parser(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        adapters = (
+            "tools/ci_diagnosis.py",
+            "tools/delivery.py",
+            "tools/integration_merge.py",
+            "tools/promotion_readiness.py",
+            "tools/promotion_snapshot.py",
+            "tools/promotion_sync.py",
+            "tools/release_readiness.py",
+            "tools/work_item_lifecycle.py",
+        )
+
+        for relative_path in adapters:
+            with self.subTest(adapter=relative_path):
+                source = (root / relative_path).read_text(encoding="utf-8")
+                self.assertIn("parse_github_json(", source)
+                self.assertNotIn("json.loads(", source)
+
     def test_bounds_response_reads(self):
         from github_http_security import MAX_GITHUB_JSON_BYTES, read_bounded_response
 

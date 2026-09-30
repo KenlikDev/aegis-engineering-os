@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- centralize strict parsing for credential-bearing GitHub REST JSON responses;
 - reject ambiguous JSON responses from local Ollama and OpenHands runtime trust boundaries;
 - enforce the canonical evidence 65,536-byte persisted JSON limit at construction and write time;
 - harden installed-project verification against ambiguous state JSON and symlinked Aegis state and skill paths;

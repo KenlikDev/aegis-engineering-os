@@ -16,6 +16,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from github_http_security import (
     github_api_headers,
     read_bounded_response,
+    parse_github_json,
     validate_github_api_base_url,
 )
 
@@ -168,15 +169,15 @@ def _default_transport(
             timeout=30.0,
         ) as response:
             raw = read_bounded_response(response)
-            return response.status, json.loads(raw.decode("utf-8")) if raw else {}
+            return response.status, parse_github_json(raw) if raw else {}
     except HTTPError as exc:
         raw = read_bounded_response(exc)
         try:
-            data = json.loads(raw.decode("utf-8")) if raw else {}
+            data = parse_github_json(raw) if raw else {}
         except (UnicodeDecodeError, json.JSONDecodeError):
             data = {}
         return exc.code, data
-    except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
         raise PromotionSnapshotError("Unable to communicate with GitHub API.") from exc
 
 
