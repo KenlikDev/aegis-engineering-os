@@ -36,6 +36,8 @@ Conditional architecture and security boundaries are represented explicitly inst
 
 The composition builder validates every referenced capability against `skills/registry.json`.
 
+The registry is parsed through the shared bounded strict JSON object loader. Duplicate keys, non-standard JSON constants, malformed UTF-8, and oversized registry input are rejected before any capability names are interpreted.
+
 An unregistered capability is a hard configuration error. The planner never silently substitutes another skill.
 
 ## Current compositions
