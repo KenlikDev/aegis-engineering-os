@@ -63,6 +63,8 @@ class PromotionSnapshotProvider(Protocol):
 
     def create_ref(self, branch: str, sha: str) -> None: ...
 
+    def delete_ref(self, branch: str, expected_sha: str) -> None: ...
+
     def create_snapshot_commit(
         self,
         *,
@@ -311,6 +313,34 @@ class GitHubPromotionSnapshotProvider:
         if status != 201:
             raise PromotionSnapshotError(
                 f"Unable to create promotion branch {branch!r}; HTTP {status}."
+            )
+
+    def delete_ref(self, branch: str, expected_sha: str) -> None:
+        self._require_sha(expected_sha, "Expected promotion branch SHA")
+        path = f"/repos/{self.repository}/git/ref/heads/{quote(branch, safe='')}"
+        status, data = self._request("GET", path)
+        if status != 200 or not isinstance(data, Mapping):
+            raise PromotionSnapshotError(
+                f"Unable to verify promotion branch before cleanup; HTTP {status}."
+            )
+        obj = data.get("object")
+        current_sha = obj.get("sha") if isinstance(obj, Mapping) else None
+        current_sha = self._require_sha(current_sha, "Current promotion branch SHA")
+        if current_sha != expected_sha:
+            raise PromotionSnapshotError(
+                "Refusing promotion branch cleanup because the branch changed after publication."
+            )
+
+        status, _ = self._request("DELETE", path)
+        if status != 204:
+            raise PromotionSnapshotError(
+                f"Unable to remove incomplete promotion branch {branch!r}; HTTP {status}."
+            )
+
+        verify_status, _ = self._request("GET", path)
+        if verify_status != 404:
+            raise PromotionSnapshotError(
+                "Promotion branch cleanup could not be verified."
             )
 
     def create_snapshot_commit(
