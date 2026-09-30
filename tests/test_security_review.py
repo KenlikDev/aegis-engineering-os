@@ -259,6 +259,30 @@ class SecurityReviewTests(unittest.TestCase):
                 any(f.rule_id == "github.api-version" for f in result.findings)
             )
 
+    def test_accepts_parameterized_github_request_with_shared_api_headers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "github_adapter.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import github_api_headers\n"
+                "DEFAULT_API_BASE_URL = 'https://api.github.com'\n"
+                "def send(url):\n"
+                "    headers = github_api_headers()\n"
+                "    return Request(url, headers=headers)\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertFalse(
+                any(
+                    f.rule_id == "github.api-version"
+                    for f in result.findings
+                )
+            )
+
     def test_compliant_non_github_request_does_not_mask_github_api_gap(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
