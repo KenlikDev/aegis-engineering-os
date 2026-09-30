@@ -65,6 +65,7 @@ class KnowledgeGapRecord:
     candidate: KnowledgeGapCandidate
     validation: Mapping[str, Any] | None
     transitions: tuple[Mapping[str, Any], ...]
+    transitions_sha256: str | None = None
 
 
 def _now() -> str:
@@ -163,6 +164,114 @@ def _candidate_payload(candidate: KnowledgeGapCandidate) -> dict[str, Any]:
     }
 
 
+def _transition_history_payload(
+    transitions: Sequence[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    """Return the exact transition representation persisted to disk."""
+    return list(_redact(list(transitions)))
+
+
+def _transitions_sha256(
+    transitions: Sequence[Mapping[str, Any]],
+) -> str:
+    """Hash the canonical persisted transition history."""
+    return _hash(_transition_history_payload(transitions))
+
+
+def _validate_transition_history(
+    state: str,
+    transitions: object,
+) -> tuple[Mapping[str, Any], ...]:
+    """Validate lifecycle transition structure and state continuity."""
+    if not isinstance(transitions, list) or not transitions:
+        raise KnowledgeGapError("Knowledge-gap transitions must be a non-empty list.")
+
+    allowed = {
+        None: {"candidate"},
+        "candidate": {"validated", "rejected"},
+        "validated": {"rejected"},
+        "rejected": set(),
+    }
+    lifecycle_states = {"candidate", "validated", "rejected"}
+    validated: list[Mapping[str, Any]] = []
+    previous_state: str | None = None
+
+    for index, raw_transition in enumerate(transitions):
+        if not isinstance(raw_transition, Mapping):
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} is malformed."
+            )
+        if set(raw_transition) != {"from", "to", "at", "reason"}:
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} has an invalid schema."
+            )
+
+        from_state = raw_transition.get("from")
+        to_state = raw_transition.get("to")
+        recorded_at = raw_transition.get("at")
+        reason = raw_transition.get("reason")
+
+        if from_state != previous_state:
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} does not continue the lifecycle chain."
+            )
+        if from_state is not None and (
+            not isinstance(from_state, str) or from_state not in lifecycle_states
+        ):
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} has an invalid source state."
+            )
+        if not isinstance(to_state, str) or to_state not in lifecycle_states:
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} has an invalid target state."
+            )
+        if to_state not in allowed.get(from_state, set()):
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} contains an invalid lifecycle transition."
+            )
+        if not isinstance(recorded_at, str):
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} timestamp is malformed."
+            )
+        try:
+            normalized_at = datetime.fromisoformat(
+                recorded_at[:-1] + "+00:00"
+                if recorded_at.endswith("Z")
+                else recorded_at
+            )
+        except ValueError as exc:
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} timestamp is not ISO-8601."
+            ) from exc
+        if normalized_at.tzinfo is None:
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} timestamp must include a timezone."
+            )
+        if not isinstance(reason, str):
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} reason is malformed."
+            )
+        validated.append(
+            {
+                "from": from_state,
+                "to": to_state,
+                "at": recorded_at,
+                "reason": _require_text(
+                    reason,
+                    f"Knowledge-gap transition {index} reason",
+                    2000,
+                ),
+            }
+        )
+        previous_state = to_state
+
+    if previous_state != state:
+        raise KnowledgeGapError(
+            "Knowledge-gap transition history does not terminate in the recorded state."
+        )
+    return tuple(validated)
+
+
 def _record_to_dict(record: KnowledgeGapRecord) -> dict[str, Any]:
     return {
         "schema_version": record.schema_version,
@@ -172,7 +281,8 @@ def _record_to_dict(record: KnowledgeGapRecord) -> dict[str, Any]:
             "candidate_sha256": record.candidate.candidate_sha256,
         },
         "validation": _redact(record.validation),
-        "transitions": _redact(list(record.transitions)),
+        "transitions": _transition_history_payload(record.transitions),
+        "transitions_sha256": record.transitions_sha256,
     }
 
 
@@ -235,13 +345,25 @@ def _record_from_dict(data: Mapping[str, Any]) -> KnowledgeGapRecord:
             )
 
     raw_transitions = data.get("transitions", [])
-    if not isinstance(raw_transitions, list):
-        raise KnowledgeGapError("Knowledge-gap transitions must be a list.")
-    transitions: list[Mapping[str, Any]] = []
-    for transition in raw_transitions:
-        if not isinstance(transition, Mapping):
-            raise KnowledgeGapError("Knowledge-gap transition entry is malformed.")
-        transitions.append(dict(transition))
+    transitions = _validate_transition_history(state, raw_transitions)
+
+    raw_transitions_sha256 = data.get("transitions_sha256")
+    if raw_transitions_sha256 is None:
+        transitions_sha256 = None
+    else:
+        if not isinstance(raw_transitions_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}",
+            raw_transitions_sha256,
+        ):
+            raise KnowledgeGapError(
+                "Knowledge-gap transitions_sha256 must be a lowercase SHA-256 value."
+            )
+        expected_transitions_sha256 = _transitions_sha256(transitions)
+        if raw_transitions_sha256 != expected_transitions_sha256:
+            raise KnowledgeGapError(
+                "Knowledge-gap transition history hash does not match its record."
+            )
+        transitions_sha256 = raw_transitions_sha256
 
     if state == "validated" and validation is None:
         raise KnowledgeGapError("Validated knowledge-gap record must contain validation evidence.")
@@ -250,7 +372,8 @@ def _record_from_dict(data: Mapping[str, Any]) -> KnowledgeGapRecord:
         state=state,
         candidate=candidate,
         validation=validation,
-        transitions=tuple(transitions),
+        transitions=transitions,
+        transitions_sha256=transitions_sha256,
     )
 
 
@@ -320,19 +443,21 @@ def create_candidate(
         candidate_sha256=_hash(_candidate_payload(candidate)),
     )
     _validate_candidate(candidate)
+    transitions = (
+        {
+            "from": None,
+            "to": "candidate",
+            "at": created_at,
+            "reason": "knowledge gap identified",
+        },
+    )
     record = KnowledgeGapRecord(
         schema_version=SCHEMA_VERSION,
         state="candidate",
         candidate=candidate,
         validation=None,
-        transitions=(
-            {
-                "from": None,
-                "to": "candidate",
-                "at": created_at,
-                "reason": "knowledge gap identified",
-            },
-        ),
+        transitions=transitions,
+        transitions_sha256=_transitions_sha256(transitions),
     )
     path = _resolve_candidate_path(store_root) / f"{identifier}.json"
     if path.exists():
@@ -381,20 +506,21 @@ def validate_candidate(
         **validation_payload,
         "evidence_sha256": _hash(validation_payload),
     }
+    transitions = record.transitions + (
+        {
+            "from": "candidate",
+            "to": "validated",
+            "at": now,
+            "reason": "focused validation passed",
+        },
+    )
     updated = KnowledgeGapRecord(
         schema_version=SCHEMA_VERSION,
         state="validated",
         candidate=record.candidate,
         validation=validation,
-        transitions=record.transitions
-        + (
-            {
-                "from": "candidate",
-                "to": "validated",
-                "at": now,
-                "reason": "focused validation passed",
-            },
-        ),
+        transitions=transitions,
+        transitions_sha256=_transitions_sha256(transitions),
     )
     _write_record(candidate_path, updated)
     return updated
@@ -409,20 +535,21 @@ def reject_candidate(path: str | Path, *, reason: str) -> KnowledgeGapRecord:
             f"Knowledge-gap rejection requires candidate or validated state; got {record.state}."
         )
     now = _now()
+    transitions = record.transitions + (
+        {
+            "from": record.state,
+            "to": "rejected",
+            "at": now,
+            "reason": _require_text(reason, "rejection reason", 2000),
+        },
+    )
     updated = KnowledgeGapRecord(
         schema_version=SCHEMA_VERSION,
         state="rejected",
         candidate=record.candidate,
         validation=record.validation,
-        transitions=record.transitions
-        + (
-            {
-                "from": record.state,
-                "to": "rejected",
-                "at": now,
-                "reason": _require_text(reason, "rejection reason", 2000),
-            },
-        ),
+        transitions=transitions,
+        transitions_sha256=_transitions_sha256(transitions),
     )
     _write_record(candidate_path, updated)
     return updated
