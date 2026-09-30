@@ -34,6 +34,7 @@ class KnowledgeGapTests(unittest.TestCase):
             self.assertEqual("candidate", payload["state"])
             self.assertTrue(payload["candidate"]["candidate_sha256"])
             self.assertIsNone(payload["validation"])
+            self.assertRegex(payload["transitions_sha256"], r"^[0-9a-f]{64}$")
 
     def test_validate_requires_evidence_and_moves_to_validated(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -81,6 +82,77 @@ class KnowledgeGapTests(unittest.TestCase):
             )
             after = json.loads(path.read_text(encoding="utf-8"))["candidate"]["candidate_sha256"]
             self.assertEqual(before, after)
+
+    def test_rejects_tampered_transition_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            create_candidate(
+                scope="global",
+                capability="transition integrity",
+                problem="Lifecycle history must remain tamper-evident.",
+                proposed_change="Hash persisted knowledge-gap transitions.",
+                references=["https://docs.example.test/knowledge/transitions"],
+                store_root=directory,
+                candidate_id="aaaaaaaa-1111-4111-8111-111111111111",
+            )
+            path = Path(directory) / "aaaaaaaa-1111-4111-8111-111111111111.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["transitions"][0]["reason"] = "tampered"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(KnowledgeGapError, "transition history hash"):
+                reject_candidate(path, reason="must fail closed")
+
+    def test_rejects_invalid_transition_chain_even_with_recomputed_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            create_candidate(
+                scope="global",
+                capability="transition semantics",
+                problem="Lifecycle transitions must form a valid chain.",
+                proposed_change="Validate transition state continuity.",
+                references=["https://docs.example.test/knowledge/chain"],
+                store_root=directory,
+                candidate_id="bbbbbbbb-2222-4222-8222-222222222222",
+            )
+            path = Path(directory) / "bbbbbbbb-2222-4222-8222-222222222222.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["transitions"][0]["from"] = "validated"
+
+            import knowledge_gap
+            payload["transitions_sha256"] = knowledge_gap._transitions_sha256(
+                payload["transitions"]
+            )
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(KnowledgeGapError, "invalid lifecycle transition"):
+                reject_candidate(path, reason="must fail closed")
+
+    def test_legacy_transition_history_is_upgraded_on_next_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            create_candidate(
+                scope="global",
+                capability="legacy compatibility",
+                problem="Legacy records may omit transition history hashes.",
+                proposed_change="Upgrade them when the record is rewritten.",
+                references=["https://docs.example.test/knowledge/legacy"],
+                store_root=directory,
+                candidate_id="cccccccc-3333-4333-8333-333333333333",
+            )
+            path = Path(directory) / "cccccccc-3333-4333-8333-333333333333.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload.pop("transitions_sha256")
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            record = reject_candidate(
+                path,
+                reason="legacy record requires explicit rejection",
+            )
+            self.assertRegex(record.transitions_sha256 or "", r"^[0-9a-f]{64}$")
+
+            persisted = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                record.transitions_sha256,
+                persisted["transitions_sha256"],
+            )
 
     def test_reject_candidate_preserves_existing_validation(self):
         with tempfile.TemporaryDirectory() as directory:
