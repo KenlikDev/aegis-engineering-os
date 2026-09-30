@@ -177,7 +177,7 @@ def _default_transport(
         except (UnicodeDecodeError, json.JSONDecodeError):
             data = {}
         return exc.code, data
-    except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
         raise DeliveryError(f"Unable to communicate with GitHub API endpoint: {exc}") from exc
 
 
