@@ -115,7 +115,7 @@ class KnowledgeGapTests(unittest.TestCase):
             )
             path = Path(directory) / "bbbbbbbb-2222-4222-8222-222222222222.json"
             payload = json.loads(path.read_text(encoding="utf-8"))
-            payload["transitions"][0]["from"] = "validated"
+            payload["transitions"][0]["to"] = "validated"
 
             import knowledge_gap
             payload["transitions_sha256"] = knowledge_gap._transitions_sha256(
