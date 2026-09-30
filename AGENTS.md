@@ -71,6 +71,10 @@ Ask the user when a decision has material product, business, security, privacy, 
 - Use task branches under ai/.
 - The shared AI integration branch is ai/integration.
 - Target flow: ai/* -> ai/integration -> develop -> main.
+- Autonomous engineering work may be merged into ai/integration through the exact-head integration workflow.
+- Prepare a develop promotion pull request only at a declared completed engineering-stage checkpoint; do not create one for every small ai/integration change.
+- Prepare a main promotion pull request only at a release-candidate or explicitly declared release checkpoint after develop readiness is verified.
+- Aegis may prepare and verify protected-branch promotion artifacts but must never approve or merge develop or main.
 - Short-lived promotion branches are prepared from the target branch for develop/main promotion.
 - Treat develop and main as human-controlled protected branches.
 - Prefer coherent, atomic commits.

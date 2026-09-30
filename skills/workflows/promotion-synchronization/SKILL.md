@@ -21,6 +21,14 @@ Advance an integrated work item to done only after a promotion pull request has 
 8. A GitHub compare of target branch -> merge commit returns exact `identical` with zero ahead/behind counts.
 9. The target branch is re-read after the compare and its exact SHA matches the merge commit.
 
+## Human checkpoint boundary
+
+Promotion pull requests are prepared only for declared engineering-stage checkpoints on `develop` or release checkpoints on `main`. The promotion artifact is bounded to one stage and includes exact source/target identities and validation evidence.
+
+Aegis may create and verify the artifact, but never approves or merges protected branches. After a human-controlled merge, this workflow verifies the exact merge and synchronizes lifecycle state; it does not repair the protected branch.
+
+See `docs/governance/promotion-checkpoints.md` for the promotion cadence.
+
 ## Rules
 
 - Never approve or merge a pull request.

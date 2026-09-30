@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- define human promotion checkpoints for completed engineering stages on develop and release checkpoints on main;
 - refuse to infer Aegis lifecycle completion from an unlabeled closed GitHub issue;
 - retain newly published promotion snapshot branches after late preparation failures so retries remain idempotent without non-atomic branch deletion;
 - harden installed-project verification reads against symlink TOCTOU by using anchored no-follow file descriptors;
