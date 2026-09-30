@@ -239,8 +239,6 @@ class GitHubIntegrationMergeProvider:
             ),
             head_repository=head_repository,
             base_repository=base_repository,
-            head_repository=head_repo["full_name"],
-            base_repository=base_repo["full_name"],
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
