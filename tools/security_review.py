@@ -334,6 +334,23 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                     (node.lineno, compliant)
                 )
 
+    def contains_shared_api_headers(expression: ast.AST | None) -> bool:
+        if expression is None:
+            return False
+        for child in ast.walk(expression):
+            if isinstance(child, ast.Call) and (
+                (
+                    isinstance(child.func, ast.Name)
+                    and child.func.id == "github_api_headers"
+                )
+                or (
+                    isinstance(child.func, ast.Attribute)
+                    and child.func.attr == "github_api_headers"
+                )
+            ):
+                return True
+        return False
+
     def request_headers_are_compliant(expression: ast.AST | None, line: int) -> bool:
         if expression is None:
             return False
@@ -427,14 +444,24 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                 )
 
         if not github_request_sinks:
-            _finding(
-                findings,
-                rule_id="github.api-version",
-                severity=HIGH,
-                path=path,
-                root=root,
-                message="GitHub API usage must send the explicit API-version header.",
+            parameterized_transport_compliant = bool(request_sinks) and all(
+                contains_shared_api_headers(
+                    next(
+                        (keyword.value for keyword in node.keywords if keyword.arg == "headers"),
+                        None,
+                    )
+                )
+                for node, _ in request_sinks
             )
+            if not parameterized_transport_compliant:
+                _finding(
+                    findings,
+                    rule_id="github.api-version",
+                    severity=HIGH,
+                    path=path,
+                    root=root,
+                    message="GitHub API usage must send the explicit API-version header.",
+                )
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
