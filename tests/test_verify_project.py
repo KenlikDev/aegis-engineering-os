@@ -45,6 +45,12 @@ class VerifyProjectSecureReadTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 _read_regular_file_no_follow(redirected / "state.json")
 
+    def test_open_regular_file_preserves_regular_file_error_for_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(OSError, "must be a regular file"):
+                _open_regular_file_no_follow(root)
+
     def test_sha256_file_reads_regular_file_through_secure_descriptor(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "skill.md"

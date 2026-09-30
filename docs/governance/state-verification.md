@@ -77,3 +77,8 @@ When Aegis itself performs a change, it should verify the result from the author
 ## Conflict handling
 
 If local state, remote state, documentation, CI, or user statements disagree, Aegis should stop relying on the disputed fact until the discrepancy is explained or explicitly recorded as uncertainty.
+
+
+## Secure verifier descriptor ownership
+
+Secure verifier reads use anchored directory file descriptors and `O_NOFOLLOW`. The directory descriptor is closed exactly once, while a returned regular-file descriptor remains owned by the caller. Validation failures preserve their original error instead of being replaced by descriptor cleanup failures.

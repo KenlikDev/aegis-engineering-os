@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden verifier file-descriptor cleanup so validation errors are preserved deterministically;
 - support repeated squash-based human promotion without treating divergent Git ancestry as an automatic readiness blocker;
 - define human promotion checkpoints for completed engineering stages on develop and release checkpoints on main;
 - refuse to infer Aegis lifecycle completion from an unlabeled closed GitHub issue;
