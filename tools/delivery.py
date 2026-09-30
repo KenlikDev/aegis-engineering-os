@@ -328,11 +328,13 @@ class GitHubPullRequestProvider:
             raise DeliveryError(
                 f"Unable to search for open pull requests; HTTP {status}."
             )
-        matches = [
-            self._parse(item)
-            for item in data
-            if isinstance(item, Mapping)
-        ]
+        matches: list[PullRequest] = []
+        for item in data:
+            if not isinstance(item, Mapping):
+                continue
+            pull_request = self._parse(item)
+            self._validate_repository_origin(pull_request)
+            matches.append(pull_request)
         exact = [
             item
             for item in matches
