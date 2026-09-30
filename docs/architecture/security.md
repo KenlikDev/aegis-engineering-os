@@ -69,7 +69,7 @@ Release readiness follows the same GitHub credential destination policy as the o
 
 ## Security-review executable API-version header check
 
-For Python sources, the GitHub API-version rule is evaluated after AST parsing and follows the executable request sink. A shared-header exemption is valid only when `github_api_headers()` reaches a `Request(..., headers=...)` expression; comments, docstrings, unused calls, and unused variables do not satisfy the control.
+For Python sources, the GitHub API-version rule is evaluated after AST parsing and follows the executable request sink. A shared-header exemption is valid only when `github_api_headers()` reaches the same `Request(..., headers=...)` expression associated with a resolvable GitHub API URL. The analyzer follows direct URL literals and simple assigned/derived name aliases. A compliant request cannot mask a separate non-compliant GitHub request in the same file. Comments, docstrings, unused calls, and unused variables do not satisfy the control.
 
 A direct `X-GitHub-Api-Version` exemption is valid only when the header appears in the executable request headers, either directly or through a simple assigned mapping that reaches `Request(..., headers=...)`. The shared `tools/github_http_security.py` module is a policy-definition surface rather than a GitHub API consumer, so the consumer rule intentionally excludes that exact path while reviewing all other Python sources.
 
