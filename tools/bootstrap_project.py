@@ -173,6 +173,41 @@ def verify_source_checkpoint(root: Path, expected_commit: str) -> None:
 
 
 
+def _resolve_source_file(
+    root: Path,
+    relative_path: Path,
+    label: str,
+) -> Path:
+    """Resolve one Aegis source file without allowing filesystem indirection."""
+    if relative_path.is_absolute() or any(
+        part == ".." for part in relative_path.parts
+    ):
+        raise SystemExit(
+            f"{label} must use a relative source path without traversal."
+        )
+
+    absolute_candidate = (root / relative_path).absolute()
+    if absolute_candidate.is_symlink():
+        raise SystemExit(f"{label} must not be a symbolic link.")
+
+    resolved = absolute_candidate.resolve()
+    if resolved != absolute_candidate:
+        raise SystemExit(
+            f"{label} must not resolve through symbolic links."
+        )
+
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit(
+            f"{label} resolves outside the Aegis source repository."
+        ) from exc
+
+    if not resolved.is_file():
+        raise SystemExit(f"{label} does not exist: {resolved}")
+    return resolved
+
+
 def _resolve_registry_skill_path(root: Path, raw_path: object, skill_name: str) -> Path:
     """Resolve one registry path while keeping the source boundary explicit."""
     if not isinstance(raw_path, str) or not raw_path.strip():
@@ -211,17 +246,21 @@ def _resolve_registry_skill_path(root: Path, raw_path: object, skill_name: str) 
     return resolved
 
 def load_source_metadata(root: Path) -> tuple[str, dict, dict]:
-    version_file = root / "VERSION"
-    manifest_file = root / "aegis-manifest.json"
-    registry_file = root / "skills" / "registry.json"
-
-    if not version_file.is_file():
-        raise SystemExit(f"Missing Aegis VERSION file: {version_file}")
-    if not manifest_file.is_file():
-        raise SystemExit(f"Missing Aegis manifest: {manifest_file}")
-    if not registry_file.is_file():
-        raise SystemExit(f"Missing Aegis skill registry: {registry_file}")
-
+    version_file = _resolve_source_file(
+        root,
+        Path("VERSION"),
+        "Aegis VERSION file",
+    )
+    manifest_file = _resolve_source_file(
+        root,
+        Path("aegis-manifest.json"),
+        "Aegis manifest",
+    )
+    registry_file = _resolve_source_file(
+        root,
+        Path("skills/registry.json"),
+        "Aegis skill registry",
+    )
     try:
         version = version_file.read_text(encoding="utf-8").strip()
         manifest = load_json_object(manifest_file)
@@ -494,10 +533,11 @@ def stage_skills(
 ) -> dict[str, str]:
     checksums: dict[str, str] = {}
     for name, relative_source in selected.items():
-        source = root / relative_source
-        if not source.is_file():
-            raise SystemExit(f"Missing Aegis skill source: {source}")
-
+        source = _resolve_source_file(
+            root,
+            relative_source,
+            f"Aegis skill source {name!r}",
+        )
         staged = stage_root / name / "SKILL.md"
         staged.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, staged)
@@ -587,7 +627,11 @@ def main() -> int:
     state_root = project / ".aegis"
     state_path = state_root / "aegis-version.json"
     agents_path = project / "AGENTS.md"
-    agents_template_path = root / "templates" / "AGENTS.md"
+    agents_template_path = _resolve_source_file(
+        root,
+        Path("templates/AGENTS.md"),
+        "Aegis AGENTS template",
+    )
 
     validate_managed_root(project, target_root, ".agents/skills")
     validate_managed_root(project, state_root, ".aegis")
