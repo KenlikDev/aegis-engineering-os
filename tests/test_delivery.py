@@ -76,6 +76,7 @@ class FakeGitHubTransport:
 
 class FakePullRequestProvider:
     def __init__(self, pull_request: PullRequest) -> None:
+        self.repository = REPOSITORY
         self.pull_request = pull_request
         self.created: list[CreatePullRequestRequest] = []
 
