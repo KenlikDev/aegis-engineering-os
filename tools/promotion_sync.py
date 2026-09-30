@@ -204,6 +204,14 @@ class GitHubPromotionSyncProvider:
         ):
             raise PromotionSyncError("GitHub promotion pull-request response is malformed.")
 
+        head_repository = head_repo["full_name"]
+        base_repository = base_repo["full_name"]
+        if head_repository != self.repository or base_repository != self.repository:
+            raise PromotionSyncError(
+                "GitHub promotion pull-request head and base repositories must match "
+                "the configured repository."
+            )
+
         return PromotionPullRequest(
             number=number,
             url=url,
@@ -218,8 +226,8 @@ class GitHubPromotionSyncProvider:
                 if data.get("merge_commit_sha") is not None
                 else None
             ),
-            head_repository=head_repo["full_name"],
-            base_repository=base_repo["full_name"],
+            head_repository=head_repository,
+            base_repository=base_repository,
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
