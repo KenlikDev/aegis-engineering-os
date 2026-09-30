@@ -22,6 +22,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from github_http_security import (
     github_api_headers,
+    parse_github_json,
     read_bounded_response,
     validate_github_api_base_url,
 )
@@ -286,15 +287,17 @@ def _default_transport(
     try:
         with _HTTP_OPENER.open(request, timeout=timeout) as response:
             raw = read_bounded_response(response)
-            return response.status, json.loads(raw.decode("utf-8")) if raw else {}
+            return response.status, parse_github_json(raw) if raw else {}
     except HTTPError as exc:
         raw = read_bounded_response(exc)
         try:
-            data = json.loads(raw.decode("utf-8")) if raw else {}
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            data = {}
+            data = parse_github_json(raw) if raw else {}
+        except ValueError as parse_error:
+            raise WorkItemLifecycleError(
+                f"GitHub API returned invalid JSON error response: {parse_error}"
+            ) from parse_error
         return exc.code, data
-    except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
         raise WorkItemLifecycleError(
             f"Unable to communicate with GitHub API endpoint {url}: {exc}"
         ) from exc
