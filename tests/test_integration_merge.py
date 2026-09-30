@@ -242,6 +242,18 @@ class IntegrationMergeTests(unittest.TestCase):
                 expected_head_sha=HEAD_SHA,
             )
 
+    def test_github_provider_rejects_fork_origin(self):
+        provider = GitHubIntegrationMergeProvider(
+            REPOSITORY,
+            "test-token",
+            transport=FakeGitHubTransport(head_repository="attacker/example-fork"),
+        )
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "head and base repositories",
+        ):
+            provider.get_pull_request(PR_NUMBER)
+
     def test_successful_merge_advances_review_to_integration(self):
         provider = FakeIntegrationProvider()
         items = work_items()
