@@ -1077,7 +1077,8 @@ class EvidenceAdapterTests(unittest.TestCase):
                 record.transitions_sha256,
                 canonical.result["transitions_sha256"],
             )
-            self.assertEqual([], canonical.uncertainty)
+            self.assertEqual(1, len(canonical.uncertainty))
+            self.assertIn("not completed", canonical.uncertainty[0])
             self.assertEqual("pending", canonical.status)
 
     def test_knowledge_gap_legacy_transition_history_is_explicitly_uncertain(self):
@@ -1108,8 +1109,10 @@ class EvidenceAdapterTests(unittest.TestCase):
 
             self.assertEqual("pending", canonical.status)
             self.assertIsNone(canonical.result["transitions_sha256"])
-            self.assertEqual(1, len(canonical.uncertainty))
-            self.assertIn("legacy", canonical.uncertainty[0].lower())
+            self.assertEqual(2, len(canonical.uncertainty))
+            self.assertTrue(
+                any("legacy" in item.lower() for item in canonical.uncertainty)
+            )
 
     def test_knowledge_gap_rejected_is_failed_and_non_active(self):
         with __import__("tempfile").TemporaryDirectory() as temp:
