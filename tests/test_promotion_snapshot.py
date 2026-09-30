@@ -47,6 +47,7 @@ class FakeTransport:
         self.target_reads = 0
         self.create_commit_payload = None
         self.advance_source_after_snapshot = False
+        self.pull_request_readback_sha = SNAPSHOT_SHA
 
     def __call__(self, method, url, headers, payload):  # noqa: ANN001
         path = url.removeprefix("https://api.github.com")
@@ -126,6 +127,9 @@ class FakeTransport:
             if self.existing_pr is None:
                 return 200, []
             return 200, [self.existing_pr]
+        if method == "GET" and path == f"/repos/{REPOSITORY}/pulls/10":
+            payload = self.pull_request_payload(self.pull_request_readback_sha)
+            return 200, payload
         if method == "POST" and path == f"/repos/{REPOSITORY}/pulls":
             self.created_pr = True
             return 201, self.pull_request_payload()
@@ -298,6 +302,18 @@ class PromotionSnapshotTests(unittest.TestCase):
             "Promotion pull request verification failed",
         ):
             prepare_promotion_snapshot(self._provider(transport), self._request())
+
+    def test_rejects_changed_pull_request_head_sha_after_creation(self):
+        transport = FakeTransport()
+        transport.pull_request_readback_sha = OTHER_SHA
+
+        with self.assertRaisesRegex(
+            PromotionSnapshotError,
+            "Promotion pull request verification failed",
+        ):
+            prepare_promotion_snapshot(self._provider(transport), self._request())
+
+        self.assertTrue(transport.created_pr)
 
     def test_rejects_malformed_pull_request_head_sha(self):
         transport = FakeTransport()
