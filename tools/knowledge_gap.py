@@ -192,6 +192,7 @@ def _validate_transition_history(
         "validated": {"rejected"},
         "rejected": set(),
     }
+    lifecycle_states = {"candidate", "validated", "rejected"}
     validated: list[Mapping[str, Any]] = []
     previous_state: str | None = None
 
@@ -214,7 +215,13 @@ def _validate_transition_history(
             raise KnowledgeGapError(
                 f"Knowledge-gap transition {index} does not continue the lifecycle chain."
             )
-        if to_state not in {"candidate", "validated", "rejected"}:
+        if from_state is not None and (
+            not isinstance(from_state, str) or from_state not in lifecycle_states
+        ):
+            raise KnowledgeGapError(
+                f"Knowledge-gap transition {index} has an invalid source state."
+            )
+        if not isinstance(to_state, str) or to_state not in lifecycle_states:
             raise KnowledgeGapError(
                 f"Knowledge-gap transition {index} has an invalid target state."
             )
