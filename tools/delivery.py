@@ -283,6 +283,8 @@ class GitHubPullRequestProvider:
             mergeable=mergeable,
             mergeable_state=mergeable_state,
             url=url,
+            head_repository=head_repo["full_name"],
+            base_repository=base_repo["full_name"],
         )
 
     def get(self, pull_request_number: int) -> PullRequest:
