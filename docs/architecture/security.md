@@ -1,3 +1,9 @@
+## Conservative executable-flow rules
+
+For `subprocess` calls, a supplied `shell=` value is compliant only when the analyzer can prove it is the literal boolean `False`. Dynamic, unresolved, or truthy shell settings are reported as high-severity findings rather than assumed safe.
+
+For GitHub API-version checks, fallback detection is restricted to request sinks whose URL is recognized as GitHub API usage. A compliant unrelated HTTP request cannot satisfy or mask a GitHub request-version requirement.
+
 ## Flow-sensitive limitations
 
 The Python GitHub API-version review is intentionally conservative when headers are assigned through variables. Every executable assignment observed before a request sink must be compliant; an unknown or conditionally non-compliant assignment prevents the request from being treated as verified.
