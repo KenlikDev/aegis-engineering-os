@@ -211,6 +211,35 @@ class FakeGitHubTransport:
 
 
 class IntegrationMergeTests(unittest.TestCase):
+    def test_rejects_fork_origin_before_merge(self):
+        provider = FakeIntegrationProvider()
+        provider.pr = IntegrationPullRequest(
+            number=provider.pr.number,
+            url=provider.pr.url,
+            head=provider.pr.head,
+            head_sha=provider.pr.head_sha,
+            base=provider.pr.base,
+            state=provider.pr.state,
+            merged=False,
+            draft=False,
+            mergeable_state="clean",
+            merge_commit_sha=None,
+            head_repository="attacker/example-fork",
+            base_repository=REPOSITORY,
+        )
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "head and base repositories must match",
+        ):
+            sync_integration_merge(
+                provider,
+                work_items(),
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
+
     def test_successful_merge_advances_review_to_integration(self):
         provider = FakeIntegrationProvider()
         items = work_items()
