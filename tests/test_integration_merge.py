@@ -180,8 +180,16 @@ class FakeGitHubTransport:
                 "number": PR_NUMBER,
                 "title": "integration merge",
                 "body": "",
-                "head": {"ref": "ai/feature/75-integration-merge", "sha": HEAD_SHA},
-                "base": {"ref": "ai/integration", "sha": INTEGRATION_SHA},
+                "head": {
+                    "ref": "ai/feature/75-integration-merge",
+                    "sha": HEAD_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": "ai/integration",
+                    "sha": INTEGRATION_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
                 "state": "closed" if merged else "open",
                 "merged_at": "2026-09-28T15:00:00Z" if merged else None,
                 "merge_commit_sha": MERGE_SHA if merged else None,
