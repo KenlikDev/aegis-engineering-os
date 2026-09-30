@@ -74,6 +74,8 @@ class FakeIntegrationProvider:
             draft=draft,
             mergeable_state=mergeable_state,
             merge_commit_sha=merge_commit_sha,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         self.integration = BranchSnapshot(
             branch="ai/integration",
