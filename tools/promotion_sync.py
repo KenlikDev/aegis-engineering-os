@@ -61,6 +61,8 @@ class PromotionPullRequest:
     state: str
     merged: bool
     merge_commit_sha: str | None
+    head_repository: str | None = None
+    base_repository: str | None = None
 
 
 class PromotionSyncProvider(Protocol):
