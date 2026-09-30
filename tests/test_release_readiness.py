@@ -17,6 +17,7 @@ from release_readiness import (  # noqa: E402
 
 REPOSITORY = "KenlikDev/aegis-engineering-os"
 MAIN_SHA = "1111111111111111111111111111111111111111"
+MOVED_MAIN_SHA = "2222222222222222222222222222222222222222"
 
 BASE_FILES = {
     "VERSION": "0.1.0-alpha.1\n",
@@ -45,6 +46,7 @@ class FakeTransport:
         changelog=BASE_FILES["CHANGELOG.md"],
         manifest_text=None,
         registry_text=None,
+        moved_after_first_branch_read=False,
     ):
         self.protected = protected
         self.validation = validation
@@ -54,6 +56,8 @@ class FakeTransport:
         self.changelog = changelog
         self.manifest_text = manifest_text
         self.registry_text = registry_text
+        self.moved_after_first_branch_read = moved_after_first_branch_read
+        self.branch_reads = 0
         self.requests = []
 
     def __call__(self, method, url, headers):
@@ -62,10 +66,16 @@ class FakeTransport:
             raise AssertionError("Release readiness must remain read-only.")
 
         if url.endswith("/branches/main"):
+            self.branch_reads += 1
+            sha = (
+                MOVED_MAIN_SHA
+                if self.moved_after_first_branch_read and self.branch_reads > 1
+                else MAIN_SHA
+            )
             return 200, {
                 "name": "main",
                 "protected": self.protected,
-                "commit": {"sha": MAIN_SHA},
+                "commit": {"sha": sha},
             }
 
         if "/actions/workflows/" in url and "/runs?" in url:
@@ -99,7 +109,7 @@ class FakeTransport:
             "CHANGELOG.md": self.changelog,
         }
         for path, content in files.items():
-            marker = f"/contents/{path}?ref=main"
+            marker = f"/contents/{path}?ref={MAIN_SHA}"
             if url.endswith(marker):
                 encoded = base64.b64encode(
                     content.encode("utf-8")
@@ -179,6 +189,28 @@ class ReleaseReadinessTests(unittest.TestCase):
             "2026-03-10",
             request.get_header("X-github-api-version"),
         )
+
+    def test_reads_release_metadata_from_exact_main_sha(self):
+        transport = FakeTransport()
+        result = assess_release_readiness(self._provider(transport))
+
+        self.assertTrue(result.ready)
+        file_requests = [
+            request[1]
+            for request in transport.requests
+            if "/contents/" in request[1]
+        ]
+        self.assertTrue(file_requests)
+        self.assertTrue(all(f"?ref={MAIN_SHA}" in url for url in file_requests))
+
+    def test_rejects_main_sha_drift_during_assessment(self):
+        transport = FakeTransport(moved_after_first_branch_read=True)
+
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "main changed during release-readiness assessment",
+        ):
+            assess_release_readiness(self._provider(transport))
 
     def test_blocks_unreleased_notes(self):
         changelog = (
