@@ -43,7 +43,8 @@ The operation is intentionally conservative:
 6. create the short-lived branch ai/<work-item>-<target>-promotion directly at the snapshot commit SHA;
 7. verify the branch commit, parents, and tree;
 8. create or reuse one open pull request into the selected target;
-9. return structured metadata without credentials.
+9. verify the pull request head SHA equals the exact promotion commit SHA, in addition to its branch/base identity;
+10. return structured metadata without credentials.
 
 The branch is never intentionally published first at the protected target SHA. A source or target change during preparation therefore fails closed before the promotion branch is published. Once a new promotion branch is published, later pull-request or verification failures never trigger automatic branch deletion because the GitHub delete-reference API has no expected-SHA compare-and-delete condition. A valid newly published snapshot branch is retained for safe idempotent retry; a missing or changed branch is treated as an explicit recovery boundary and Aegis never overwrites or deletes it automatically. A snapshot commit is bound to the exact source revision for which promotion readiness verified Aegis Validation.
 
@@ -59,7 +60,7 @@ ai/<work-item>-main-promotion
 
 When the branch already exists, its commit must exactly match the expected target parent, integration parent, and integration tree. A mismatch is a hard failure rather than an attempt to repair or overwrite the branch.
 
-Open pull requests are searched by exact repository owner, head branch, and base branch. More than one matching open pull request is a hard failure.
+Open pull requests are searched by exact repository owner, head branch, and base branch. More than one matching open pull request is a hard failure. The selected pull request must also expose an exact valid head SHA equal to the verified promotion commit SHA; matching branch names alone are not sufficient provenance.
 
 ## Pull-request repository origin
 
