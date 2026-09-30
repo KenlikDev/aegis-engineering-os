@@ -645,21 +645,98 @@ def write_bytes_atomically(
         os.close(directory_fd)
 
 
+def _open_secure_source_file(
+    path: Path,
+    *,
+    error_type: type[Exception],
+) -> int:
+    """Open one regular source file without following any path-component symlinks."""
+    if (
+        os.name != "posix"
+        or not hasattr(os, "O_DIRECTORY")
+        or not hasattr(os, "O_NOFOLLOW")
+    ):
+        raise error_type(
+            "Atomic source copy requires POSIX directory-FD and no-follow support."
+        )
+
+    absolute = Path(os.path.abspath(path))
+    if absolute == Path(absolute.anchor):
+        raise error_type(f"Atomic copy source must identify a file: {path}")
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        directory_fd = os.open(absolute.anchor, directory_flags)
+    except OSError as exc:
+        raise error_type(
+            f"Unable to securely open the atomic copy source root: {absolute.anchor}"
+        ) from exc
+
+    try:
+        for component in absolute.parent.parts:
+            if component == absolute.anchor:
+                continue
+            try:
+                next_fd = os.open(
+                    component,
+                    directory_flags,
+                    dir_fd=directory_fd,
+                )
+            except OSError as exc:
+                raise error_type(
+                    f"Unable to securely open atomic copy source directory: {absolute.parent}"
+                ) from exc
+            os.close(directory_fd)
+            directory_fd = next_fd
+
+        try:
+            file_fd = os.open(
+                absolute.name,
+                os.O_RDONLY | os.O_NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+            file_stat = os.fstat(file_fd)
+        except OSError as exc:
+            raise error_type(
+                f"Unable to securely open atomic copy source: {path}"
+            ) from exc
+
+        if not stat.S_ISREG(file_stat.st_mode):
+            os.close(file_fd)
+            raise error_type(
+                f"Atomic copy source must be a regular file: {path}"
+            )
+        return file_fd
+    finally:
+        os.close(directory_fd)
+
+
 def copy_file_atomically(
     source_path: str | Path,
     output_path: str | Path,
     *,
     error_type: type[Exception] = EvidenceContractError,
 ) -> None:
-    """Copy one regular source file into a destination through the atomic byte writer."""
+    """Copy one regular source file through no-follow source and atomic destination boundaries."""
     source = Path(source_path).expanduser()
-    if source.is_symlink() or not source.is_file():
-        raise error_type(f"Atomic copy source must be a regular non-symlink file: {source}")
+    file_descriptor = _open_secure_source_file(
+        source,
+        error_type=error_type,
+    )
     try:
-        payload = source.read_bytes()
-        mode = stat.S_IMODE(source.stat().st_mode)
-    except (OSError, UnicodeError) as exc:
+        file_stat = os.fstat(file_descriptor)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(file_descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        payload = b"".join(chunks)
+        mode = stat.S_IMODE(file_stat.st_mode)
+    except OSError as exc:
         raise error_type(f"Unable to read atomic copy source: {source}") from exc
+    finally:
+        os.close(file_descriptor)
 
     write_bytes_atomically(
         payload,
