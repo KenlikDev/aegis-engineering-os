@@ -47,6 +47,8 @@ class FakeTransport:
         self.target_reads = 0
         self.create_commit_payload = None
         self.advance_source_after_snapshot = False
+        self.pull_request_readback_sha = SNAPSHOT_SHA
+        self.pull_request_created_payload = None
 
     def __call__(self, method, url, headers, payload):  # noqa: ANN001
         path = url.removeprefix("https://api.github.com")
@@ -126,9 +128,14 @@ class FakeTransport:
             if self.existing_pr is None:
                 return 200, []
             return 200, [self.existing_pr]
+        if method == "GET" and path == f"/repos/{REPOSITORY}/pulls/10":
+            if self.existing_pr is not None:
+                return 200, self.existing_pr
+            payload = self.pull_request_payload(self.pull_request_readback_sha)
+            return 200, payload
         if method == "POST" and path == f"/repos/{REPOSITORY}/pulls":
             self.created_pr = True
-            return 201, self.pull_request_payload()
+            return 201, self.pull_request_created_payload or self.pull_request_payload()
 
         if method == "GET" and path == f"/repos/{REPOSITORY}/compare/{self.target_sha}...{self.source_sha}":
             return 200, {
@@ -158,13 +165,16 @@ class FakeTransport:
         raise AssertionError(f"Unexpected request: {method} {path}")
 
     @staticmethod
-    def pull_request_payload():
+    def pull_request_payload(head_sha=SNAPSHOT_SHA):
         return {
             "number": 10,
             "html_url": "https://github.com/KenlikDev/aegis-engineering-os/pull/10",
             "state": "open",
             "merged": False,
-            "head": {"ref": "ai/1-develop-promotion"},
+            "head": {
+                "ref": "ai/1-develop-promotion",
+                "sha": head_sha,
+            },
             "base": {"ref": "develop"},
             "draft": True,
         }
@@ -193,6 +203,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertEqual(TARGET_SHA, result.target_sha)
         self.assertEqual("ai/1-develop-promotion", result.promotion_branch)
         self.assertEqual(SNAPSHOT_SHA, result.promotion_sha)
+        self.assertEqual(SNAPSHOT_SHA, result.pull_request.head_sha)
         self.assertFalse(result.branch_reused)
         self.assertFalse(result.pull_request_reused)
         self.assertTrue(transport.created_branch)
@@ -283,6 +294,54 @@ class PromotionSnapshotTests(unittest.TestCase):
 
         self.assertFalse(transport.created_branch)
 
+    def test_rejects_pull_request_with_matching_branch_but_wrong_head_sha(self):
+        transport = FakeTransport(
+            existing_branch=SNAPSHOT_SHA,
+            existing_pr=FakeTransport.pull_request_payload(OTHER_SHA),
+        )
+        transport.pull_request_readback_sha = OTHER_SHA
+
+        with self.assertRaisesRegex(
+            PromotionSnapshotError,
+            "Promotion pull request verification failed",
+        ):
+            prepare_promotion_snapshot(self._provider(transport), self._request())
+
+    def test_rejects_changed_pull_request_head_sha_after_creation(self):
+        transport = FakeTransport()
+        transport.pull_request_readback_sha = OTHER_SHA
+
+        with self.assertRaisesRegex(
+            PromotionSnapshotError,
+            "Promotion pull request verification failed",
+        ):
+            prepare_promotion_snapshot(self._provider(transport), self._request())
+
+        self.assertTrue(transport.created_pr)
+
+    def test_rejects_malformed_pull_request_head_sha(self):
+        transport = FakeTransport()
+        payload = FakeTransport.pull_request_payload()
+        payload["head"]["sha"] = "not-a-sha"
+        transport.pull_request_created_payload = payload
+
+        def malformed_pr(method, url, headers, request_payload):  # noqa: ANN001
+            if method == "POST" and url.endswith("/pulls"):
+                return 201, payload
+            return transport(method, url, headers, request_payload)
+
+        provider = GitHubPromotionSnapshotProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=malformed_pr,
+        )
+
+        with self.assertRaisesRegex(
+            PromotionSnapshotError,
+            "GitHub pull-request response is malformed",
+        ):
+            prepare_promotion_snapshot(provider, self._request())
+
     def test_reuses_matching_snapshot_and_pr(self):
         transport = FakeTransport(
             existing_branch=SNAPSHOT_SHA,
@@ -293,6 +352,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertTrue(result.branch_reused)
         self.assertTrue(result.pull_request_reused)
         self.assertEqual(SNAPSHOT_SHA, result.promotion_sha)
+        self.assertEqual(SNAPSHOT_SHA, result.pull_request.head_sha)
         self.assertFalse(transport.created_branch)
         self.assertFalse(transport.created_commit)
         self.assertFalse(transport.created_pr)

@@ -79,6 +79,8 @@ class PromotionSnapshotProvider(Protocol):
         base: str,
     ) -> list[PullRequestSnapshot]: ...
 
+    def get_pull_request(self, number: int) -> PullRequestSnapshot: ...
+
     def create_pull_request(
         self,
         *,
@@ -104,6 +106,7 @@ class PullRequestSnapshot:
     state: str
     merged: bool
     head: str
+    head_sha: str
     base: str
     draft: bool
 
@@ -367,6 +370,22 @@ class GitHubPromotionSnapshotProvider:
                 result.append(parsed)
         return result
 
+    def get_pull_request(self, number: int) -> PullRequestSnapshot:
+        if number <= 0:
+            raise PromotionSnapshotError("Pull-request number must be positive.")
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/pulls/{number}",
+        )
+        if status != 200 or not isinstance(data, Mapping):
+            raise PromotionSnapshotError(
+                f"Unable to read promotion pull request #{number}; HTTP {status}."
+            )
+        parsed = self._parse_pull_request(data)
+        if parsed is None:
+            raise PromotionSnapshotError("GitHub pull-request response is malformed.")
+        return parsed
+
     def create_pull_request(
         self,
         *,
@@ -395,7 +414,7 @@ class GitHubPromotionSnapshotProvider:
         parsed = self._parse_pull_request(data)
         if parsed is None:
             raise PromotionSnapshotError("GitHub pull-request response is malformed.")
-        return parsed
+        return self.get_pull_request(parsed.number)
 
     @staticmethod
     def _parse_pull_request(data: Mapping[str, Any]) -> PullRequestSnapshot | None:
@@ -407,6 +426,7 @@ class GitHubPromotionSnapshotProvider:
         base = data.get("base")
         draft = data.get("draft", False)
         head_ref = head.get("ref") if isinstance(head, Mapping) else None
+        head_sha = head.get("sha") if isinstance(head, Mapping) else None
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
         if not (
             isinstance(number, int)
@@ -414,6 +434,8 @@ class GitHubPromotionSnapshotProvider:
             and isinstance(state, str)
             and isinstance(merged, bool)
             and isinstance(head_ref, str)
+            and isinstance(head_sha, str)
+            and SHA_RE.fullmatch(head_sha)
             and isinstance(base_ref, str)
             and isinstance(draft, bool)
         ):
@@ -424,6 +446,7 @@ class GitHubPromotionSnapshotProvider:
             state=state,
             merged=merged,
             head=head_ref,
+            head_sha=head_sha,
             base=base_ref,
             draft=draft,
         )
@@ -538,7 +561,7 @@ def prepare_promotion_snapshot(
 
     pr_reused = bool(existing_prs)
     if existing_prs:
-        pull_request = existing_prs[0]
+        pull_request = provider.get_pull_request(existing_prs[0].number)
     else:
         pull_request = provider.create_pull_request(
             title=(
@@ -561,6 +584,7 @@ def prepare_promotion_snapshot(
 
     if (
         pull_request.head != branch
+        or pull_request.head_sha != promotion_sha
         or pull_request.base != request.target_branch
         or pull_request.state != "open"
         or pull_request.merged
@@ -599,6 +623,7 @@ def _to_dict(result: PromotionSnapshotResult) -> dict[str, Any]:
             "state": result.pull_request.state,
             "merged": result.pull_request.merged,
             "head": result.pull_request.head,
+            "head_sha": result.pull_request.head_sha,
             "base": result.pull_request.base,
             "draft": result.pull_request.draft,
         },
