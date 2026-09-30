@@ -106,7 +106,7 @@ OpenHands execution now has an explicit adapter as well. It preserves the alread
 
 Lifecycle mutations now have an explicit adapter as well. It preserves provider, operation, work-item identity, state transition, verification state, reference, and identifier. Verified mutations become `verified`; unverified mutations remain `unknown` with explicit read-after-write uncertainty.
 
-Knowledge-gap records now have an explicit adapter as well. It preserves candidate provenance and controlled lifecycle state; candidate/validated/rejected map to `pending`/`verified`/`failed`, without treating verified candidate knowledge as active guidance.
+Knowledge-gap records now have an explicit adapter as well. It preserves candidate provenance, controlled lifecycle state, transition history, and the transition-history SHA-256 when present; candidate/validated/rejected map to `pending`/`verified`/`failed`, without treating verified candidate knowledge as active guidance. Legacy records without transition-history hashing remain explicitly uncertain at the canonical provenance boundary.
 
 Requirements clarification, workflow composition, and architecture planning now have explicit adapters as well. They preserve their specialized planning information and map only their existing gate state into canonical status.
 
