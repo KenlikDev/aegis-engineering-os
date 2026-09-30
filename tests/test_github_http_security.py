@@ -112,6 +112,22 @@ class GitHubHttpSecurityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported constant"):
             parse_github_json(b'{"value":NaN}')
 
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            parse_github_json(b'{"value":')
+
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            parse_github_json(b"\xff\xfe")
+
+        self.assertIsNone(parse_github_json(b"null"))
+        self.assertTrue(parse_github_json(b"true"))
+        self.assertEqual("ok", parse_github_json(b'"ok"'))
+
+    def test_rejects_empty_github_json_response(self):
+        from github_http_security import parse_github_json
+
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            parse_github_json(b"")
+
     def test_github_adapters_use_shared_strict_json_parser(self):
         from pathlib import Path
 
