@@ -82,7 +82,7 @@ class WorkflowCompositionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(WorkflowCompositionError, "unsupported constant"):
+            with self.assertRaisesRegex(WorkflowCompositionError, "JSON constant .*not allowed"):
                 compose_workflow("feature", registry_path=path)
 
     def test_unknown_registry_capability_fails_closed(self):
