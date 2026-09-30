@@ -354,6 +354,13 @@ def sync_integration_merge(
 
     pull_request = provider.get_pull_request(pull_request_number)
     _validate_task_branch_for_work_item(pull_request.head, work_item_id)
+    if (
+        pull_request.head_repository != provider.repository
+        or pull_request.base_repository != provider.repository
+    ):
+        raise IntegrationMergeError(
+            "Pull request head and base repositories must match the configured repository."
+        )
     if pull_request.base != INTEGRATION_BRANCH:
         raise IntegrationMergeError(
             "Pull request base does not match ai/integration."
