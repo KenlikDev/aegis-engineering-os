@@ -121,6 +121,8 @@ class FakeIntegrationProvider:
             draft=False,
             mergeable_state="unknown",
             merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         return MergeResult(merged=True, merge_commit_sha=MERGE_SHA)
 
