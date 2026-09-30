@@ -209,6 +209,14 @@ class GitHubIntegrationMergeProvider:
                 "GitHub integration pull-request response is malformed."
             )
 
+        head_repository = head_repo["full_name"]
+        base_repository = base_repo["full_name"]
+        if head_repository != self.repository or base_repository != self.repository:
+            raise IntegrationMergeError(
+                "GitHub integration pull-request head and base repositories must match "
+                "the configured repository."
+            )
+
         merged_at = data.get("merged_at")
         mergeable_state = data.get("mergeable_state")
         if mergeable_state is not None and not isinstance(mergeable_state, str):
@@ -229,6 +237,8 @@ class GitHubIntegrationMergeProvider:
                 if data.get("merge_commit_sha") is not None
                 else None
             ),
+            head_repository=head_repository,
+            base_repository=base_repository,
             head_repository=head_repo["full_name"],
             base_repository=base_repo["full_name"],
         )
