@@ -3,6 +3,8 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden installed-project verification reads against symlink TOCTOU by using anchored no-follow file descriptors;
+
 - preserve pull request head and base repository origin in verified integration and promotion provenance;
 
 - make GitHub API-version security review fail closed when unsafe header assignments can be masked by later compliant assignments;
