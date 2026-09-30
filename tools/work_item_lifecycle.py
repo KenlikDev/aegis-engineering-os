@@ -412,12 +412,18 @@ class GitHubIssuesProvider:
                 if isinstance(label, Mapping) and isinstance(label.get("name"), str)
             )
         )
-        state = self._extract_state(list(labels))
-        has_status_label = any(
+        state_labels_present = any(
             STATUS_LABEL_RE.fullmatch(label) for label in labels
         )
-        if not has_status_label and data.get("state") == "closed":
-            state = LifecycleState.DONE
+        if not state_labels_present:
+            if data.get("state") == "closed":
+                raise WorkItemLifecycleError(
+                    "GitHub issue is closed without an Aegis status label; "
+                    "refusing to infer lifecycle completion."
+                )
+            state = LifecycleState.INTAKE
+        else:
+            state = self._extract_state(list(labels))
         resume_state = self._extract_resume_state(list(labels), state)
         if state == LifecycleState.DONE and data.get("state") != "closed":
             raise WorkItemLifecycleError("Aegis done state requires a closed GitHub issue.")
