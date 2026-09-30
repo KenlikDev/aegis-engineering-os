@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- refuse to infer Aegis lifecycle completion from an unlabeled closed GitHub issue;
 - compensate failed promotion snapshot publication without deleting pre-existing or concurrently changed branches;
 - harden installed-project verification reads against symlink TOCTOU by using anchored no-follow file descriptors;
 
