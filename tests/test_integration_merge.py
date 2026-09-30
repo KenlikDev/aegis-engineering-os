@@ -158,11 +158,13 @@ class UnverifiedTransitionProvider(InMemoryWorkItemProvider):
 
 
 class FakeGitHubTransport:
-    def __init__(self):
+    def __init__(self, *, head_repository=REPOSITORY, base_repository=REPOSITORY):
         self.calls = []
         self.pr_reads = 0
         self.merge_payload = None
         self.comparison = {"status": "identical", "ahead_by": 0, "behind_by": 0}
+        self.head_repository = head_repository
+        self.base_repository = base_repository
 
     def __call__(self, method, url, headers, payload):
         path = url.removeprefix("https://api.github.com")
