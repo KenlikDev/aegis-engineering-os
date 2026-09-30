@@ -305,7 +305,9 @@ class GitHubPullRequestProvider:
             raise DeliveryError(
                 f"Unable to read pull request #{pull_request_number}; HTTP {status}."
             )
-        return self._parse(data)
+        pull_request = self._parse(data)
+        self._validate_repository_origin(pull_request)
+        return pull_request
 
     def find_open(self, head: str, base: str) -> PullRequest | None:
         _validate_task_branch(head)
