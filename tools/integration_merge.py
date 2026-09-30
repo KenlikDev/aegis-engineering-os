@@ -189,11 +189,17 @@ class GitHubIntegrationMergeProvider:
         base = data.get("base")
         state = data.get("state")
         url = data.get("html_url")
+        head_repo = head.get("repo")
+        base_repo = base.get("repo")
         if (
             not isinstance(head, Mapping)
             or not isinstance(base, Mapping)
             or not isinstance(head.get("ref"), str)
             or not isinstance(base.get("ref"), str)
+            or not isinstance(head_repo, Mapping)
+            or not isinstance(base_repo, Mapping)
+            or not isinstance(head_repo.get("full_name"), str)
+            or not isinstance(base_repo.get("full_name"), str)
             or not isinstance(state, str)
             or state not in {"open", "closed"}
             or not isinstance(url, str)
