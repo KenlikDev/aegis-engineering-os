@@ -23,6 +23,7 @@ class FakeTransport:
         self,
         *,
         target_behind: int = 0,
+        compare_status: str | None = None,
         validation_conclusion: str | None = "success",
         validation_sha: str = SOURCE_SHA,
         source_protected: bool = True,
@@ -34,6 +35,7 @@ class FakeTransport:
     ) -> None:
         self.calls: list[tuple[str, str]] = []
         self.target_behind = target_behind
+        self.compare_status = compare_status or ("ahead" if target_behind == 0 else "behind")
         self.validation_conclusion = validation_conclusion
         self.validation_sha = validation_sha
         self.source_protected = source_protected
@@ -63,8 +65,8 @@ class FakeTransport:
 
         if path == f"/repos/{REPOSITORY}/compare/{TARGET_SHA}...{SOURCE_SHA}":
             return 200, {
-                "status": "ahead" if self.target_behind == 0 else "behind",
-                "ahead_by": 2 if self.target_behind == 0 else 1,
+                "status": self.compare_status,
+                "ahead_by": 2 if self.compare_status in {"ahead", "diverged"} else 0,
                 "behind_by": self.target_behind,
                 "total_commits": 2,
                 "files": [{"filename": "one.txt"}, {"filename": "two.txt"}],
@@ -195,6 +197,21 @@ class PromotionReadinessTests(unittest.TestCase):
             "develop changed since the promotion snapshot.",
             result.blockers,
         )
+
+    def test_diverged_history_after_squash_promotion_is_allowed(self) -> None:
+        result = self._provider(
+            target_behind=5,
+            compare_status="diverged",
+        ).assess(
+            source_branch="ai/integration",
+            target_branch="develop",
+            workflow=".github/workflows/validate.yml",
+        )
+        self.assertTrue(result.ready)
+        self.assertEqual("diverged", result.compare.status)
+        self.assertEqual(5, result.compare.behind_by)
+        self.assertGreater(result.compare.ahead_by, 0)
+        self.assertEqual((), result.blockers)
 
     def test_source_behind_target_blocks(self) -> None:
         result = self._provider(target_behind=1).assess(
