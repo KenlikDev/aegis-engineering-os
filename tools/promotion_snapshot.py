@@ -561,7 +561,7 @@ def prepare_promotion_snapshot(
 
     pr_reused = bool(existing_prs)
     if existing_prs:
-        pull_request = existing_prs[0]
+        pull_request = provider.get_pull_request(existing_prs[0].number)
     else:
         pull_request = provider.create_pull_request(
             title=(
