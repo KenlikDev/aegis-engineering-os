@@ -45,7 +45,7 @@ The operation is intentionally conservative:
 8. create or reuse one open pull request into the selected target;
 9. return structured metadata without credentials.
 
-The branch is never intentionally published first at the protected target SHA. A source or target change during preparation therefore fails closed before the promotion branch is published. A snapshot commit is bound to the exact source revision for which promotion readiness verified Aegis Validation.
+The branch is never intentionally published first at the protected target SHA. A source or target change during preparation therefore fails closed before the promotion branch is published. If a later step fails after a newly created promotion branch is published, Aegis verifies that the branch still points to the exact snapshot SHA created by the current run, deletes only that branch, and verifies the deletion. A pre-existing promotion branch is never deleted. If cleanup cannot be verified, Aegis fails closed and reports the cleanup failure instead of claiming the snapshot was safely recovered. A snapshot commit is bound to the exact source revision for which promotion readiness verified Aegis Validation.
 
 
 The resulting commit represents the verified integration state as a target-based promotion artifact. Because the target is required to be an ancestor, no merge conflict needs to be resolved by Aegis.
