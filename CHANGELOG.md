@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind prepared promotion pull requests to the exact promotion snapshot head SHA;
 - harden atomic bootstrap source copies with anchored no-follow descriptors and single-file snapshots;
 - fix GitHub REST error handling so strict JSON parse failures preserve HTTP status without escaping the transport boundary;
 - harden knowledge-gap lifecycle history with tamper-evident transition hashes and explicit legacy uncertainty;
