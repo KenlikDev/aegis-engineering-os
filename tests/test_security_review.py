@@ -442,6 +442,52 @@ class SecurityReviewTests(unittest.TestCase):
                 any(f.rule_id == "github.api-version" for f in result.findings)
             )
 
+    def test_compliant_request_does_not_mask_unsafe_github_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import github_api_headers\n"
+                "BASE = 'https://api.github.com'\n"
+                "SAFE = Request(BASE, headers=github_api_headers())\n"
+                "UNSAFE = Request(BASE + '/repos/KenlikDev/example')\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            findings = [
+                finding
+                for finding in result.findings
+                if finding.rule_id == "github.api-version"
+            ]
+            self.assertEqual(1, len(findings))
+
+    def test_derived_github_url_alias_requires_header_at_sink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "unsafe.py").write_text(
+                "from urllib.request import Request\n"
+                "BASE = 'https://api.github.com'\n"
+                "URL = BASE + '/repos/KenlikDev/example'\n"
+                "REQUEST = Request(URL)\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(
+                    finding.rule_id == "github.api-version"
+                    and finding.line == 4
+                    for finding in result.findings
+                )
+            )
+
     def test_does_not_accept_textual_api_version_header_reference(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
