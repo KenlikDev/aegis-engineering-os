@@ -57,7 +57,7 @@ class PromotionSnapshotProvider(Protocol):
 
     def get_commit(self, ref: str) -> GitCommitSnapshot: ...
 
-    def is_ancestor(self, target_sha: str, source_sha: str) -> bool: ...
+    def is_promotable_relationship(self, target_sha: str, source_sha: str) -> bool: ...
 
     def get_ref_commit(self, branch: str) -> GitCommitSnapshot | None: ...
 
@@ -462,8 +462,7 @@ def _ensure_ready(
         )
     if source.sha == target.sha:
         raise PromotionSnapshotError("Promotion contains no delta.")
-    comparison = provider._readiness_provider().compare(target.sha, source.sha)
-    if comparison.status == "behind" or comparison.ahead_by == 0:
+    if not provider.is_promotable_relationship(target.sha, source.sha):
         raise PromotionSnapshotError(
             f"Promotion source does not contain a promotable delta beyond {request.target_branch}."
         )
