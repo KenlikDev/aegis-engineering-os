@@ -104,6 +104,7 @@ class PullRequestSnapshot:
     state: str
     merged: bool
     head: str
+    head_sha: str
     base: str
     draft: bool
 
@@ -407,6 +408,7 @@ class GitHubPromotionSnapshotProvider:
         base = data.get("base")
         draft = data.get("draft", False)
         head_ref = head.get("ref") if isinstance(head, Mapping) else None
+        head_sha = head.get("sha") if isinstance(head, Mapping) else None
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
         if not (
             isinstance(number, int)
@@ -414,6 +416,8 @@ class GitHubPromotionSnapshotProvider:
             and isinstance(state, str)
             and isinstance(merged, bool)
             and isinstance(head_ref, str)
+            and isinstance(head_sha, str)
+            and SHA_RE.fullmatch(head_sha)
             and isinstance(base_ref, str)
             and isinstance(draft, bool)
         ):
@@ -424,6 +428,7 @@ class GitHubPromotionSnapshotProvider:
             state=state,
             merged=merged,
             head=head_ref,
+            head_sha=head_sha,
             base=base_ref,
             draft=draft,
         )
@@ -561,6 +566,7 @@ def prepare_promotion_snapshot(
 
     if (
         pull_request.head != branch
+        or pull_request.head_sha != promotion_sha
         or pull_request.base != request.target_branch
         or pull_request.state != "open"
         or pull_request.merged
@@ -599,6 +605,7 @@ def _to_dict(result: PromotionSnapshotResult) -> dict[str, Any]:
             "state": result.pull_request.state,
             "merged": result.pull_request.merged,
             "head": result.pull_request.head,
+            "head_sha": result.pull_request.head_sha,
             "base": result.pull_request.base,
             "draft": result.pull_request.draft,
         },
