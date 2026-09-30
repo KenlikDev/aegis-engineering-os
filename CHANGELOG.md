@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- fix GitHub REST error handling so strict JSON parse failures preserve HTTP status without escaping the transport boundary;
 - harden knowledge-gap lifecycle history with tamper-evident transition hashes and explicit legacy uncertainty;
 - reject symlinked or externally resolving bootstrap source files so source_commit covers the contents actually consumed;
 - pin release-readiness metadata to the exact main SHA and reject target drift during assessment;
