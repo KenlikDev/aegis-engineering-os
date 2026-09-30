@@ -61,6 +61,8 @@ class FakePullRequestProvider:
             mergeable=True,
             mergeable_state="clean",
             url=f"https://github.com/KenlikDev/aegis-engineering-os/pull/{PR_NUMBER}",
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
 
     def find_open(self, head, base):
@@ -98,6 +100,8 @@ class FakeMergeProvider:
             draft=False,
             mergeable_state="clean",
             merge_commit_sha=None,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         self.integration = BranchSnapshot(
             branch="ai/integration",
@@ -134,6 +138,8 @@ class FakeMergeProvider:
             draft=False,
             mergeable_state="unknown",
             merge_commit_sha=MERGE,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         return MergeResult(merged=True, merge_commit_sha=MERGE)
 
