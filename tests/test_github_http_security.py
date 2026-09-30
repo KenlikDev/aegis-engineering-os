@@ -113,7 +113,6 @@ class GitHubHttpSecurityTests(unittest.TestCase):
             "promotion_sync",
             "release_readiness",
             "ci_diagnosis",
-            "work_item_lifecycle",
         )
         bodies = (
             b"<html>upstream gateway error</html>",
@@ -163,6 +162,32 @@ class GitHubHttpSecurityTests(unittest.TestCase):
                                 )
 
                         self.assertEqual((502, {}), result)
+
+    def test_work_item_lifecycle_fails_closed_on_strict_http_error_parse_failure(self):
+        from http.client import HTTPMessage
+
+        module = importlib.import_module("work_item_lifecycle")
+        error = HTTPError(
+            "https://api.github.com/repos/KenlikDev/aegis-engineering-os",
+            502,
+            "Bad Gateway",
+            HTTPMessage(),
+            io.BytesIO(b"<html>upstream gateway error</html>"),
+        )
+        provider = module.GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "secret-token",
+        )
+
+        with patch.object(module._HTTP_OPENER, "open", side_effect=error):
+            with self.assertRaisesRegex(
+                module.WorkItemLifecycleError,
+                "invalid JSON error response",
+            ):
+                provider._request(
+                    "GET",
+                    "/repos/KenlikDev/aegis-engineering-os/issues/1",
+                )
 
     def test_parses_strict_github_json(self):
         from github_http_security import parse_github_json
