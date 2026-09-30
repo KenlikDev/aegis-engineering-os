@@ -13,6 +13,7 @@ from evidence_contract import (  # noqa: E402
     EvidenceContractError,
     EvidenceRecord,
     build_evidence,
+    copy_file_atomically,
     write_evidence,
 )
 
@@ -157,6 +158,42 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             self.assertEqual("protected\n", external.read_text(encoding="utf-8"))
             self.assertEqual("replacement\n", output.read_text(encoding="utf-8"))
             self.assertFalse(output.is_symlink())
+
+    def test_atomic_copy_rejects_symlinked_source_parent(self) -> None:
+        if os.name != "posix":
+            self.skipTest("source no-follow directory-FD support is only available on POSIX.")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external"
+            external.mkdir()
+            (external / "source.txt").write_text("outside\n", encoding="utf-8")
+
+            source_root = root / "source"
+            source_root.symlink_to(external, target_is_directory=True)
+            output = root / "output.txt"
+
+            with self.assertRaisesRegex(
+                EvidenceContractError,
+                "Unable to securely open atomic copy source directory",
+            ):
+                copy_file_atomically(source_root / "source.txt", output)
+
+            self.assertFalse(output.exists())
+
+    def test_atomic_copy_uses_one_open_source_snapshot(self) -> None:
+        if os.name != "posix":
+            self.skipTest("source no-follow directory-FD support is only available on POSIX.")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.txt"
+            output = root / "output.txt"
+            source.write_text("source\n", encoding="utf-8")
+
+            copy_file_atomically(source, output)
+
+            self.assertEqual("source\n", output.read_text(encoding="utf-8"))
 
     def test_build_evidence_rejects_oversized_canonical_payload(self) -> None:
         large_result = {"items": ["x" * 4096 for _ in range(20)]}
