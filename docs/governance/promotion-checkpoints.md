@@ -27,7 +27,7 @@ A stage is complete for promotion when:
 3. the applicable implementation, testing, security, architecture, and documentation checks have passed;
 4. canonical provenance and lifecycle evidence is internally consistent;
 5. the exact current `ai/integration` SHA has a successful Aegis Validation run;
-6. promotion readiness confirms the exact protected target state and a positive promotable file delta;
+6. promotion readiness confirms the exact protected target state, a positive promotable file delta, and a semantically consistent GitHub compare relationship;
 7. a deterministic promotion snapshot is created from the exact source and target SHAs;
 8. the resulting promotion pull request contains a bounded description of the stage and its exact source/target identities.
 
