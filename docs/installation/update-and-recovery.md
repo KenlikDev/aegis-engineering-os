@@ -41,7 +41,9 @@ still exist and match their recorded checksums.
 
 Bootstrap refuses to run from a dirty Aegis source worktree. The recorded
 source commit therefore identifies the clean source revision used to build the
-installed skill set.
+installed skill set. Bootstrap also rejects symbolic-link source metadata, skill
+sources, and the AGENTS template, including paths that resolve through symbolic
+ancestors outside the Aegis source tree.
 
 ## Offline recovery
 

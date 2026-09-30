@@ -197,6 +197,64 @@ class AegisPolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "symbolic link"):
                 bootstrap_project.load_source_metadata(root)
 
+    def test_bootstrap_rejects_symlinked_source_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside = root.parent / f"{root.name}-version"
+            outside.write_text("external-version\n", encoding="utf-8")
+            self.addCleanup(outside.unlink, missing_ok=True)
+
+            version = root / "VERSION"
+            try:
+                version.symlink_to(outside)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"Symbolic links are unavailable: {exc}")
+
+            (root / "aegis-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": "external-version",
+                        "repository": "test",
+                        "default_work_item_provider": "github",
+                        "work_item_strategy": "issues",
+                        "optional_integrations": [],
+                        "active_knowledge_model": "repository",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            skills = root / "skills"
+            skills.mkdir()
+            (skills / "registry.json").write_text(
+                json.dumps({"version": "external-version", "skills": []}),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(SystemExit, "VERSION file.*symbolic link"):
+                bootstrap_project.load_source_metadata(root)
+
+    def test_bootstrap_rejects_symlinked_hardcoded_skill_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside = root.parent / f"{root.name}-skill"
+            outside.write_text("external skill\n", encoding="utf-8")
+            self.addCleanup(outside.unlink, missing_ok=True)
+
+            source = root / "skill.md"
+            try:
+                source.symlink_to(outside)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"Symbolic links are unavailable: {exc}")
+
+            stage_root = root / "stage"
+            stage_root.mkdir()
+            selected = {"example": Path("skill.md")}
+
+            with self.assertRaisesRegex(SystemExit, "skill source.*symbolic link"):
+                bootstrap_project.stage_skills(root, selected, stage_root)
+
+            self.assertFalse((stage_root / "example" / "SKILL.md").exists())
+
     def test_state_verification_skill_exists_and_is_registered(self) -> None:
         skill_path = ROOT / "skills/state-verification/SKILL.md"
         self.assertTrue(skill_path.is_file())
