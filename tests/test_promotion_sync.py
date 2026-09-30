@@ -159,9 +159,11 @@ class FakeWorkItemProvider:
 
 
 class FakeGitHubTransport:
-    def __init__(self):
+    def __init__(self, *, head_repository=REPOSITORY, base_repository=REPOSITORY):
         self.url = None
         self.status = "ahead"
+        self.head_repository = head_repository
+        self.base_repository = base_repository
 
     def __call__(self, method, url, headers, payload):
         self.url = url
