@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden promotion readiness to reject semantically inconsistent GitHub compare relationships and negative commit counts;
 - require promotion readiness to expose a non-empty changed-file delta instead of treating history-only divergence as promotable;
 - align promotion documentation with the executable squash-divergence readiness contract;
 - harden verifier file-descriptor cleanup so validation errors are preserved deterministically;
