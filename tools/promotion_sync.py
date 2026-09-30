@@ -318,6 +318,13 @@ def sync_promotion_merge(
         raise PromotionSyncError(
             "Promotion pull-request head does not match the deterministic promotion branch."
         )
+    if (
+        pull_request.head_repository != provider.repository
+        or pull_request.base_repository != provider.repository
+    ):
+        raise PromotionSyncError(
+            "Promotion pull-request head and base repositories must match the configured repository."
+        )
     if pull_request.base != target_branch:
         raise PromotionSyncError(
             "Promotion pull-request base does not match the selected protected target."
