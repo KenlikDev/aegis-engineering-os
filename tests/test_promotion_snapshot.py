@@ -48,6 +48,7 @@ class FakeTransport:
         self.create_commit_payload = None
         self.advance_source_after_snapshot = False
         self.pull_request_readback_sha = SNAPSHOT_SHA
+        self.pull_request_created_payload = None
 
     def __call__(self, method, url, headers, payload):  # noqa: ANN001
         path = url.removeprefix("https://api.github.com")
@@ -128,11 +129,13 @@ class FakeTransport:
                 return 200, []
             return 200, [self.existing_pr]
         if method == "GET" and path == f"/repos/{REPOSITORY}/pulls/10":
+            if self.existing_pr is not None:
+                return 200, self.existing_pr
             payload = self.pull_request_payload(self.pull_request_readback_sha)
             return 200, payload
         if method == "POST" and path == f"/repos/{REPOSITORY}/pulls":
             self.created_pr = True
-            return 201, self.pull_request_payload()
+            return 201, self.pull_request_created_payload or self.pull_request_payload()
 
         if method == "GET" and path == f"/repos/{REPOSITORY}/compare/{self.target_sha}...{self.source_sha}":
             return 200, {
@@ -296,6 +299,7 @@ class PromotionSnapshotTests(unittest.TestCase):
             existing_branch=SNAPSHOT_SHA,
             existing_pr=FakeTransport.pull_request_payload(OTHER_SHA),
         )
+        transport.pull_request_readback_sha = OTHER_SHA
 
         with self.assertRaisesRegex(
             PromotionSnapshotError,
@@ -319,6 +323,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         transport = FakeTransport()
         payload = FakeTransport.pull_request_payload()
         payload["head"]["sha"] = "not-a-sha"
+        transport.pull_request_created_payload = payload
 
         def malformed_pr(method, url, headers, request_payload):  # noqa: ANN001
             if method == "POST" and url.endswith("/pulls"):
