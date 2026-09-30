@@ -189,13 +189,11 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
             root = Path(temp)
             source = root / "source.txt"
             output = root / "output.txt"
-            source.write_text("source
-", encoding="utf-8")
+            source.write_text("source\n", encoding="utf-8")
 
             copy_file_atomically(source, output)
 
-            self.assertEqual("source
-", output.read_text(encoding="utf-8"))
+            self.assertEqual("source\n", output.read_text(encoding="utf-8"))
 
     def test_build_evidence_rejects_oversized_canonical_payload(self) -> None:
         large_result = {"items": ["x" * 4096 for _ in range(20)]}
