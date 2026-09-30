@@ -427,6 +427,39 @@ class DeliveryTests(unittest.TestCase):
         pr = provider.get(60)
         self.assertEqual("", pr.body)
 
+    def test_github_provider_rejects_fork_origin(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.pull_requests[60] = {
+            "number": 60,
+            "title": "fork-origin",
+            "body": "",
+            "head": {
+                "ref": request().head,
+                "repo": {"full_name": "attacker/example-fork"},
+            },
+            "base": {
+                "ref": request().base,
+                "repo": {"full_name": REPOSITORY},
+            },
+            "state": "open",
+            "merged_at": None,
+            "draft": False,
+            "mergeable": True,
+            "mergeable_state": "clean",
+            "html_url": PR_URL,
+        }
+        provider = GitHubPullRequestProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "repositories must match",
+        ):
+            provider.get(60)
+
     def test_github_provider_parses_merged_state(self) -> None:
         transport = FakeGitHubTransport()
         transport.pull_requests[60] = {
