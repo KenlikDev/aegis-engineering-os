@@ -231,7 +231,7 @@ class PromotionReadinessTests(unittest.TestCase):
 
         self.assertFalse(result.ready)
         self.assertIn(
-            "history-only divergence with no changed files",
+            "Promotion contains history-only divergence with no changed files.",
             result.blockers,
         )
     def test_source_behind_target_blocks(self) -> None:
