@@ -66,6 +66,8 @@ class FakePromotionProvider:
             state=state,
             merged=merged,
             merge_commit_sha=merge_commit_sha,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         self.target = BranchSnapshot(
             branch="main",
