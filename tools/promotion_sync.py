@@ -186,10 +186,16 @@ class GitHubPromotionSyncProvider:
         url = data.get("html_url")
         state = data.get("state")
         merged_at = data.get("merged_at")
+        head_repo = head.get("repo")
+        base_repo = base.get("repo")
         if (
             not isinstance(url, str)
             or not HTTPS_URL_RE.fullmatch(url)
             or not isinstance(state, str)
+            or not isinstance(head_repo, Mapping)
+            or not isinstance(base_repo, Mapping)
+            or not isinstance(head_repo.get("full_name"), str)
+            or not isinstance(base_repo.get("full_name"), str)
             or state not in {"open", "closed"}
             or not isinstance(head, Mapping)
             or not isinstance(base, Mapping)
