@@ -87,7 +87,7 @@ A work item is complete only when:
 
 ## Executable lifecycle bridge
 
-The provider-neutral lifecycle is implemented by `tools/work_item_lifecycle.py`. The core transition model is deliberately independent of GitHub. The GitHub adapter persists the active lifecycle state through `aegis:status:<state>` labels and maps only `done` to GitHub's closed issue state.
+The provider-neutral lifecycle is implemented by `tools/work_item_lifecycle.py`. The core transition model is deliberately independent of GitHub. The GitHub adapter persists the active lifecycle state through `aegis:status:<state>` labels and maps only `done` to GitHub's closed issue state. A generic GitHub `closed` issue without an Aegis status label is ambiguous and is rejected rather than inferred as `done`.
 
 Blocked work preserves its previous active state in an `aegis:resume:<state>` label. A blocked item can therefore resume only at the recorded state; the adapter rejects ambiguous or stale resume metadata.
 
