@@ -34,6 +34,14 @@ The integration merge operation requires `expected_head_sha` for every open pull
 
 This prevents a new commit pushed after validation from being merged using stale validation evidence.
 
+## Pull-request repository origin
+
+Every PR consumed by integration delivery carries explicit `head.repo.full_name` and `base.repo.full_name` provenance. Both repository identities must equal the configured repository before a PR can participate in autonomous merge, lifecycle synchronization, or canonical verified evidence.
+
+Canonical `integration-delivery` provenance preserves these origin fields so downstream consumers can distinguish repository ownership verification from branch-name and SHA validation. Missing or foreign origin data cannot be represented as verified evidence.
+
+`not-merged` observations remain `unknown`; they do not claim successful repository-origin verification or a completed integration merge.
+
 ## Safety boundary
 
 The controller only accepts ai/integration as its target.
