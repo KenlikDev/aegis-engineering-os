@@ -63,6 +63,8 @@ class PromotionSnapshotProvider(Protocol):
 
     def create_ref(self, branch: str, sha: str) -> None: ...
 
+    def delete_ref(self, branch: str, expected_sha: str) -> None: ...
+
     def create_snapshot_commit(
         self,
         *,
@@ -313,6 +315,34 @@ class GitHubPromotionSnapshotProvider:
                 f"Unable to create promotion branch {branch!r}; HTTP {status}."
             )
 
+    def delete_ref(self, branch: str, expected_sha: str) -> None:
+        self._require_sha(expected_sha, "Expected promotion branch SHA")
+        path = f"/repos/{self.repository}/git/ref/heads/{quote(branch, safe='')}"
+        status, data = self._request("GET", path)
+        if status != 200 or not isinstance(data, Mapping):
+            raise PromotionSnapshotError(
+                f"Unable to verify promotion branch before cleanup; HTTP {status}."
+            )
+        obj = data.get("object")
+        current_sha = obj.get("sha") if isinstance(obj, Mapping) else None
+        current_sha = self._require_sha(current_sha, "Current promotion branch SHA")
+        if current_sha != expected_sha:
+            raise PromotionSnapshotError(
+                "Refusing promotion branch cleanup because the branch changed after publication."
+            )
+
+        status, _ = self._request("DELETE", path)
+        if status != 204:
+            raise PromotionSnapshotError(
+                f"Unable to remove incomplete promotion branch {branch!r}; HTTP {status}."
+            )
+
+        verify_status, _ = self._request("GET", path)
+        if verify_status != 404:
+            raise PromotionSnapshotError(
+                "Promotion branch cleanup could not be verified."
+            )
+
     def create_snapshot_commit(
         self,
         *,
@@ -485,91 +515,105 @@ def prepare_promotion_snapshot(
 
     existing_branch = provider.get_ref_commit(branch)
     branch_reused = existing_branch is not None
+    branch_published = False
 
-    if existing_branch is not None:
+    try:
+        if existing_branch is not None:
+            if (
+                existing_branch.parents != (target.sha, source.sha)
+                or existing_branch.tree_sha != source.tree_sha
+            ):
+                raise PromotionSnapshotError(
+                    f"Existing promotion branch {branch!r} does not match the current snapshot."
+                )
+            promotion_sha = existing_branch.sha
+        else:
+            promotion_sha = provider.create_snapshot_commit(
+                message=(
+                    f"chore: prepare promotion snapshot for #{request.work_item_id} "
+                    f"to {request.target_branch}"
+                ),
+                tree_sha=source.tree_sha,
+                target_sha=target.sha,
+                source_sha=source.sha,
+            )
+
+            current_source = provider.get_commit(request.source_branch)
+            current_target = provider.get_commit(request.target_branch)
+            if current_source.sha != source.sha:
+                raise PromotionSnapshotError(
+                    "ai/integration changed while the promotion snapshot was being prepared."
+                )
+            if current_target.sha != target.sha:
+                raise PromotionSnapshotError(
+                    f"{request.target_branch} changed while the promotion snapshot was being prepared."
+                )
+
+            provider.create_ref(branch, promotion_sha)
+            branch_published = True
+
+        verified = provider.get_ref_commit(branch)
+        if verified is None:
+            raise PromotionSnapshotError("Promotion branch disappeared after creation.")
         if (
-            existing_branch.parents != (target.sha, source.sha)
-            or existing_branch.tree_sha != source.tree_sha
+            verified.parents != (target.sha, source.sha)
+            or verified.tree_sha != source.tree_sha
+            or verified.sha != promotion_sha
         ):
             raise PromotionSnapshotError(
-                f"Existing promotion branch {branch!r} does not match the current snapshot."
-            )
-        promotion_sha = existing_branch.sha
-    else:
-        promotion_sha = provider.create_snapshot_commit(
-            message=(
-                f"chore: prepare promotion snapshot for #{request.work_item_id} "
-                f"to {request.target_branch}"
-            ),
-            tree_sha=source.tree_sha,
-            target_sha=target.sha,
-            source_sha=source.sha,
-        )
-
-        current_source = provider.get_commit(request.source_branch)
-        current_target = provider.get_commit(request.target_branch)
-        if current_source.sha != source.sha:
-            raise PromotionSnapshotError(
-                "ai/integration changed while the promotion snapshot was being prepared."
-            )
-        if current_target.sha != target.sha:
-            raise PromotionSnapshotError(
-                f"{request.target_branch} changed while the promotion snapshot was being prepared."
+                "Promotion branch verification failed after snapshot creation."
             )
 
-        provider.create_ref(branch, promotion_sha)
-
-    verified = provider.get_ref_commit(branch)
-    if verified is None:
-        raise PromotionSnapshotError("Promotion branch disappeared after creation.")
-    if (
-        verified.parents != (target.sha, source.sha)
-        or verified.tree_sha != source.tree_sha
-        or verified.sha != promotion_sha
-    ):
-        raise PromotionSnapshotError(
-            "Promotion branch verification failed after snapshot creation."
-        )
-
-    existing_prs = provider.list_open_pull_requests(
-        head=branch,
-        base=request.target_branch,
-    )
-    if len(existing_prs) > 1:
-        raise PromotionSnapshotError(
-            "Multiple open promotion pull requests exist for the same branch pair."
-        )
-
-    pr_reused = bool(existing_prs)
-    if existing_prs:
-        pull_request = existing_prs[0]
-    else:
-        pull_request = provider.create_pull_request(
-            title=(
-                f"chore: promote ai/integration to {request.target_branch} "
-                f"(#{request.work_item_id})"
-            ),
-            body=(
-                "## Aegis promotion snapshot\n\n"
-                f"- Work item: #{request.work_item_id}\n"
-                f"- Source: {request.source_branch} at {source.sha}\n"
-                f"- Target: {request.target_branch} at {target.sha}\n"
-                f"- Snapshot branch: {branch} at {promotion_sha}\n\n"
-                "This pull request is a prepared promotion artifact. "
-                "Aegis does not approve or merge protected branches."
-            ),
+        existing_prs = provider.list_open_pull_requests(
             head=branch,
             base=request.target_branch,
-            draft=request.draft,
         )
+        if len(existing_prs) > 1:
+            raise PromotionSnapshotError(
+                "Multiple open promotion pull requests exist for the same branch pair."
+            )
 
-    if (
-        pull_request.head != branch
-        or pull_request.base != request.target_branch
-        or pull_request.state != "open"
-        or pull_request.merged
-    ):
-        raise PromotionSnapshotError("Promotion pull request verification failed.")
+        pr_reused = bool(existing_prs)
+        if existing_prs:
+            pull_request = existing_prs[0]
+        else:
+            pull_request = provider.create_pull_request(
+                title=(
+                    f"chore: promote ai/integration to {request.target_branch} "
+                    f"(#{request.work_item_id})"
+                ),
+                body=(
+                    "## Aegis promotion snapshot\n\n"
+                    f"- Work item: #{request.work_item_id}\n"
+                    f"- Source: {request.source_branch} at {source.sha}\n"
+                    f"- Target: {request.target_branch} at {target.sha}\n"
+                    f"- Snapshot branch: {branch} at {promotion_sha}\n\n"
+                    "This pull request is a prepared promotion artifact. "
+                    "Aegis does not approve or merge protected branches."
+                ),
+                head=branch,
+                base=request.target_branch,
+                draft=request.draft,
+            )
+
+        if (
+            pull_request.head != branch
+            or pull_request.base != request.target_branch
+            or pull_request.state != "open"
+            or pull_request.merged
+        ):
+            raise PromotionSnapshotError("Promotion pull request verification failed.")
+    except Exception as exc:
+        if not branch_published:
+            raise
+        try:
+            provider.delete_ref(branch, promotion_sha)
+        except Exception as cleanup_error:
+            raise PromotionSnapshotError(
+                "Promotion snapshot preparation failed and cleanup of the newly "
+                f"published branch also failed: {cleanup_error}"
+            ) from exc
+        raise
 
     return PromotionSnapshotResult(
         repository=request.repository,
