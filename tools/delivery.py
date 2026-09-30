@@ -234,8 +234,8 @@ class GitHubPullRequestProvider:
         base = data.get("base")
         state = data.get("state")
         url = data.get("html_url")
-        head_repo = head.get("repo")
-        base_repo = base.get("repo")
+        head_repo = head.get("repo") if isinstance(head, Mapping) else None
+        base_repo = base.get("repo") if isinstance(base, Mapping) else None
         if (
             not isinstance(number, int)
             or not isinstance(title, str)
