@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind workflow GitHub API-version findings to executable run blocks so unrelated YAML text cannot mask missing request headers;
 - reject fork-origin pull requests at autonomous integration, delivery, and promotion synchronization boundaries;
 - reject ambiguous workflow skill-registry JSON before workflow composition;
 - bind Python GitHub API-version security findings to the executable GitHub request sink so compliant requests cannot mask unsafe ones;

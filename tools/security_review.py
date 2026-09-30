@@ -167,6 +167,36 @@ def _strip_yaml_comments(text: str) -> str:
 
     return "".join(cleaned_lines)
 
+def _extract_workflow_run_blocks(text: str) -> list[str]:
+    """Extract executable GitHub Actions run scalars without interpreting other YAML fields."""
+    lines = text.splitlines()
+    blocks: list[str] = []
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        match = re.match(r"^(?P<indent>\s*)(?:-\s+)?run:\s*(?P<value>.*)$", line)
+        if match is None:
+            index += 1
+            continue
+
+        indent = len(match.group("indent"))
+        value = match.group("value")
+        block_lines = [value]
+        if value in {"|", "|-", "|+", ">", ">-", ">+"}:
+            index += 1
+            while index < len(lines):
+                candidate = lines[index]
+                if candidate.strip() and len(candidate) - len(candidate.lstrip()) <= indent:
+                    break
+                block_lines.append(candidate)
+                index += 1
+        blocks.append("\n".join(block_lines))
+        index += 1
+
+    return blocks
+
+
 def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
     if PULL_REQUEST_TARGET_RE.search(text):
         match = PULL_REQUEST_TARGET_RE.search(text)
@@ -229,7 +259,19 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
             )
 
     workflow_text = _strip_yaml_comments(text)
-    if GITHUB_API_RE.search(workflow_text) and API_VERSION_HEADER not in workflow_text:
+    run_blocks = _extract_workflow_run_blocks(workflow_text)
+    for run_block in run_blocks:
+        if GITHUB_API_RE.search(run_block) and API_VERSION_HEADER not in run_block:
+            _finding(
+                findings,
+                rule_id="github.api-version",
+                severity=HIGH,
+                path=path,
+                root=root,
+                message="GitHub API usage in an executable run block must send the explicit API-version header.",
+            )
+
+    if not run_blocks and GITHUB_API_RE.search(workflow_text) and API_VERSION_HEADER not in workflow_text:
         _finding(
             findings,
             rule_id="github.api-version",
@@ -238,6 +280,7 @@ def _review_workflow(path: Path, text: str, root: Path, findings: list[SecurityF
             root=root,
             message="GitHub API usage must send the explicit API-version header.",
         )
+
 
 
 def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFinding]) -> None:
