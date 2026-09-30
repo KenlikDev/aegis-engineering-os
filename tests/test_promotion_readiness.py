@@ -24,6 +24,7 @@ class FakeTransport:
         *,
         target_behind: int = 0,
         compare_status: str | None = None,
+        changed_files: int = 2,
         validation_conclusion: str | None = "success",
         validation_sha: str = SOURCE_SHA,
         source_protected: bool = True,
