@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- require promotion readiness to expose a non-empty changed-file delta instead of treating history-only divergence as promotable;
 - align promotion documentation with the executable squash-divergence readiness contract;
 - harden verifier file-descriptor cleanup so validation errors are preserved deterministically;
 - support repeated squash-based human promotion without treating divergent Git ancestry as an automatic readiness blocker;
