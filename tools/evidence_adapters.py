@@ -148,6 +148,13 @@ def promotion_sync_evidence(
         raise EvidenceContractError(
             "Promotion synchronization pull request does not describe the verified promotion merge."
         )
+    if (
+        pull_request.get("head_repository") != repository
+        or pull_request.get("base_repository") != repository
+    ):
+        raise EvidenceContractError(
+            "Promotion synchronization pull-request repositories must match the configured repository."
+        )
     if result.get("traceability_verified") is not True:
         raise EvidenceContractError(
             "Promotion synchronization traceability is not read-after-write verified."
@@ -287,8 +294,10 @@ def integration_delivery_evidence(
         "number": pull_request.get("number"),
         "url": pull_request.get("url"),
         "head": pull_request.get("head"),
+        "head_repository": pull_request.get("head_repository"),
         "head_sha": pull_request.get("head_sha"),
         "base": pull_request.get("base"),
+        "base_repository": pull_request.get("base_repository"),
         "merged": pull_request.get("merged"),
         "merge_commit_sha": pull_request.get("merge_commit_sha"),
     }
@@ -635,6 +644,13 @@ def integration_merge_evidence(
     work_item = result.get("work_item")
     if not isinstance(pull_request, Mapping):
         raise EvidenceContractError("Integration merge pull_request result is malformed.")
+    if (
+        pull_request.get("head_repository") != repository
+        or pull_request.get("base_repository") != repository
+    ):
+        raise EvidenceContractError(
+            "Integration merge pull-request repositories must match the configured repository."
+        )
     if not isinstance(integration, Mapping):
         raise EvidenceContractError("Integration merge integration result is malformed.")
     if not isinstance(work_item, Mapping):
