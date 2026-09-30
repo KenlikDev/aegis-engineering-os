@@ -28,6 +28,7 @@ class FakeTransport:
         source_sha=SOURCE_SHA,
         target_sha=TARGET_SHA,
         behind=0,
+        compare_status=None,
         protected=True,
         existing_branch=None,
         existing_pr=None,
@@ -35,6 +36,7 @@ class FakeTransport:
         self.source_sha = source_sha
         self.target_sha = target_sha
         self.behind = behind
+        self.compare_status = compare_status or ("ahead" if behind == 0 else "behind")
         self.protected = protected
         self.existing_branch = existing_branch
         self.existing_pr = existing_pr
@@ -130,8 +132,8 @@ class FakeTransport:
 
         if method == "GET" and path == f"/repos/{REPOSITORY}/compare/{self.target_sha}...{self.source_sha}":
             return 200, {
-                "status": "ahead" if self.behind == 0 else "diverged",
-                "ahead_by": 2,
+                "status": self.compare_status,
+                "ahead_by": 2 if self.compare_status in {"ahead", "diverged"} else 0,
                 "behind_by": self.behind,
                 "total_commits": 2,
                 "files": [{"filename": "one.txt"}],
@@ -294,6 +296,18 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertFalse(transport.created_branch)
         self.assertFalse(transport.created_commit)
         self.assertFalse(transport.created_pr)
+
+    def test_allows_diverged_history_after_squash_promotion(self):
+        transport = FakeTransport(
+            behind=5,
+            compare_status="diverged",
+        )
+        result = prepare_promotion_snapshot(self._provider(transport), self._request())
+
+        self.assertEqual(SNAPSHOT_SHA, result.promotion_sha)
+        self.assertTrue(transport.created_branch)
+        self.assertEqual(SNAPSHOT_SHA, transport.created_ref_sha)
+        self.assertTrue(transport.created_pr)
 
     def test_blocks_when_target_is_behind(self):
         transport = FakeTransport(behind=1)
