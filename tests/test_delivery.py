@@ -48,8 +48,14 @@ class FakeGitHubTransport:
                 "number": number,
                 "title": payload["title"],
                 "body": payload["body"],
-                "head": {"ref": payload["head"]},
-                "base": {"ref": payload["base"]},
+                "head": {
+                    "ref": payload["head"],
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": payload["base"],
+                    "repo": {"full_name": REPOSITORY},
+                },
                 "state": "open",
                 "merged_at": None,
                 "draft": payload.get("draft", False),
@@ -70,6 +76,7 @@ class FakeGitHubTransport:
 
 class FakePullRequestProvider:
     def __init__(self, pull_request: PullRequest) -> None:
+        self.repository = REPOSITORY
         self.pull_request = pull_request
         self.created: list[CreatePullRequestRequest] = []
 
@@ -216,6 +223,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -255,6 +264,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -293,6 +304,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
         with self.assertRaises(DeliveryError):
@@ -318,6 +331,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -354,8 +369,14 @@ class DeliveryTests(unittest.TestCase):
             "number": 60,
             "title": "existing",
             "body": "",
-            "head": {"ref": request().head},
-            "base": {"ref": request().base},
+            "head": {
+                "ref": request().head,
+                "repo": {"full_name": REPOSITORY},
+            },
+            "base": {
+                "ref": request().base,
+                "repo": {"full_name": REPOSITORY},
+            },
             "state": "open",
             "merged_at": None,
             "draft": False,
@@ -383,8 +404,14 @@ class DeliveryTests(unittest.TestCase):
             "number": 60,
             "title": "nullable body",
             "body": None,
-            "head": {"ref": request().head},
-            "base": {"ref": request().base},
+            "head": {
+                "ref": request().head,
+                "repo": {"full_name": REPOSITORY},
+            },
+            "base": {
+                "ref": request().base,
+                "repo": {"full_name": REPOSITORY},
+            },
             "state": "open",
             "merged_at": None,
             "draft": False,
@@ -401,14 +428,53 @@ class DeliveryTests(unittest.TestCase):
         pr = provider.get(60)
         self.assertEqual("", pr.body)
 
+    def test_github_provider_rejects_fork_origin(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.pull_requests[60] = {
+            "number": 60,
+            "title": "fork-origin",
+            "body": "",
+            "head": {
+                "ref": request().head,
+                "repo": {"full_name": "attacker/example-fork"},
+            },
+            "base": {
+                "ref": request().base,
+                "repo": {"full_name": REPOSITORY},
+            },
+            "state": "open",
+            "merged_at": None,
+            "draft": False,
+            "mergeable": True,
+            "mergeable_state": "clean",
+            "html_url": PR_URL,
+        }
+        provider = GitHubPullRequestProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "repositories must match",
+        ):
+            provider.get(60)
+
     def test_github_provider_parses_merged_state(self) -> None:
         transport = FakeGitHubTransport()
         transport.pull_requests[60] = {
             "number": 60,
             "title": "merged",
             "body": "",
-            "head": {"ref": request().head},
-            "base": {"ref": request().base},
+            "head": {
+                "ref": request().head,
+                "repo": {"full_name": REPOSITORY},
+            },
+            "base": {
+                "ref": request().base,
+                "repo": {"full_name": REPOSITORY},
+            },
             "state": "closed",
             "merged_at": "2026-09-28T14:00:00Z",
             "draft": False,
@@ -441,6 +507,8 @@ class DeliveryTests(unittest.TestCase):
             mergeable=True,
             mergeable_state="clean",
             url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
         )
         pr_provider = FakePullRequestProvider(pr)
 
@@ -469,6 +537,8 @@ class DeliveryTests(unittest.TestCase):
             mergeable=True,
             mergeable_state="clean",
             url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
         )
         pr_provider = FakePullRequestProvider(pr)
 
@@ -508,6 +578,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
 
@@ -541,6 +613,8 @@ class DeliveryTests(unittest.TestCase):
                 mergeable=True,
                 mergeable_state="clean",
                 url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
             )
         )
         with self.assertRaises(DeliveryError):

@@ -66,6 +66,8 @@ class FakePromotionProvider:
             state=state,
             merged=merged,
             merge_commit_sha=merge_commit_sha,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         self.target = BranchSnapshot(
             branch="main",
@@ -157,12 +159,32 @@ class FakeWorkItemProvider:
 
 
 class FakeGitHubTransport:
-    def __init__(self):
+    def __init__(self, *, head_repository=REPOSITORY, base_repository=REPOSITORY):
         self.url = None
         self.status = "ahead"
+        self.head_repository = head_repository
+        self.base_repository = base_repository
 
     def __call__(self, method, url, headers, payload):
         self.url = url
+        if url.endswith(f"/repos/{REPOSITORY}/pulls/{PROMOTION_PR}"):
+            return 200, {
+                "number": PROMOTION_PR,
+                "html_url": "https://github.com/KenlikDev/aegis-engineering-os/pull/123",
+                "head": {
+                    "ref": "ai/1-main-promotion",
+                    "sha": HEAD_SHA,
+                    "repo": {"full_name": self.head_repository},
+                },
+                "base": {
+                    "ref": "main",
+                    "sha": TARGET_SHA,
+                    "repo": {"full_name": self.base_repository},
+                },
+                "state": "closed",
+                "merged_at": "2026-09-28T15:00:00Z",
+                "merge_commit_sha": MERGE_SHA,
+            }
         return 200, {
             "status": self.status,
             "ahead_by": 1 if self.status == "ahead" else 0,
@@ -206,6 +228,46 @@ class FakeGitHubTransport:
             self.assertEqual("promotion:1->main", canonical.subject)
 
 class PromotionSyncTests(unittest.TestCase):
+    def test_rejects_fork_origin_before_lifecycle_transition(self):
+        provider = FakePromotionProvider()
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head=provider.pull_request.head,
+            head_sha=provider.pull_request.head_sha,
+            base=provider.pull_request.base,
+            base_sha=provider.pull_request.base_sha,
+            state=provider.pull_request.state,
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository="attacker/example-fork",
+            base_repository=REPOSITORY,
+        )
+
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "head and base repositories must match",
+        ):
+            sync_promotion_merge(
+                provider,
+                FakeWorkItemProvider(),
+                "1",
+                PROMOTION_PR,
+                target_branch="main",
+            )
+
+    def test_github_provider_rejects_fork_origin(self):
+        provider = GitHubPromotionSyncProvider(
+            REPOSITORY,
+            "test-token",
+            transport=FakeGitHubTransport(head_repository="attacker/example-fork"),
+        )
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "head and base repositories",
+        ):
+            provider.get_pull_request(PROMOTION_PR)
+
     def test_github_provider_requires_identical_compare(self):
         transport = FakeGitHubTransport()
         provider = GitHubPromotionSyncProvider(

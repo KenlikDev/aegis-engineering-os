@@ -47,6 +47,8 @@ def work_items(state=LifecycleState.REVIEW):
 
 
 class FakePullRequestProvider:
+    repository = REPOSITORY
+
     def __init__(self):
         self.created = []
         self.pull_request = PullRequest(
@@ -61,6 +63,8 @@ class FakePullRequestProvider:
             mergeable=True,
             mergeable_state="clean",
             url=f"https://github.com/KenlikDev/aegis-engineering-os/pull/{PR_NUMBER}",
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
 
     def find_open(self, head, base):
@@ -98,6 +102,8 @@ class FakeMergeProvider:
             draft=False,
             mergeable_state="clean",
             merge_commit_sha=None,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         self.integration = BranchSnapshot(
             branch="ai/integration",
@@ -134,6 +140,8 @@ class FakeMergeProvider:
             draft=False,
             mergeable_state="unknown",
             merge_commit_sha=MERGE,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         return MergeResult(merged=True, merge_commit_sha=MERGE)
 
@@ -293,6 +301,8 @@ class IntegrationDeliveryTests(unittest.TestCase):
                     draft=value.draft,
                     mergeable_state=value.mergeable_state,
                     merge_commit_sha=value.merge_commit_sha,
+                    head_repository=REPOSITORY,
+                    base_repository=REPOSITORY,
                 )
             return value
 
@@ -319,6 +329,8 @@ class IntegrationDeliveryTests(unittest.TestCase):
             draft=False,
             mergeable_state="unknown",
             merge_commit_sha=MERGE,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
 
         result = deliver_to_integration(

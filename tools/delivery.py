@@ -72,6 +72,8 @@ class PullRequest:
     mergeable: bool | None
     mergeable_state: str | None
     url: str
+    head_repository: str | None = None
+    base_repository: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -232,12 +234,18 @@ class GitHubPullRequestProvider:
         base = data.get("base")
         state = data.get("state")
         url = data.get("html_url")
+        head_repo = head.get("repo") if isinstance(head, Mapping) else None
+        base_repo = base.get("repo") if isinstance(base, Mapping) else None
         if (
             not isinstance(number, int)
             or not isinstance(title, str)
             or not isinstance(body, str)
             or not isinstance(head, Mapping)
             or not isinstance(base, Mapping)
+            or not isinstance(head_repo, Mapping)
+            or not isinstance(base_repo, Mapping)
+            or not isinstance(head_repo.get("full_name"), str)
+            or not isinstance(base_repo.get("full_name"), str)
             or not isinstance(head.get("ref"), str)
             or not isinstance(base.get("ref"), str)
             or not isinstance(state, str)
@@ -275,7 +283,18 @@ class GitHubPullRequestProvider:
             mergeable=mergeable,
             mergeable_state=mergeable_state,
             url=url,
+            head_repository=head_repo["full_name"],
+            base_repository=base_repo["full_name"],
         )
+
+    def _validate_repository_origin(self, pull_request: PullRequest) -> None:
+        if (
+            pull_request.head_repository != self.repository
+            or pull_request.base_repository != self.repository
+        ):
+            raise DeliveryError(
+                "GitHub pull-request head and base repositories must match the configured repository."
+            )
 
     def get(self, pull_request_number: int) -> PullRequest:
         status, data = self._request(
@@ -286,7 +305,9 @@ class GitHubPullRequestProvider:
             raise DeliveryError(
                 f"Unable to read pull request #{pull_request_number}; HTTP {status}."
             )
-        return self._parse(data)
+        pull_request = self._parse(data)
+        self._validate_repository_origin(pull_request)
+        return pull_request
 
     def find_open(self, head: str, base: str) -> PullRequest | None:
         _validate_task_branch(head)
@@ -307,11 +328,13 @@ class GitHubPullRequestProvider:
             raise DeliveryError(
                 f"Unable to search for open pull requests; HTTP {status}."
             )
-        matches = [
-            self._parse(item)
-            for item in data
-            if isinstance(item, Mapping)
-        ]
+        matches: list[PullRequest] = []
+        for item in data:
+            if not isinstance(item, Mapping):
+                continue
+            pull_request = self._parse(item)
+            self._validate_repository_origin(pull_request)
+            matches.append(pull_request)
         exact = [
             item
             for item in matches
@@ -448,6 +471,13 @@ def sync_merged_pull_request(
     pull_request = provider.get(pull_request_number)
     if pull_request.head != expected_head:
         raise DeliveryError("Pull request head does not match the expected Aegis task branch.")
+    if (
+        pull_request.head_repository != getattr(provider, "repository", None)
+        or pull_request.base_repository != getattr(provider, "repository", None)
+    ):
+        raise DeliveryError(
+            "Pull request head and base repositories must match the configured repository."
+        )
     if pull_request.base != integration_branch:
         raise DeliveryError("Pull request base does not match the configured integration branch.")
     if not pull_request.merged or pull_request.state != "closed":

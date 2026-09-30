@@ -61,6 +61,8 @@ class PromotionPullRequest:
     state: str
     merged: bool
     merge_commit_sha: str | None
+    head_repository: str | None = None
+    base_repository: str | None = None
 
 
 class PromotionSyncProvider(Protocol):
@@ -184,10 +186,16 @@ class GitHubPromotionSyncProvider:
         url = data.get("html_url")
         state = data.get("state")
         merged_at = data.get("merged_at")
+        head_repo = head.get("repo") if isinstance(head, Mapping) else None
+        base_repo = base.get("repo") if isinstance(base, Mapping) else None
         if (
             not isinstance(url, str)
             or not HTTPS_URL_RE.fullmatch(url)
             or not isinstance(state, str)
+            or not isinstance(head_repo, Mapping)
+            or not isinstance(base_repo, Mapping)
+            or not isinstance(head_repo.get("full_name"), str)
+            or not isinstance(base_repo.get("full_name"), str)
             or state not in {"open", "closed"}
             or not isinstance(head, Mapping)
             or not isinstance(base, Mapping)
@@ -195,6 +203,14 @@ class GitHubPromotionSyncProvider:
             or not isinstance(base.get("ref"), str)
         ):
             raise PromotionSyncError("GitHub promotion pull-request response is malformed.")
+
+        head_repository = head_repo["full_name"]
+        base_repository = base_repo["full_name"]
+        if head_repository != self.repository or base_repository != self.repository:
+            raise PromotionSyncError(
+                "GitHub promotion pull-request head and base repositories must match "
+                "the configured repository."
+            )
 
         return PromotionPullRequest(
             number=number,
@@ -210,6 +226,8 @@ class GitHubPromotionSyncProvider:
                 if data.get("merge_commit_sha") is not None
                 else None
             ),
+            head_repository=head_repository,
+            base_repository=base_repository,
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
@@ -307,6 +325,13 @@ def sync_promotion_merge(
     if pull_request.head != expected_head:
         raise PromotionSyncError(
             "Promotion pull-request head does not match the deterministic promotion branch."
+        )
+    if (
+        pull_request.head_repository != provider.repository
+        or pull_request.base_repository != provider.repository
+    ):
+        raise PromotionSyncError(
+            "Promotion pull-request head and base repositories must match the configured repository."
         )
     if pull_request.base != target_branch:
         raise PromotionSyncError(

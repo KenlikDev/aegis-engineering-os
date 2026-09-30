@@ -56,6 +56,8 @@ class IntegrationPullRequest:
     draft: bool
     mergeable_state: str | None
     merge_commit_sha: str | None
+    head_repository: str | None = None
+    base_repository: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,11 +189,17 @@ class GitHubIntegrationMergeProvider:
         base = data.get("base")
         state = data.get("state")
         url = data.get("html_url")
+        head_repo = head.get("repo") if isinstance(head, Mapping) else None
+        base_repo = base.get("repo") if isinstance(base, Mapping) else None
         if (
             not isinstance(head, Mapping)
             or not isinstance(base, Mapping)
             or not isinstance(head.get("ref"), str)
             or not isinstance(base.get("ref"), str)
+            or not isinstance(head_repo, Mapping)
+            or not isinstance(base_repo, Mapping)
+            or not isinstance(head_repo.get("full_name"), str)
+            or not isinstance(base_repo.get("full_name"), str)
             or not isinstance(state, str)
             or state not in {"open", "closed"}
             or not isinstance(url, str)
@@ -199,6 +207,14 @@ class GitHubIntegrationMergeProvider:
         ):
             raise IntegrationMergeError(
                 "GitHub integration pull-request response is malformed."
+            )
+
+        head_repository = head_repo["full_name"]
+        base_repository = base_repo["full_name"]
+        if head_repository != self.repository or base_repository != self.repository:
+            raise IntegrationMergeError(
+                "GitHub integration pull-request head and base repositories must match "
+                "the configured repository."
             )
 
         merged_at = data.get("merged_at")
@@ -221,6 +237,8 @@ class GitHubIntegrationMergeProvider:
                 if data.get("merge_commit_sha") is not None
                 else None
             ),
+            head_repository=head_repository,
+            base_repository=base_repository,
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
@@ -344,6 +362,13 @@ def sync_integration_merge(
 
     pull_request = provider.get_pull_request(pull_request_number)
     _validate_task_branch_for_work_item(pull_request.head, work_item_id)
+    if (
+        pull_request.head_repository != provider.repository
+        or pull_request.base_repository != provider.repository
+    ):
+        raise IntegrationMergeError(
+            "Pull request head and base repositories must match the configured repository."
+        )
     if pull_request.base != INTEGRATION_BRANCH:
         raise IntegrationMergeError(
             "Pull request base does not match ai/integration."

@@ -74,6 +74,8 @@ class FakeIntegrationProvider:
             draft=draft,
             mergeable_state=mergeable_state,
             merge_commit_sha=merge_commit_sha,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         self.integration = BranchSnapshot(
             branch="ai/integration",
@@ -119,6 +121,8 @@ class FakeIntegrationProvider:
             draft=False,
             mergeable_state="unknown",
             merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
         )
         return MergeResult(merged=True, merge_commit_sha=MERGE_SHA)
 
@@ -154,11 +158,13 @@ class UnverifiedTransitionProvider(InMemoryWorkItemProvider):
 
 
 class FakeGitHubTransport:
-    def __init__(self):
+    def __init__(self, *, head_repository=REPOSITORY, base_repository=REPOSITORY):
         self.calls = []
         self.pr_reads = 0
         self.merge_payload = None
         self.comparison = {"status": "identical", "ahead_by": 0, "behind_by": 0}
+        self.head_repository = head_repository
+        self.base_repository = base_repository
 
     def __call__(self, method, url, headers, payload):
         path = url.removeprefix("https://api.github.com")
@@ -178,8 +184,16 @@ class FakeGitHubTransport:
                 "number": PR_NUMBER,
                 "title": "integration merge",
                 "body": "",
-                "head": {"ref": "ai/feature/75-integration-merge", "sha": HEAD_SHA},
-                "base": {"ref": "ai/integration", "sha": INTEGRATION_SHA},
+                "head": {
+                    "ref": "ai/feature/75-integration-merge",
+                    "sha": HEAD_SHA,
+                    "repo": {"full_name": self.head_repository},
+                },
+                "base": {
+                    "ref": "ai/integration",
+                    "sha": INTEGRATION_SHA,
+                    "repo": {"full_name": self.base_repository},
+                },
                 "state": "closed" if merged else "open",
                 "merged_at": "2026-09-28T15:00:00Z" if merged else None,
                 "merge_commit_sha": MERGE_SHA if merged else None,
@@ -199,6 +213,47 @@ class FakeGitHubTransport:
 
 
 class IntegrationMergeTests(unittest.TestCase):
+    def test_rejects_fork_origin_before_merge(self):
+        provider = FakeIntegrationProvider()
+        provider.pr = IntegrationPullRequest(
+            number=provider.pr.number,
+            url=provider.pr.url,
+            head=provider.pr.head,
+            head_sha=provider.pr.head_sha,
+            base=provider.pr.base,
+            state=provider.pr.state,
+            merged=False,
+            draft=False,
+            mergeable_state="clean",
+            merge_commit_sha=None,
+            head_repository="attacker/example-fork",
+            base_repository=REPOSITORY,
+        )
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "head and base repositories must match",
+        ):
+            sync_integration_merge(
+                provider,
+                work_items(),
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+            )
+
+    def test_github_provider_rejects_fork_origin(self):
+        provider = GitHubIntegrationMergeProvider(
+            REPOSITORY,
+            "test-token",
+            transport=FakeGitHubTransport(head_repository="attacker/example-fork"),
+        )
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "head and base repositories",
+        ):
+            provider.get_pull_request(PR_NUMBER)
+
     def test_successful_merge_advances_review_to_integration(self):
         provider = FakeIntegrationProvider()
         items = work_items()
