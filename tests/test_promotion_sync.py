@@ -256,6 +256,18 @@ class PromotionSyncTests(unittest.TestCase):
                 target_branch="main",
             )
 
+    def test_github_provider_rejects_fork_origin(self):
+        provider = GitHubPromotionSyncProvider(
+            REPOSITORY,
+            "test-token",
+            transport=FakeGitHubTransport(head_repository="attacker/example-fork"),
+        )
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "head and base repositories",
+        ):
+            provider.get_pull_request(PROMOTION_PR)
+
     def test_github_provider_requires_identical_compare(self):
         transport = FakeGitHubTransport()
         provider = GitHubPromotionSyncProvider(
