@@ -339,6 +339,8 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual("work-item:150", canonical.subject)
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation"]["head_sha"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["head_repository"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["base_repository"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
         self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
 
@@ -1352,6 +1354,8 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual("work-item:143", canonical.subject)
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation_head_sha"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["head_repository"])
+        self.assertEqual(REPOSITORY, canonical.result["pull_request"]["base_repository"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
         self.assertTrue(canonical.result["work_item"]["transition_verified"])
         self.assertEqual(canonical.evidence_id, canonical.evidence_sha256)
