@@ -11,7 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from evidence_contract import EvidenceContractError, write_evidence
+from evidence_contract import (
+    EvidenceContractError,
+    load_json_object,
+    write_evidence,
+)
 
 
 DEFAULT_REGISTRY = (
@@ -140,12 +144,12 @@ COMPOSITIONS: Mapping[str, tuple[WorkflowStep, ...]] = {
 
 def _load_registry(path: Path) -> set[str]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        data = load_json_object(path)
+    except (EvidenceContractError, OSError) as exc:
         raise WorkflowCompositionError(
             f"Unable to read skill registry {path}: {exc}"
         ) from exc
-    if not isinstance(data, dict) or not isinstance(data.get("skills"), list):
+    if not isinstance(data.get("skills"), list):
         raise WorkflowCompositionError("Skill registry must contain a skills list.")
 
     names: set[str] = set()

@@ -62,6 +62,29 @@ class WorkflowCompositionTests(unittest.TestCase):
         second = compose_workflow("bug-fix")
         self.assertEqual(first, second)
 
+    def test_rejects_ambiguous_registry_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            path.write_text(
+                '{"skills": [{"name": "work-item-lifecycle"}], '
+                '"skills": [{"name": "work-item-lifecycle"}, {"name": "code-review"}]}',
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(WorkflowCompositionError, "Duplicate JSON key"):
+                compose_workflow("feature", registry_path=path)
+
+    def test_rejects_non_standard_registry_json_constants(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            path.write_text(
+                '{"skills": [{"name": "work-item-lifecycle"}], "enabled": NaN}',
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(WorkflowCompositionError, "JSON constant .*not allowed"):
+                compose_workflow("feature", registry_path=path)
+
     def test_unknown_registry_capability_fails_closed(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
