@@ -79,6 +79,24 @@ class PromotionSnapshotProvider(Protocol):
         base: str,
     ) -> list[PullRequestSnapshot]: ...
 
+    def get_pull_request(self, number: int) -> PullRequestSnapshot: ...
+
+    def get_pull_request(self, number: int) -> PullRequestSnapshot:
+        if number <= 0:
+            raise PromotionSnapshotError("Pull-request number must be positive.")
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/pulls/{number}",
+        )
+        if status != 200 or not isinstance(data, Mapping):
+            raise PromotionSnapshotError(
+                f"Unable to read promotion pull request #{number}; HTTP {status}."
+            )
+        parsed = self._parse_pull_request(data)
+        if parsed is None:
+            raise PromotionSnapshotError("GitHub pull-request response is malformed.")
+        return parsed
+
     def create_pull_request(
         self,
         *,
@@ -396,7 +414,7 @@ class GitHubPromotionSnapshotProvider:
         parsed = self._parse_pull_request(data)
         if parsed is None:
             raise PromotionSnapshotError("GitHub pull-request response is malformed.")
-        return parsed
+        return self.get_pull_request(parsed.number)
 
     @staticmethod
     def _parse_pull_request(data: Mapping[str, Any]) -> PullRequestSnapshot | None:
