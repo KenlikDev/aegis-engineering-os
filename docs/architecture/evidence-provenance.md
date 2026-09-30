@@ -128,3 +128,7 @@ A separate evidence-set requirements consumer can validate whether an explicitly
 ## Atomic persistence anchoring
 
 Atomic JSON persistence is anchored to an opened destination directory on POSIX systems. Destination path components are opened with no-follow semantics, the temporary file is created relative to the retained directory handle, and replacement is performed relative to that same handle. This prevents an ancestor directory symlink substitution from redirecting the write after path validation.
+
+### Integration merge canonicalization
+
+Canonical `integration-merge` evidence is fail-closed against the complete producer contract. A verified record requires a closed-and-merged task PR targeting `ai/integration`, exact PR head and merge revisions, same-repository head/base identities, exact protected integration revision, read-after-write verified traceability, and a verified lifecycle transition to `integration`. When the PR was already merged and no new validation head exists, that absence is preserved as explicit uncertainty rather than inferred success.

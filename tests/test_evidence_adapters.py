@@ -1455,6 +1455,78 @@ class EvidenceAdapterTests(unittest.TestCase):
             write_evidence(canonical, path)
             self.assertEqual(canonical, read_and_validate_evidence(path))
 
+    def _verified_integration_merge_result(self):
+        return {
+            "status": "verified",
+            "work_item_id": "143",
+            "validation_head_sha": SOURCE_SHA,
+            "pull_request": {
+                "number": 143,
+                "url": "https://github.com/example/pull/143",
+                "head": "ai/feature/143-integration-merge-provenance",
+                "head_repository": REPOSITORY,
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "base_repository": REPOSITORY,
+                "state": "closed",
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "traceability_verified": True,
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+    def test_integration_merge_verified_rejects_unmerged_pull_request(self):
+        result = self._verified_integration_merge_result()
+        result["pull_request"]["state"] = "open"
+        result["pull_request"]["merged"] = False
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "pull-request identity or merged state is invalid",
+        ):
+            integration_merge_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+    def test_integration_merge_verified_rejects_unverified_lifecycle_mutation(self):
+        result = self._verified_integration_merge_result()
+        result["work_item"]["transition_verified"] = False
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "lifecycle transition must be read-after-write verified",
+        ):
+            integration_merge_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+    def test_integration_merge_verified_rejects_validation_head_mismatch(self):
+        result = self._verified_integration_merge_result()
+        result["validation_head_sha"] = TARGET_SHA
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "validation head does not match",
+        ):
+            integration_merge_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
     def test_integration_merge_not_merged_remains_unknown(self):
         result = {
             "status": "not-merged",
