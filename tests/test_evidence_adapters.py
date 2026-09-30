@@ -1056,6 +1056,61 @@ class EvidenceAdapterTests(unittest.TestCase):
                 canonical.result["validation"]["evidence_refs"][0],
             )
 
+    def test_knowledge_gap_preserves_transition_history_integrity(self):
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            record = create_candidate(
+                scope="global",
+                capability="knowledge transition provenance",
+                problem="Lifecycle history must remain independently verifiable.",
+                proposed_change="Hash persisted knowledge-gap transitions.",
+                references=["https://docs.example.test/knowledge/transitions"],
+                store_root=temp,
+                candidate_id="13000000-0000-4000-8000-000000000005",
+            )
+
+            canonical = knowledge_gap_evidence(
+                record,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+            self.assertEqual(
+                record.transitions_sha256,
+                canonical.result["transitions_sha256"],
+            )
+            self.assertEqual([], canonical.uncertainty)
+            self.assertEqual("pending", canonical.status)
+
+    def test_knowledge_gap_legacy_transition_history_is_explicitly_uncertain(self):
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            record = create_candidate(
+                scope="global",
+                capability="legacy knowledge provenance",
+                problem="Legacy transition hashes may be absent.",
+                proposed_change="Preserve explicit uncertainty until rewritten.",
+                references=["https://docs.example.test/knowledge/legacy"],
+                store_root=temp,
+                candidate_id="13000000-0000-4000-8000-000000000006",
+            )
+            record_type = type(record)
+            legacy = record_type(
+                schema_version=record.schema_version,
+                state=record.state,
+                candidate=record.candidate,
+                validation=record.validation,
+                transitions=record.transitions,
+                transitions_sha256=None,
+            )
+
+            canonical = knowledge_gap_evidence(
+                legacy,
+                observed_at="2026-09-28T18:00:00Z",
+            )
+
+            self.assertEqual("pending", canonical.status)
+            self.assertIsNone(canonical.result["transitions_sha256"])
+            self.assertEqual(1, len(canonical.uncertainty))
+            self.assertIn("legacy", canonical.uncertainty[0].lower())
+
     def test_knowledge_gap_rejected_is_failed_and_non_active(self):
         with __import__("tempfile").TemporaryDirectory() as temp:
             record = create_candidate(
