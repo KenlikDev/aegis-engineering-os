@@ -167,6 +167,24 @@ class FakeGitHubTransport:
 
     def __call__(self, method, url, headers, payload):
         self.url = url
+        if url.endswith(f"/repos/{REPOSITORY}/pulls/{PROMOTION_PR}"):
+            return 200, {
+                "number": PROMOTION_PR,
+                "html_url": "https://github.com/KenlikDev/aegis-engineering-os/pull/123",
+                "head": {
+                    "ref": "ai/1-main-promotion",
+                    "sha": HEAD_SHA,
+                    "repo": {"full_name": self.head_repository},
+                },
+                "base": {
+                    "ref": "main",
+                    "sha": TARGET_SHA,
+                    "repo": {"full_name": self.base_repository},
+                },
+                "state": "closed",
+                "merged_at": "2026-09-28T15:00:00Z",
+                "merge_commit_sha": MERGE_SHA,
+            }
         return 200, {
             "status": self.status,
             "ahead_by": 1 if self.status == "ahead" else 0,
