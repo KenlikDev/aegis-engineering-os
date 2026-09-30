@@ -30,7 +30,7 @@ review
 
 Validation evidence is bound to the exact PR head SHA.
 
-The integration merge operation requires `expected_head_sha` for every open pull request. It fails closed if the current PR head differs from the exact SHA supplied by the higher-level validation boundary. Already-merged pull requests may omit the SHA because no new merge mutation is performed. The composed delivery result therefore distinguishes a fresh exact-head validation path from an already-completed merge synchronization path.
+The integration merge operation requires `expected_head_sha` for every open pull request. GitHub pull-request data must also identify both `head.repo.full_name` and `base.repo.full_name`, and both must equal the configured repository. A fork-origin pull request is rejected even when its branch name and commit SHA match the expected Aegis values. It fails closed if the current PR head differs from the exact SHA supplied by the higher-level validation boundary. Already-merged pull requests may omit the SHA because no new merge mutation is performed. The composed delivery result therefore distinguishes a fresh exact-head validation path from an already-completed merge synchronization path.
 
 This prevents a new commit pushed after validation from being merged using stale validation evidence.
 
