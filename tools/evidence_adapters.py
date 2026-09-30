@@ -1098,6 +1098,10 @@ def knowledge_gap_evidence(
     transitions = _canonical_safe(list(record.transitions))
 
     references = list(record.candidate.references)
+    if record.transitions_sha256 is None:
+        uncertainty.append(
+            "Legacy knowledge-gap record does not contain an independently hashed transition history."
+        )
     if isinstance(validation, Mapping):
         raw_refs = validation.get("evidence_refs")
         if isinstance(raw_refs, list):
@@ -1130,6 +1134,7 @@ def knowledge_gap_evidence(
                 },
                 "validation": validation,
                 "transitions": transitions,
+                "transitions_sha256": record.transitions_sha256,
             },
             "uncertainty": uncertainty,
             "references": references,
