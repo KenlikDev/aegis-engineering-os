@@ -229,6 +229,8 @@ class GitHubIntegrationMergeProvider:
                 if data.get("merge_commit_sha") is not None
                 else None
             ),
+            head_repository=head_repo["full_name"],
+            base_repository=base_repo["full_name"],
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
