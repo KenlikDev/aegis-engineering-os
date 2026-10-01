@@ -340,6 +340,17 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "head_sha": SOURCE_SHA,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
             },
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "integration": {
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
@@ -362,6 +373,7 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual("work-item:150", canonical.subject)
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation"]["head_sha"])
+        self.assertEqual(TARGET_SHA, canonical.result["post_merge_validation"]["validated_sha"])
         self.assertEqual(REPOSITORY, canonical.result["pull_request"]["head_repository"])
         self.assertEqual(REPOSITORY, canonical.result["pull_request"]["base_repository"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
