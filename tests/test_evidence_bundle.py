@@ -113,7 +113,7 @@ class EvidenceBundleTests(unittest.TestCase):
         except OSError as exc:
             self.skipTest(f"symbolic links unavailable: {exc}")
 
-        with self.assertRaisesRegex(EvidenceBundleError, "symlink"):
+        with self.assertRaisesRegex(EvidenceBundleError, "securely open atomic copy source"):
             build_evidence_bundle(root, "Readiness input set", [linked])
 
     def test_malformed_bundle_schema_is_rejected(self):
