@@ -28,8 +28,9 @@ The workflow:
 2. verifies the optional lifecycle precondition;
 3. executes every declared gate in manifest order;
 4. preserves required and optional gate semantics;
-5. returns bounded redacted output;
-6. when explicitly configured with a provider, uses the existing quality-gate lifecycle synchronization contract.
+5. executes gates without inheriting common credential-like parent environment variables;
+6. returns bounded redacted output;
+7. when explicitly configured with a provider, uses the existing quality-gate lifecycle synchronization contract.
 
 A required gate failure is never bypassed.
 
