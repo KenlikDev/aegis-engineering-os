@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from evidence_contract import EvidenceContractError, parse_json_object
@@ -67,6 +68,25 @@ def _request_json(
 
 
 def _normalize_base_url(value: str) -> str:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        raise RuntimePreflightError("OpenHands Agent Server URL must use http or https.")
+    if parsed.username or parsed.password:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must not contain credentials."
+        )
+    if parsed.query or parsed.fragment:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must not contain a query or fragment."
+        )
+    if not parsed.hostname:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must contain a hostname."
+        )
+    if parsed.hostname.lower() not in {"localhost", "127.0.0.1", "::1"}:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server preflight requires a loopback server URL."
+        )
     return value.rstrip("/")
 
 
