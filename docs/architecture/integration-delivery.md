@@ -22,15 +22,16 @@ review
 -> require the head SHA to remain unchanged
 -> squash merge with the exact validated SHA
 -> verify merged PR and merge commit
--> compare `ai/integration` against the merge commit and require `identical`
--> re-read `ai/integration` and require its SHA to equal the merge commit
+-> require successful Aegis Validation for the exact merge commit SHA
+-> verify the merge commit is contained in the current `ai/integration` history
+-> re-read `ai/integration` and record its current SHA separately
 -> advance work item review -> integration
 
 ## Race safety
 
 Validation evidence is bound to the exact PR head SHA.
 
-The integration merge operation requires `expected_head_sha` for every open pull request. GitHub pull-request data must also identify both `head.repo.full_name` and `base.repo.full_name`, and both must equal the configured repository. A fork-origin pull request is rejected even when its branch name and commit SHA match the expected Aegis values. It fails closed if the current PR head differs from the exact SHA supplied by the higher-level validation boundary. Already-merged pull requests may omit the SHA because no new merge mutation is performed. The composed delivery result therefore distinguishes a fresh exact-head validation path from an already-completed merge synchronization path.
+The integration merge operation requires `expected_head_sha` for every open pull request and a separate successful Aegis Validation observation for the resulting merge commit before lifecycle synchronization. GitHub pull-request data must also identify both `head.repo.full_name` and `base.repo.full_name`, and both must equal the configured repository. A fork-origin pull request is rejected even when its branch name and commit SHA match the expected Aegis values. It fails closed if the current PR head differs from the exact SHA supplied by the higher-level validation boundary. Already-merged pull requests may omit the pre-merge task-head SHA because no new merge mutation is performed, but they still require successful validation for the exact existing merge commit before lifecycle synchronization.
 
 This prevents a new commit pushed after validation from being merged using stale validation evidence.
 
@@ -53,7 +54,8 @@ It never:
 - approves pull requests;
 - bypasses branch protection;
 - merges a draft pull request;
-- merges without successful exact-head Aegis Validation.
+- merges without successful exact-head Aegis Validation;
+- synchronizes review -> integration without successful validation of the exact resulting merge commit.
 
 Already-merged pull requests are treated as an idempotent recovery case: the controller skips a new merge attempt and verifies the existing merge through the lower-level integration synchronization boundary.
 
@@ -74,7 +76,7 @@ No exact-head validation SHA for an open PR:
 - do not merge;
 - leave the work item in review.
 
-Post-merge comparison is not `identical`:
+Post-merge ancestry cannot be verified:
 - do not advance the work item lifecycle;
 - do not report integration as verified.
 
@@ -87,6 +89,8 @@ PR is draft, not clean, or targets the wrong branch:
 - report the condition.
 
 Successful verified merge:
+- require post-merge Aegis Validation for the exact merge commit SHA;
+- verify the merge commit is contained in the current `ai/integration` history;
 - verify traceability mutation evidence;
 - verify lifecycle transition mutation evidence;
 - attach traceability;

@@ -15,7 +15,7 @@ from integration_merge import (
     MergeResult,
     sync_integration_merge,
 )
-from promotion_readiness import BranchSnapshot  # noqa: E402
+from promotion_readiness import BranchSnapshot, ValidationRun  # noqa: E402
 from work_item_lifecycle import (  # noqa: E402
     InMemoryWorkItemProvider,
     LifecycleState,
@@ -84,6 +84,7 @@ class FakeIntegrationProvider:
         )
         self.exact_merge = exact_merge
         self.post_merge_sha = post_merge_sha
+        self.contains_merge = post_merge_sha == MERGE_SHA
         self.merge_calls = []
 
     def get_pull_request(self, number):
@@ -106,6 +107,10 @@ class FakeIntegrationProvider:
         self.merge_calls.append(("exact", target_branch, commit_sha))
         return self.exact_merge
 
+    def target_contains_commit(self, target_branch, commit_sha):
+        self.merge_calls.append(("contains", target_branch, commit_sha))
+        return self.contains_merge
+
     def merge_pull_request(self, number, expected_head_sha):
         self.merge_calls.append(("merge", number, expected_head_sha))
         if number != PR_NUMBER or expected_head_sha != HEAD_SHA:
@@ -125,6 +130,30 @@ class FakeIntegrationProvider:
             base_repository=REPOSITORY,
         )
         return MergeResult(merged=True, merge_commit_sha=MERGE_SHA)
+
+
+class FakeValidationProvider:
+    def __init__(self, available=True, wrong_sha=False):
+        self.repository = REPOSITORY
+        self.available = available
+        self.wrong_sha = wrong_sha
+        self.calls = []
+
+    def latest_successful_validation(self, workflow, head_sha):
+        self.calls.append((workflow, head_sha))
+        if not self.available:
+            return None
+        validated_sha = ADVANCED_SHA if self.wrong_sha else head_sha
+        return ValidationRun(
+            id=990,
+            workflow=workflow,
+            status="completed",
+            conclusion="success",
+            head_sha=validated_sha,
+            url="https://github.com/kenlikdev/aegis-engineering-os/actions/runs/990",
+            validated_sha=validated_sha,
+            evidence_type="branch-push",
+        )
 
 
 class UnverifiedTraceabilityProvider(InMemoryWorkItemProvider):
@@ -213,6 +242,16 @@ class FakeGitHubTransport:
 
 
 class IntegrationMergeTests(unittest.TestCase):
+    def sync(self, provider, items, *, validation_provider=None, **kwargs):
+        return sync_integration_merge(
+            provider,
+            items,
+            "75",
+            PR_NUMBER,
+            validation_provider=validation_provider or FakeValidationProvider(),
+            **kwargs,
+        )
+
     def test_rejects_fork_origin_before_merge(self):
         provider = FakeIntegrationProvider()
         provider.pr = IntegrationPullRequest(
@@ -234,11 +273,9 @@ class IntegrationMergeTests(unittest.TestCase):
             IntegrationMergeError,
             "head and base repositories must match",
         ):
-            sync_integration_merge(
+            self.sync(
                 provider,
                 work_items(),
-                "75",
-                PR_NUMBER,
                 expected_head_sha=HEAD_SHA,
             )
 
@@ -254,22 +291,65 @@ class IntegrationMergeTests(unittest.TestCase):
         ):
             provider.get_pull_request(PR_NUMBER)
 
+    def test_missing_post_merge_validation_blocks_lifecycle_transition(self):
+        provider = FakeIntegrationProvider()
+        items = work_items()
+        validation = FakeValidationProvider(available=False)
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "No successful Aegis Validation run exists",
+        ):
+            sync_integration_merge(
+                provider,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+                validation_provider=validation,
+                post_merge_validation_timeout_seconds=0.01,
+                post_merge_validation_poll_interval_seconds=0.01,
+            )
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+        self.assertTrue(validation.calls)
+
+    def test_wrong_post_merge_validation_revision_blocks_lifecycle_transition(self):
+        provider = FakeIntegrationProvider()
+        items = work_items()
+        validation = FakeValidationProvider(wrong_sha=True)
+
+        with self.assertRaisesRegex(
+            IntegrationMergeError,
+            "No successful Aegis Validation run exists",
+        ):
+            sync_integration_merge(
+                provider,
+                items,
+                "75",
+                PR_NUMBER,
+                expected_head_sha=HEAD_SHA,
+                validation_provider=validation,
+                post_merge_validation_timeout_seconds=0.01,
+                post_merge_validation_poll_interval_seconds=0.01,
+            )
+
+        self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
+
     def test_successful_merge_advances_review_to_integration(self):
         provider = FakeIntegrationProvider()
         items = work_items()
 
-        result = sync_integration_merge(
-            provider,
-            items,
-            "75",
-            PR_NUMBER,
+        result = self.sync(
+                provider,
+                items,
             expected_head_sha=HEAD_SHA,
         )
 
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
         self.assertEqual(
-            [("merge", PR_NUMBER, HEAD_SHA), ("exact", "ai/integration", MERGE_SHA)],
+            [("merge", PR_NUMBER, HEAD_SHA), ("contains", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
         self.assertIn(MERGE_SHA, items.comments["75"][0])
@@ -282,17 +362,15 @@ class IntegrationMergeTests(unittest.TestCase):
         )
         items = work_items()
 
-        result = sync_integration_merge(
-            provider,
-            items,
-            "75",
-            PR_NUMBER,
+        result = self.sync(
+                provider,
+                items,
         )
 
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
         self.assertEqual(
-            [("exact", "ai/integration", MERGE_SHA)],
+            [("contains", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
 
@@ -313,11 +391,9 @@ class IntegrationMergeTests(unittest.TestCase):
             IntegrationMergeError,
             "Traceability mutation was not read-after-write verified",
         ):
-            sync_integration_merge(
+            self.sync(
                 merge,
                 items,
-                "75",
-                PR_NUMBER,
                 expected_head_sha=HEAD_SHA,
             )
 
@@ -340,11 +416,9 @@ class IntegrationMergeTests(unittest.TestCase):
             IntegrationMergeError,
             "Lifecycle transition mutation was not read-after-write verified",
         ):
-            sync_integration_merge(
+            self.sync(
                 merge,
                 items,
-                "75",
-                PR_NUMBER,
                 expected_head_sha=HEAD_SHA,
             )
 
@@ -374,6 +448,11 @@ class IntegrationMergeTests(unittest.TestCase):
                 ),
                 patch.object(
                     integration_merge_module,
+                    "_build_validation_provider",
+                    return_value=FakeValidationProvider(),
+                ),
+                patch.object(
+                    integration_merge_module,
                     "_build_work_item_provider",
                     return_value=items,
                 ),
@@ -391,7 +470,7 @@ class IntegrationMergeTests(unittest.TestCase):
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "mergeable_state must be clean"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
         self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
         self.assertEqual([], provider.merge_calls)
@@ -401,7 +480,7 @@ class IntegrationMergeTests(unittest.TestCase):
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "Draft pull requests"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
         self.assertEqual([], provider.merge_calls)
 
@@ -409,7 +488,7 @@ class IntegrationMergeTests(unittest.TestCase):
         provider = FakeIntegrationProvider(pr_state="closed", merged=False)
         items = work_items()
 
-        result = sync_integration_merge(provider, items, "75", PR_NUMBER)
+        result = self.sync(provider, items)
 
         self.assertEqual("not-merged", result["status"])
         self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
@@ -420,7 +499,7 @@ class IntegrationMergeTests(unittest.TestCase):
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "must remain protected"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
         self.assertEqual([], provider.merge_calls)
 
@@ -432,11 +511,9 @@ class IntegrationMergeTests(unittest.TestCase):
             IntegrationMergeError,
             "head SHA changed after validation",
         ):
-            sync_integration_merge(
+            self.sync(
                 provider,
                 items,
-                "75",
-                PR_NUMBER,
                 expected_head_sha=HEAD_SHA,
             )
 
@@ -449,14 +526,14 @@ class IntegrationMergeTests(unittest.TestCase):
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "task branch for this work item"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
     def test_rejects_wrong_base(self):
         provider = FakeIntegrationProvider(base="develop")
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "base does not match"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
     def test_rejects_open_pr_without_validation_head_sha(self):
         provider = FakeIntegrationProvider()
@@ -466,24 +543,38 @@ class IntegrationMergeTests(unittest.TestCase):
             IntegrationMergeError,
             "exact validation head SHA is required",
         ):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
         self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
         self.assertEqual([], provider.merge_calls)
 
-    def test_rejects_integration_branch_advanced_after_exact_compare(self):
+    def test_allows_integration_branch_advance_after_merge_commit_validation(self):
         provider = FakeIntegrationProvider(post_merge_sha=ADVANCED_SHA)
+        provider.contains_merge = True
+        items = work_items()
+
+        result = self.sync(
+            provider,
+            items,
+            expected_head_sha=HEAD_SHA,
+        )
+
+        self.assertEqual("verified", result["status"])
+        self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
+        self.assertEqual(ADVANCED_SHA, result["integration"]["sha"])
+
+    def test_rejects_integration_branch_without_merge_commit_ancestry(self):
+        provider = FakeIntegrationProvider(post_merge_sha=ADVANCED_SHA)
+        provider.contains_merge = False
         items = work_items()
 
         with self.assertRaisesRegex(
             IntegrationMergeError,
-            "advanced after exact merge verification",
+            "does not contain integration merge commit",
         ):
-            sync_integration_merge(
+            self.sync(
                 provider,
                 items,
-                "75",
-                PR_NUMBER,
                 expected_head_sha=HEAD_SHA,
             )
 
@@ -494,21 +585,20 @@ class IntegrationMergeTests(unittest.TestCase):
         items = work_items()
 
         with self.assertRaisesRegex(IntegrationMergeError, "no merge commit SHA"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
     def test_rejects_merge_commit_not_in_target(self):
-        provider = FakeIntegrationProvider(exact_merge=False)
+        provider = FakeIntegrationProvider()
+        provider.contains_merge = False
         items = work_items()
 
         with self.assertRaisesRegex(
             IntegrationMergeError,
-            "not exactly equal to integration merge commit",
+            "does not contain integration merge commit",
         ):
-            sync_integration_merge(
+            self.sync(
                 provider,
                 items,
-                "75",
-                PR_NUMBER,
                 expected_head_sha=HEAD_SHA,
             )
 
@@ -519,9 +609,24 @@ class IntegrationMergeTests(unittest.TestCase):
         items = work_items(LifecycleState.VERIFICATION)
 
         with self.assertRaisesRegex(IntegrationMergeError, "requires a work item in review"):
-            sync_integration_merge(provider, items, "75", PR_NUMBER)
+            self.sync(provider, items)
 
         self.assertEqual([], provider.merge_calls)
+
+    def test_github_provider_accepts_ancestor_compare_result(self):
+        transport = FakeGitHubTransport()
+        transport.comparison = {
+            "status": "behind",
+            "ahead_by": 0,
+            "behind_by": 4,
+        }
+        provider = GitHubIntegrationMergeProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        self.assertTrue(provider.target_contains_commit("ai/integration", MERGE_SHA))
 
     def test_github_provider_rejects_non_identical_compare_result(self):
         transport = FakeGitHubTransport()
@@ -562,7 +667,7 @@ class IntegrationMergeTests(unittest.TestCase):
         )
 
         self.assertTrue(
-            provider.target_matches_commit("ai/integration", MERGE_SHA)
+            provider.target_contains_commit("ai/integration", MERGE_SHA)
         )
 
 

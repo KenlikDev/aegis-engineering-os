@@ -233,6 +233,18 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "head_sha": SOURCE_SHA,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
             },
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
+
             "integration": {
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
@@ -259,6 +271,17 @@ class EvidenceAdapterTests(unittest.TestCase):
             "status": "verified",
             "work_item_id": "143",
             "validation_head_sha": SOURCE_SHA,
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 143,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "pull_request": {
                 "number": 143,
                 "url": "https://github.com/example/pull/143",
@@ -317,10 +340,22 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "head_sha": SOURCE_SHA,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
             },
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "integration": {
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -339,6 +374,7 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual("work-item:150", canonical.subject)
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertEqual(SOURCE_SHA, canonical.result["validation"]["head_sha"])
+        self.assertEqual(TARGET_SHA, canonical.result["post_merge_validation"]["validated_sha"])
         self.assertEqual(REPOSITORY, canonical.result["pull_request"]["head_repository"])
         self.assertEqual(REPOSITORY, canonical.result["pull_request"]["base_repository"])
         self.assertEqual(TARGET_SHA, canonical.result["integration"]["sha"])
@@ -366,10 +402,22 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "merge_commit_sha": TARGET_SHA,
             },
             "validation": None,
+            "post_merge_validation": {
+                "id": 1502,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 163,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1502",
+            },
             "integration": {
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -387,7 +435,45 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertIsNone(canonical.result["validation"])
         self.assertEqual(1, len(canonical.uncertainty))
-        self.assertIn("No new validation run", canonical.uncertainty[0])
+        self.assertIn("No pre-merge task-head validation", canonical.uncertainty[0])
+
+    def test_integration_delivery_rejects_missing_post_merge_validation(self):
+        result = {
+            "status": "verified",
+            "work_item_id": "163",
+            "traceability_verified": True,
+            "pull_request": {
+                "number": 163,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/pull/163",
+                "head": "ai/feature/163-already-merged-provenance",
+                "head_repository": REPOSITORY,
+                "head_sha": SOURCE_SHA,
+                "base": "ai/integration",
+                "base_repository": REPOSITORY,
+                "merged": True,
+                "merge_commit_sha": TARGET_SHA,
+            },
+            "validation": None,
+            "integration": {
+                "branch": "ai/integration",
+                "sha": TARGET_SHA,
+                "protected": True,
+            },
+            "work_item": {
+                "state_after": "integration",
+                "transition_verified": True,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "post-merge validation is required",
+        ):
+            integration_delivery_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-09-28T18:00:00Z",
+            )
 
     def test_integration_delivery_rejects_partial_verified_result_without_identity(self):
         result = {
@@ -419,7 +505,7 @@ class EvidenceAdapterTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             EvidenceContractError,
-            "merge commit does not match the post-merge integration SHA",
+            "post-merge validation is required",
         ):
             integration_delivery_evidence(
                 result,
@@ -449,10 +535,22 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "head_sha": SOURCE_SHA,
                 "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1500",
             },
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "branch-push",
+                "pull_request_number": 150,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "integration": {
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -1409,6 +1507,17 @@ class EvidenceAdapterTests(unittest.TestCase):
             "status": "verified",
             "work_item_id": "143",
             "validation_head_sha": SOURCE_SHA,
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 143,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "pull_request": {
                 "number": 143,
                 "url": "https://github.com/example/pull/143",
@@ -1425,6 +1534,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "traceability_verified": True,
             "work_item": {
@@ -1460,6 +1570,17 @@ class EvidenceAdapterTests(unittest.TestCase):
             "status": "verified",
             "work_item_id": "143",
             "validation_head_sha": SOURCE_SHA,
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 143,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "pull_request": {
                 "number": 143,
                 "url": "https://github.com/example/pull/143",
@@ -1476,6 +1597,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "traceability_verified": True,
             "work_item": {

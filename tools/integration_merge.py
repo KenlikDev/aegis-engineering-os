@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass
@@ -22,7 +23,11 @@ from github_http_security import (
     validate_github_api_base_url,
 )
 
-from promotion_readiness import BranchSnapshot
+from promotion_readiness import (
+    DEFAULT_WORKFLOW,
+    BranchSnapshot,
+    ValidationRun,
+)
 from work_item_lifecycle import (
     LifecycleState,
     Traceability,
@@ -68,6 +73,16 @@ class MergeResult:
     merge_commit_sha: str | None
 
 
+class ValidationProvider(Protocol):
+    """Provider-neutral exact-SHA post-merge validation lookup."""
+
+    def latest_successful_validation(
+        self,
+        workflow: str,
+        head_sha: str,
+    ) -> ValidationRun | None: ...
+
+
 class IntegrationMergeProvider(Protocol):
     """Provider-neutral boundary for the only autonomous merge Aegis permits."""
 
@@ -78,6 +93,8 @@ class IntegrationMergeProvider(Protocol):
     def get_branch(self, branch: str) -> BranchSnapshot: ...
 
     def target_matches_commit(self, target_branch: str, commit_sha: str) -> bool: ...
+
+    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool: ...
 
     def merge_pull_request(self, number: int, expected_head_sha: str) -> MergeResult: ...
 
@@ -282,6 +299,28 @@ class GitHubIntegrationMergeProvider:
             raise IntegrationMergeError("GitHub comparison response is malformed.")
         return compare_status == "identical" and ahead_by == 0 and behind_by == 0
 
+    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool:
+        """Return whether target contains the verified commit as an ancestor."""
+        self._sha(commit_sha, "Merge commit SHA")
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/compare/{quote(target_branch, safe='')}...{commit_sha}",
+        )
+        if status != 200 or not isinstance(data, Mapping):
+            raise IntegrationMergeError(
+                f"Unable to verify merge commit ancestry in {target_branch!r}; HTTP {status}."
+            )
+        compare_status = data.get("status")
+        ahead_by = data.get("ahead_by")
+        behind_by = data.get("behind_by")
+        if (
+            compare_status not in {"identical", "behind"}
+            or not isinstance(ahead_by, int)
+            or not isinstance(behind_by, int)
+        ):
+            raise IntegrationMergeError("GitHub comparison response is malformed.")
+        return ahead_by == 0
+
     def merge_pull_request(
         self,
         number: int,
@@ -328,6 +367,46 @@ def _validate_request(
         raise IntegrationMergeError("Pull-request number must be positive.")
 
 
+def _wait_for_post_merge_validation(
+    validation_provider: ValidationProvider,
+    merge_commit_sha: str,
+    *,
+    workflow: str,
+    timeout_seconds: float,
+    poll_interval_seconds: float,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> ValidationRun:
+    if not workflow.strip():
+        raise IntegrationMergeError("Validation workflow must not be empty.")
+    if timeout_seconds <= 0 or poll_interval_seconds <= 0:
+        raise IntegrationMergeError(
+            "Post-merge validation timeout and poll interval must be greater than zero."
+        )
+
+    deadline = monotonic() + timeout_seconds
+    while True:
+        validation = validation_provider.latest_successful_validation(
+            workflow,
+            merge_commit_sha,
+        )
+        if validation is not None:
+            validated_sha = validation.validated_sha or validation.head_sha
+            if (
+                validation.status == "completed"
+                and validation.conclusion == "success"
+                and validated_sha == merge_commit_sha
+            ):
+                return validation
+
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise IntegrationMergeError(
+                "No successful Aegis Validation run exists for the exact integration merge commit."
+            )
+        sleep(min(poll_interval_seconds, remaining))
+
+
 def _validate_task_branch_for_work_item(branch: str, work_item_id: str) -> None:
     expected_pattern = re.compile(
         rf"^ai/(feature|fix|refactor|chore)/{re.escape(work_item_id)}-[A-Za-z0-9._-]+$"
@@ -345,6 +424,12 @@ def sync_integration_merge(
     pull_request_number: int,
     *,
     expected_head_sha: str | None = None,
+    validation_provider: ValidationProvider | None = None,
+    validation_workflow: str = DEFAULT_WORKFLOW,
+    post_merge_validation_timeout_seconds: float = 600.0,
+    post_merge_validation_poll_interval_seconds: float = 2.0,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     """Merge a verified task PR into ai/integration and synchronize lifecycle state."""
     _validate_request(provider.repository, work_item_id, pull_request_number)
@@ -427,20 +512,29 @@ def sync_integration_merge(
     if merge_commit_sha is None:
         raise IntegrationMergeError("Merged integration pull request has no merge commit SHA.")
 
-    if not provider.target_matches_commit(
+    if validation_provider is None:
+        raise IntegrationMergeError(
+            "A validation provider is required before a work item can enter integration."
+        )
+    post_merge_validation = _wait_for_post_merge_validation(
+        validation_provider,
+        merge_commit_sha,
+        workflow=validation_workflow,
+        timeout_seconds=post_merge_validation_timeout_seconds,
+        poll_interval_seconds=post_merge_validation_poll_interval_seconds,
+        monotonic=monotonic,
+        sleep=sleep,
+    )
+
+    if not provider.target_contains_commit(
         INTEGRATION_BRANCH,
         merge_commit_sha,
     ):
         raise IntegrationMergeError(
-            f"ai/integration is not exactly equal to integration merge commit {merge_commit_sha}."
+            f"ai/integration does not contain integration merge commit {merge_commit_sha}."
         )
 
     integration = provider.get_branch(INTEGRATION_BRANCH)
-    if integration.sha != merge_commit_sha:
-        raise IntegrationMergeError(
-            f"ai/integration advanced after exact merge verification: "
-            f"observed {integration.sha}, expected {merge_commit_sha}."
-        )
 
     trace = work_item_provider.attach_traceability(
         work_item_id,
@@ -474,6 +568,17 @@ def sync_integration_merge(
         "status": "verified",
         "work_item_id": work_item_id,
         "validation_head_sha": expected_head_sha,
+        "post_merge_validation": {
+            "id": post_merge_validation.id,
+            "workflow": post_merge_validation.workflow,
+            "status": post_merge_validation.status,
+            "conclusion": post_merge_validation.conclusion,
+            "head_sha": post_merge_validation.head_sha,
+            "validated_sha": post_merge_validation.validated_sha,
+            "evidence_type": post_merge_validation.evidence_type,
+            "pull_request_number": post_merge_validation.pull_request_number,
+            "url": post_merge_validation.url,
+        },
         "pull_request": {
             "number": pull_request.number,
             "url": pull_request.url,
@@ -490,6 +595,7 @@ def sync_integration_merge(
             "branch": integration.branch,
             "sha": integration.sha,
             "protected": integration.protected,
+            "contains_merge_commit": True,
         },
         "traceability_verified": trace.verified,
         "work_item": {
@@ -497,6 +603,12 @@ def sync_integration_merge(
             "transition_verified": mutation.verified,
         },
     }
+
+
+def _build_validation_provider(repository: str, token: str) -> ValidationProvider:
+    from promotion_readiness import GitHubPromotionProvider
+
+    return GitHubPromotionProvider(repository, token)
 
 
 def _build_work_item_provider(repository: str, token: str) -> WorkItemProvider:
@@ -513,6 +625,19 @@ def main() -> int:
     parser.add_argument("work_item_id")
     parser.add_argument("pull_request_number", type=int)
     parser.add_argument("--expected-head-sha", default=None)
+    parser.add_argument("--validation-workflow", default=DEFAULT_WORKFLOW)
+    parser.add_argument(
+        "--post-merge-validation-timeout",
+        type=float,
+        default=600.0,
+        help="Maximum seconds to wait for exact merge-commit Aegis Validation.",
+    )
+    parser.add_argument(
+        "--post-merge-validation-poll-interval",
+        type=float,
+        default=2.0,
+        help="Seconds between exact merge-commit validation checks.",
+    )
     parser.add_argument(
         "--canonical-evidence-output",
         type=Path,
@@ -531,6 +656,10 @@ def main() -> int:
             args.work_item_id,
             args.pull_request_number,
             expected_head_sha=args.expected_head_sha,
+            validation_provider=_build_validation_provider(args.repository, token),
+            validation_workflow=args.validation_workflow,
+            post_merge_validation_timeout_seconds=args.post_merge_validation_timeout,
+            post_merge_validation_poll_interval_seconds=args.post_merge_validation_poll_interval,
         )
     except (IntegrationMergeError, WorkItemLifecycleError, ValueError) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
