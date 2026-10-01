@@ -329,6 +329,55 @@ class RuntimePreflightTests(unittest.TestCase):
                     openhands_agent_server_url="http://127.0.0.1:9000",
                 )
 
+    def test_preflight_rejects_non_loopback_agent_server_url(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout, headers=None: responses[url],
+        ):
+            with self.assertRaisesRegex(
+                preflight_runtime.RuntimePreflightError,
+                "loopback server URL",
+            ):
+                preflight_runtime.preflight(
+                    self.profile_path,
+                    "development-local",
+                    openhands_agent_server_url="https://example.invalid:9000",
+                )
+
+    def test_preflight_rejects_agent_server_url_credentials_and_query(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout, headers=None: responses[url],
+        ):
+            for url in (
+                "http://user:password@127.0.0.1:9000",
+                "http://127.0.0.1:9000?token=secret",
+                "http://127.0.0.1:9000/#fragment",
+            ):
+                with self.subTest(url=url):
+                    with self.assertRaises(preflight_runtime.RuntimePreflightError):
+                        preflight_runtime.preflight(
+                            self.profile_path,
+                            "development-local",
+                            openhands_agent_server_url=url,
+                        )
+
     def test_preflight_rejects_non_local_openhands_agent_server(self) -> None:
         responses = {
             "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
