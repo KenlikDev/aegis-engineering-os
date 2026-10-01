@@ -162,12 +162,9 @@ def preflight(
     }
 
     if openhands_agent_server_url:
-        try:
-            agent_server_base_url = _normalize_agent_server_url(
-                openhands_agent_server_url
-            )
-        except RuntimePreflightError:
-            raise
+        agent_server_base_url = _normalize_agent_server_url(
+            openhands_agent_server_url
+        )
 
         alive = _request_json(f"{agent_server_base_url}/alive", timeout)
         if alive.get("status") != "ok":
