@@ -8,7 +8,7 @@ The executable boundary does not discover arbitrary versions by heuristic. It va
 
 ## Source snapshot integrity
 
-Each version source is read as one byte snapshot. The SHA-256 digest and decoded text used for version matching are derived from that same snapshot, preventing a split-read provenance mismatch if the source changes concurrently.
+Each version source is read as one byte snapshot through the shared anchored no-follow reader on POSIX. Symlinked source files or parent directories are rejected, and the SHA-256 digest and decoded text used for version matching are derived from that same snapshot, preventing path traversal and split-read provenance mismatches.
 
 ## Evidence model
 
