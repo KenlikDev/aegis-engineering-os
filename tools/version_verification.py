@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from evidence_contract import EvidenceContractError, load_json_object, write_json_atomically
+from evidence_contract import EvidenceContractError, load_json_object, read_bytes_no_follow, write_json_atomically
 
 
 SCHEMA_VERSION = 1
@@ -70,21 +70,25 @@ def _clean_text(value: object, field: str, *, max_length: int = 512) -> str:
 def _relative_source(project: Path, source: str) -> tuple[Path, str]:
     relative = Path(_clean_text(source, "source"))
     if relative.is_absolute():
-        resolved = relative.expanduser().resolve()
+        candidate = relative.expanduser()
     else:
-        resolved = (project / relative).resolve()
+        candidate = project / relative
+    candidate = Path(candidate.absolute())
     try:
-        relative_display = resolved.relative_to(project).as_posix()
+        relative_display = candidate.relative_to(project).as_posix()
     except ValueError as exc:
         raise VersionVerificationError(
             f"Version source must remain inside the project root: {source}"
         ) from exc
-    return resolved, relative_display
+    return candidate, relative_display
 
 
 def _sha256_and_text(path: Path) -> tuple[str, str]:
     try:
-        snapshot = path.read_bytes()
+        snapshot = read_bytes_no_follow(
+            path,
+            error_type=VersionVerificationError,
+        )
         content = snapshot.decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise VersionVerificationError(
