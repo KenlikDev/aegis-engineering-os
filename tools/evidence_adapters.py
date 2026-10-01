@@ -310,9 +310,9 @@ def integration_delivery_evidence(
             raise EvidenceContractError(
                 "Integration delivery pull-request repositories must match the configured repository."
             )
-        if merge_sha != integration_sha:
+        if integration.get("contains_merge_commit") is not True:
             raise EvidenceContractError(
-                "Integration delivery merge commit does not match the post-merge integration SHA."
+                "Verified integration delivery must prove that the current integration tip contains the merge commit."
             )
         if result.get("traceability_verified") is not True:
             raise EvidenceContractError(
@@ -322,7 +322,7 @@ def integration_delivery_evidence(
             raise EvidenceContractError(
                 "Integration delivery lifecycle transition must be read-after-write verified."
             )
-        revision = merge_sha
+        revision = integration_sha
 
     pull_request_payload = {
         "number": pull_request.get("number"),
@@ -730,6 +730,7 @@ def integration_merge_evidence(
     integration_branch = integration.get("branch")
     integration_sha = integration.get("sha")
     integration_protected = integration.get("protected")
+    contains_merge_commit = integration.get("contains_merge_commit")
 
     transition_state = work_item.get("state_after")
     transition_verified = work_item.get("transition_verified")
@@ -775,10 +776,9 @@ def integration_merge_evidence(
         raise EvidenceContractError(
             "Verified integration merge branch identity or protection state is invalid."
         )
-
-    if merge_commit_sha != integration_sha:
+    if contains_merge_commit is not True:
         raise EvidenceContractError(
-            "Integration merge commit does not match the observed integration SHA."
+            "Verified integration merge must prove that the current integration tip contains the merge commit."
         )
 
     validation_head_sha = result.get("validation_head_sha")
