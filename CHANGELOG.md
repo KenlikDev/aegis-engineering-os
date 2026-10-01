@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- serialize GitHub lifecycle transitions per work item with conditional fast-forward Git-ref locks and bounded stale-lock recovery;
 - require successful Aegis Validation for the exact integration merge commit before advancing work items to integration;
 - preserve separate task-head and post-merge validation provenance in integration evidence;
 - prevent quality-gate commands from inheriting common credential-like environment variables;
