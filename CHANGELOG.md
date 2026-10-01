@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- harden security review to fail closed on dynamic subprocess shell settings and unrelated HTTP request sinks;
 - harden canonical integration-merge evidence to require the complete verified producer contract and preserve missing validation as explicit uncertainty;
 - bind prepared promotion pull requests to the exact promotion snapshot head SHA;
 - harden atomic bootstrap source copies with anchored no-follow descriptors and single-file snapshots;
