@@ -557,17 +557,35 @@ def backup_paths(
     for name in sorted(affected_names):
         destination = target_root / name
         if destination.exists():
-            backup = backup_root / "skills" / name
-            shutil.copytree(destination, backup)
+            validate_existing_managed_path(destination, None, name)
+            source = destination / "SKILL.md"
+            backup = backup_root / "skills" / name / "SKILL.md"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            copy_file_atomically(
+                source,
+                backup,
+                error_type=EvidenceContractError,
+            )
             backups[name] = backup
 
     state_backup: Path | None = None
     state_existed = state_path.is_file()
     if state_existed:
         state_backup = backup_root / "aegis-version.json"
-        shutil.copy2(state_path, state_backup)
+        copy_file_atomically(
+            state_path,
+            state_backup,
+            error_type=EvidenceContractError,
+        )
 
     return backups, state_backup, state_existed
+
+
+def _remove_managed_skill_path(destination: Path) -> None:
+    if destination.is_symlink():
+        destination.unlink()
+    elif destination.exists():
+        shutil.rmtree(destination)
 
 
 def restore_transaction(
@@ -582,12 +600,16 @@ def restore_transaction(
 ) -> None:
     for name in sorted(affected_names):
         destination = target_root / name
-        if destination.exists():
-            shutil.rmtree(destination)
+        if destination.exists() or destination.is_symlink():
+            _remove_managed_skill_path(destination)
         backup = backups.get(name)
         if backup:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(backup, destination)
+            destination.mkdir(parents=True, exist_ok=True)
+            copy_file_atomically(
+                backup,
+                destination / "SKILL.md",
+                error_type=EvidenceContractError,
+            )
 
     if state_path.exists():
         state_path.unlink()
