@@ -68,9 +68,15 @@ def _request_json(
 
 
 def _normalize_base_url(value: str) -> str:
+    return value.rstrip("/")
+
+
+def _normalize_agent_server_url(value: str) -> str:
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"}:
-        raise RuntimePreflightError("OpenHands Agent Server URL must use http or https.")
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must use http or https."
+        )
     if parsed.username or parsed.password:
         raise RuntimePreflightError(
             "OpenHands Agent Server URL must not contain credentials."
@@ -156,7 +162,12 @@ def preflight(
     }
 
     if openhands_agent_server_url:
-        agent_server_base_url = _normalize_base_url(openhands_agent_server_url)
+        try:
+            agent_server_base_url = _normalize_agent_server_url(
+                openhands_agent_server_url
+            )
+        except RuntimePreflightError:
+            raise
 
         alive = _request_json(f"{agent_server_base_url}/alive", timeout)
         if alive.get("status") != "ok":
