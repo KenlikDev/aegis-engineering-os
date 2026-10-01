@@ -180,6 +180,8 @@ def deliver_to_integration(
                 expected_head_sha=validation.head_sha,
                 validation_provider=validation_provider,
                 validation_workflow=request.workflow,
+                post_merge_validation_timeout_seconds=request.post_merge_validation_timeout_seconds,
+                post_merge_validation_poll_interval_seconds=request.post_merge_validation_poll_interval_seconds,
             )
         except IntegrationMergeError as exc:
             raise IntegrationDeliveryError(
