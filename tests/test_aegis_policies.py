@@ -82,6 +82,65 @@ class AegisPolicyTests(unittest.TestCase):
                 )
             self.assertFalse((backup_root / "skills" / "aegis-orchestrator").exists())
 
+    def test_structural_skill_validation_rejects_file_symlink(self) -> None:
+        import validate_aegis
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            external = root / "external.md"
+            external.write_text(
+                "---\nname: safe-skill\ndescription: safe skill\n---\n\n# Safe\n",
+                encoding="utf-8",
+            )
+            skill = root / "SKILL.md"
+            try:
+                skill.symlink_to(external)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            with patch.object(validate_aegis, "ROOT", root):
+                with self.assertRaises(SystemExit):
+                    validate_aegis.validate_skill(skill, {})
+
+    def test_structural_skill_validation_rejects_parent_symlink(self) -> None:
+        import validate_aegis
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            external = root / "external"
+            external.mkdir()
+            source = external / "SKILL.md"
+            source.write_text(
+                "---\nname: safe-skill\ndescription: safe skill\n---\n\n# Safe\n",
+                encoding="utf-8",
+            )
+            linked = root / "linked"
+            try:
+                linked.symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            with patch.object(validate_aegis, "ROOT", root):
+                with self.assertRaises(SystemExit):
+                    validate_aegis.validate_skill(linked / "SKILL.md", {})
+
+    def test_structural_metadata_rejects_file_symlink(self) -> None:
+        import validate_aegis
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            external = root / "external-version"
+            external.write_text("0.1.0-alpha.1\n", encoding="utf-8")
+            linked = root / "VERSION"
+            try:
+                linked.symlink_to(external)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            with patch.object(validate_aegis, "ROOT", root):
+                with self.assertRaises(SystemExit):
+                    validate_aegis.require_regular_file(linked, "VERSION file")
+
     def test_pull_request_template_matches_language_and_evidence_contract(self) -> None:
         import validate_aegis
 
