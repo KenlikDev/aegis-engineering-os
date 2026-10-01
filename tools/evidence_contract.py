@@ -133,19 +133,53 @@ def parse_json_object(
 
 
 def load_json_object(path: str | Path) -> dict[str, Any]:
-    """Read a bounded JSON object and reject ambiguous JSON syntax."""
-    file_path = Path(path).expanduser().resolve()
+    """Read a bounded JSON object without following symlinked path components."""
+    file_path = Path(path).expanduser()
     try:
-        raw = file_path.read_bytes()
+        raw = read_bytes_no_follow(
+            file_path,
+            max_bytes=MAX_JSON_BYTES,
+            error_type=EvidenceContractError,
+        )
     except OSError as exc:
         raise EvidenceContractError(
             f"Unable to read evidence input {file_path}: {exc}"
         ) from exc
-    if len(raw) > MAX_JSON_BYTES:
-        raise EvidenceContractError(
-            f"Evidence JSON exceeds the {MAX_JSON_BYTES}-byte limit."
-        )
     return parse_json_object(raw, label="Evidence JSON")
+
+
+def read_bytes_no_follow(
+    path: str | Path,
+    *,
+    max_bytes: int | None = None,
+    error_type: type[Exception] = EvidenceContractError,
+) -> bytes:
+    """Read a regular file through anchored no-follow directory descriptors."""
+    if max_bytes is not None and (
+        not isinstance(max_bytes, int) or max_bytes <= 0
+    ):
+        raise error_type("Maximum file size must be a positive integer.")
+
+    file_descriptor = _open_secure_source_file(
+        Path(path).expanduser(),
+        error_type=error_type,
+    )
+    try:
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(file_descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if max_bytes is not None and total > max_bytes:
+                raise error_type(
+                    f"File exceeds the {max_bytes}-byte limit: {path}"
+                )
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(file_descriptor)
 
 
 def _validate_string(
