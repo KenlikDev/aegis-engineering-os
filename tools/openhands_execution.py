@@ -13,6 +13,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Callable, Literal, Mapping
+
+from evidence_contract import EvidenceContractError, parse_json_object
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import (
@@ -25,6 +27,9 @@ from urllib.request import (
 DEFAULT_OPENHANDS_VERSION = "1.49.5"
 DEFAULT_TIMEOUT_SECONDS = 3600.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
+MAX_JSON_RESPONSE_BYTES = 1024 * 1024
+MAX_EVENT_PAGES = 100
+MAX_EVENTS = 10_000
 DEFAULT_WORKSPACE_ROOT = "/projects"
 
 TERMINAL_STATUSES = frozenset({"finished", "error", "stuck"})
@@ -117,10 +122,19 @@ def _request_json(
     request = Request(url, data=body, headers=dict(request_headers), method=method)
     try:
         with _HTTP_OPENER.open(request, timeout=timeout) as response:
-            raw = response.read()
+            raw = response.read(MAX_JSON_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_JSON_RESPONSE_BYTES:
+                raise OpenHandsExecutionError(
+                    "OpenHands JSON response exceeds the "
+                    f"{MAX_JSON_RESPONSE_BYTES}-byte download limit."
+                )
             if not raw:
                 return response.status, {}
-            parsed = json.loads(raw.decode("utf-8"))
+            parsed = parse_json_object(
+                raw,
+                label="OpenHands JSON response",
+                max_bytes=MAX_JSON_RESPONSE_BYTES,
+            )
     except HTTPError as exc:
         # Preserve the HTTP status so callers can intentionally accept a documented
         # non-2xx response such as 409 Conflict from the run endpoint.
@@ -131,15 +145,12 @@ def _request_json(
         OSError,
         UnicodeDecodeError,
         json.JSONDecodeError,
+        EvidenceContractError,
     ) as exc:
         raise OpenHandsExecutionError(
             f"Unable to communicate with OpenHands at {url}: {exc}"
         ) from exc
 
-    if not isinstance(parsed, dict):
-        raise OpenHandsExecutionError(
-            f"OpenHands endpoint returned a non-object JSON document: {url}"
-        )
     return response.status, parsed
 
 
@@ -538,8 +549,16 @@ class OpenHandsExecutionClient:
         events: list[dict[str, Any]] = []
         page_id: str | None = None
         seen_pages: set[str] = set()
+        page_count = 0
 
         while True:
+            if page_count >= MAX_EVENT_PAGES:
+                raise OpenHandsExecutionError(
+                    "OpenHands event pagination exceeded the "
+                    f"{MAX_EVENT_PAGES}-page limit.",
+                    conversation_id,
+                )
+            page_count += 1
             query = {"limit": "100"}
             if page_id:
                 query["page_id"] = page_id
@@ -560,6 +579,12 @@ class OpenHandsExecutionClient:
             ):
                 raise OpenHandsExecutionError(
                     "OpenHands event search returned an invalid items list.",
+                    conversation_id,
+                )
+            if len(events) + len(items) > MAX_EVENTS:
+                raise OpenHandsExecutionError(
+                    "OpenHands execution event history exceeded the "
+                    f"{MAX_EVENTS}-event limit.",
                     conversation_id,
                 )
             events.extend(items)

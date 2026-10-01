@@ -12,7 +12,8 @@ description: Validate software behavior through risk-based test design, regressi
 - verify integration boundaries;
 - distinguish product defects from environment defects;
 - prevent flaky tests from being treated as reliable evidence;
-- report reproducible failures with evidence.
+- report reproducible failures with evidence;
+- use the testing workflow as the execution boundary for project-declared verification commands.
 
 ## Independence
 

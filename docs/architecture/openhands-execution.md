@@ -29,6 +29,14 @@ A single execution follows this order:
 
 The run trigger accepts the \`409 Conflict\` response documented by the installed SDK as an indication that the conversation is already running.
 
+## Response-size safety
+
+Every OpenHands JSON response is bounded to 1 MiB and parsed through the shared strict JSON object contract before interpretation. Duplicate object keys and non-standard JSON constants are rejected; a larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
+
+Event history retrieval is additionally bounded to 100 pages and 10,000 accumulated events. A history that exceeds either boundary is rejected rather than being returned as incomplete execution evidence.
+
+Every OpenHands JSON response is bounded to 1 MiB before JSON parsing. A larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
+
 ## State handling
 
 The OpenHands Agent Server defines \`finished\`, \`error\`, and \`stuck\` as terminal execution states.
@@ -51,6 +59,14 @@ By default the adapter allows only project paths below \`/projects\` and rejects
 - paths outside the configured root.
 
 Aegis must therefore establish the host-to-container project mapping separately. This adapter does not invent a mount mapping or access host files on behalf of OpenHands.
+
+## Canonical provenance
+
+The low-level `OpenHandsExecutionResult` can be adapted through `openhands_execution_evidence` in `tools/evidence_adapters.py`.
+
+The adapter is downstream of the existing execution redaction boundary. It does not execute requests, rerun conversations, inspect credentials, or mutate Git state. Finished maps to canonical `verified`; error, stuck, and blocked outcomes map to `failed` with explicit uncertainty.
+
+Canonical provenance removes secret-like mapping keys before shared evidence validation. This is an evidence-format safety measure and does not change the original execution result.
 
 ## Authentication and evidence
 

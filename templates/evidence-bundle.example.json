@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "bundle_id": "sha256-generated-by-tools/evidence_bundle.py",
+  "purpose": "Explicit purpose for this evidence set",
+  "members": [
+    {
+      "evidence_id": "sha256-of-member-evidence",
+      "path": ".aegis/example-evidence.json"
+    }
+  ]
+}

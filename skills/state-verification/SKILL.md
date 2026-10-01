@@ -87,3 +87,14 @@ When direct verification is unavailable:
 ## Completion rule
 
 A state-dependent task is complete only when the final relevant state has been verified or the remaining uncertainty is explicitly documented.
+## Executable evidence boundary
+
+Use `tools/state_verification.py` to record explicit observed state into the canonical evidence envelope:
+
+    python3 tools/state_verification.py record /path/to/state-input.json /path/to/state-evidence.json
+
+Validate the resulting artifact before relying on it:
+
+    python3 tools/state_verification.py validate /path/to/state-evidence.json
+
+The input identifies the evidence kind, authoritative source, observed subject, revision when available, observation timestamp, observed result, uncertainty, references, and optional artifact hash. The tool computes a canonical SHA-256 identity over the normalized unsigned payload. It never connects to a provider, changes observed state, or treats a user claim as independently verified.

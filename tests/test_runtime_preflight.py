@@ -1,17 +1,78 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from urllib.request import Request
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import preflight_runtime  # noqa: E402
+from evidence_contract import read_and_validate_evidence  # noqa: E402
 
 
 class RuntimePreflightTests(unittest.TestCase):
     def setUp(self) -> None:
         self.profile_path = ROOT / "templates" / "ai-profiles.example.json"
+
+    def test_request_json_rejects_redirects(self) -> None:
+        handler = preflight_runtime._NoRedirectHandler()
+        with self.assertRaisesRegex(
+            preflight_runtime.RuntimePreflightError,
+            "unexpected redirect",
+        ):
+            handler.redirect_request(Request("http://127.0.0.1:9000/api/settings"))
+
+    def test_request_json_rejects_duplicate_keys(self) -> None:
+        from preflight_runtime import _request_json
+
+        class DuplicateResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b'{"status":"ok","status":"verified"}'
+
+        class DuplicateOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return DuplicateResponse()
+
+        with patch("preflight_runtime._NO_REDIRECT_OPENER", DuplicateOpener()):
+            with self.assertRaisesRegex(
+                preflight_runtime.RuntimePreflightError,
+                "Duplicate JSON key",
+            ):
+                _request_json("http://127.0.0.1:11434/api/version", 5)
+
+    def test_request_json_rejects_oversized_response(self) -> None:
+        from preflight_runtime import MAX_JSON_RESPONSE_BYTES, _request_json
+
+        class OversizedResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b"{" + b"x" * limit
+
+        class OversizedOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return OversizedResponse()
+
+        with patch("preflight_runtime._NO_REDIRECT_OPENER", OversizedOpener()):
+            with self.assertRaisesRegex(
+                preflight_runtime.RuntimePreflightError,
+                f"{MAX_JSON_RESPONSE_BYTES}-byte download limit",
+            ):
+                _request_json("http://127.0.0.1:11434/api/version", 5)
 
     def test_preflight_verifies_exact_local_model(self) -> None:
         responses = {
@@ -39,6 +100,63 @@ class RuntimePreflightTests(unittest.TestCase):
         self.assertEqual("gemma4:31b", result["model"])
         self.assertEqual("0.12.0", result["ollama_version"])
         self.assertTrue(result["model_available"])
+
+    def test_cli_writes_canonical_runtime_preflight_evidence(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "runtime-preflight.json"
+            argv = [
+                "preflight_runtime.py",
+                str(self.profile_path),
+                "development-local",
+                "--canonical-evidence-output",
+                str(output),
+            ]
+            with (
+                patch.object(
+                    preflight_runtime,
+                    "_request_json",
+                    side_effect=lambda url, timeout, headers=None: responses[url],
+                ),
+                patch.object(sys, "argv", argv),
+            ):
+                self.assertEqual(0, preflight_runtime.main())
+
+            canonical = read_and_validate_evidence(output)
+            self.assertEqual("runtime-preflight", canonical.kind)
+            self.assertEqual("profile:development-local", canonical.subject)
+            self.assertEqual("gemma4:31b", canonical.result["model"])
+
+    def test_cli_refuses_to_overwrite_profile_with_canonical_evidence(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        argv = [
+            "preflight_runtime.py",
+            str(self.profile_path),
+            "development-local",
+            "--canonical-evidence-output",
+            str(self.profile_path),
+        ]
+        with (
+            patch.object(
+                preflight_runtime,
+                "_request_json",
+                side_effect=lambda url, timeout, headers=None: responses[url],
+            ),
+            patch.object(sys, "argv", argv),
+        ):
+            self.assertEqual(1, preflight_runtime.main())
 
     def test_preflight_rejects_missing_exact_model(self) -> None:
         responses = {
@@ -210,6 +328,55 @@ class RuntimePreflightTests(unittest.TestCase):
                     "development-local",
                     openhands_agent_server_url="http://127.0.0.1:9000",
                 )
+
+    def test_preflight_rejects_non_loopback_agent_server_url(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout, headers=None: responses[url],
+        ):
+            with self.assertRaisesRegex(
+                preflight_runtime.RuntimePreflightError,
+                "loopback server URL",
+            ):
+                preflight_runtime.preflight(
+                    self.profile_path,
+                    "development-local",
+                    openhands_agent_server_url="https://example.invalid:9000",
+                )
+
+    def test_preflight_rejects_agent_server_url_credentials_and_query(self) -> None:
+        responses = {
+            "http://127.0.0.1:11434/api/version": {"version": "0.12.0"},
+            "http://127.0.0.1:11434/api/tags": {
+                "models": [{"name": "gemma4:31b"}]
+            },
+        }
+
+        with patch.object(
+            preflight_runtime,
+            "_request_json",
+            side_effect=lambda url, timeout, headers=None: responses[url],
+        ):
+            for url in (
+                "http://user:password@127.0.0.1:9000",
+                "http://127.0.0.1:9000?token=secret",
+                "http://127.0.0.1:9000/#fragment",
+            ):
+                with self.subTest(url=url):
+                    with self.assertRaises(preflight_runtime.RuntimePreflightError):
+                        preflight_runtime.preflight(
+                            self.profile_path,
+                            "development-local",
+                            openhands_agent_server_url=url,
+                        )
 
     def test_preflight_rejects_non_local_openhands_agent_server(self) -> None:
         responses = {

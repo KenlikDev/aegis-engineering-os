@@ -235,6 +235,58 @@ class OpenHandsExecutionTests(unittest.TestCase):
         self.assertNotIn("llm-secret-value", repr(result))
         self.assertNotIn("event-secret", repr(result))
 
+    def test_real_http_json_response_rejects_duplicate_keys(self) -> None:
+        from openhands_execution import _request_json
+
+        class DuplicateResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b'{"execution_status":"running","execution_status":"finished"}'
+
+        class DuplicateOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return DuplicateResponse()
+
+        with patch("openhands_execution._HTTP_OPENER", DuplicateOpener()):
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                "Duplicate JSON key",
+            ):
+                _request_json("GET", f"{SERVER}/api/conversations/{CID}", {}, None)
+
+    def test_real_http_json_response_is_bounded(self) -> None:
+        from openhands_execution import MAX_JSON_RESPONSE_BYTES, _request_json
+
+        class OversizedResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, limit):
+                return b"{" + b"x" * limit
+
+        class OversizedOpener:
+            def open(self, request, timeout):  # noqa: ANN001, ARG002
+                return OversizedResponse()
+
+        with patch("openhands_execution._HTTP_OPENER", OversizedOpener()):
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                f"{MAX_JSON_RESPONSE_BYTES}-byte download limit",
+            ):
+                _request_json("GET", f"{SERVER}/alive", {}, None)
+
     def test_real_http_409_is_returned_for_status_specific_handling(self) -> None:
         response = HTTPError(
             f"{SERVER}/api/conversations/{CID}/run",
@@ -364,6 +416,45 @@ class OpenHandsExecutionTests(unittest.TestCase):
         transport = FakeTransport(responses)
         with self.assertRaises(OpenHandsExecutionError):
             OpenHandsExecutionClient(transport).execute(request_data())
+
+    def test_event_pagination_is_bounded_by_page_count(self) -> None:
+        from openhands_execution import MAX_EVENT_PAGES
+
+        responses = responses_with_states(["finished", "finished"])
+        responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
+            (200, {"items": [], "next_page_id": f"page-{index}"})
+            for index in range(MAX_EVENT_PAGES + 1)
+        ]
+        transport = FakeTransport(responses)
+
+        with self.assertRaisesRegex(
+            OpenHandsExecutionError,
+            f"{MAX_EVENT_PAGES}-page limit",
+        ):
+            OpenHandsExecutionClient(transport).execute(request_data())
+
+    def test_event_pagination_is_bounded_by_event_count(self) -> None:
+        event_limit = 150
+
+        with patch("openhands_execution.MAX_EVENTS", event_limit):
+            responses = responses_with_states(["finished", "finished"])
+            responses[("GET", f"{SERVER}/api/conversations/{CID}/events/search")] = [
+                (
+                    200,
+                    {
+                        "items": [{"id": f"event-{page * 100 + index}"} for index in range(100)],
+                        "next_page_id": "page-2" if page == 0 else None,
+                    },
+                )
+                for page in range(2)
+            ]
+            transport = FakeTransport(responses)
+
+            with self.assertRaisesRegex(
+                OpenHandsExecutionError,
+                f"{event_limit}-event limit",
+            ):
+                OpenHandsExecutionClient(transport).execute(request_data())
 
     def test_http_409_run_trigger_is_accepted(self) -> None:
         responses = responses_with_states(["running", "finished", "finished"])

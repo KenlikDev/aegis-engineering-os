@@ -29,7 +29,7 @@ Promotion branches are owner-controlled delivery mechanisms and are not autonomo
 
 ## Protection intent
 
-develop and main should require pull requests, successful required checks, and human approval according to repository policy.
+develop and main require pull requests and successful required checks under the current live rulesets. The current rulesets require 0 approving reviews, so the human-only promotion rule is enforced by Aegis operating policy rather than a distinct GitHub approval gate. The owner may strengthen the GitHub rulesets when an independent human-review boundary is required.
 
 ai/integration should require successful automated quality gates before changes are accepted. Human approval can remain optional if the owner intentionally chooses that autonomy level.
 
@@ -48,3 +48,61 @@ Squash merge task branches into ai/integration when that improves history clarit
 For promotion branches, create a clean snapshot from the target branch containing only the verified delta from ai/integration. Use squash merge into develop or main according to the target branch policy.
 
 The exact strategy can be revised after real-world validation.
+
+
+## Pull-request delivery boundary
+
+The executable delivery boundary is \`tools/delivery.py\`.
+
+The allowed autonomous sequence is:
+
+\`review -> PR created/verified -> integration\`
+
+The delivery layer may create or reuse a PR from an \`ai/*\` task branch into an explicit \`ai/*\` integration branch. It must not approve, merge, or promote into \`develop\` or \`main\`.
+
+After a PR is actually merged, \`sync-merge\` verifies the PR source branch and target branch before advancing the authoritative work item from \`review\` to \`integration\`.
+
+The bridge never treats \`mergeable=true\` or a clean mergeability state as equivalent to an actual merge.
+
+
+## Promotion readiness
+
+The read-only promotion verifier is \`tools/promotion_readiness.py\`.
+
+It evaluates \`ai/integration -> develop\` or \`ai/integration -> main\` using fresh GitHub state. The target must be explicitly selected and protected; \`ai/integration\` must also remain protected.
+
+The verifier records the exact source and target SHAs, compare divergence, changed-file count, and the result of the required \`Aegis Validation\` workflow for the exact source SHA.
+
+Promotion is blocked when the source is behind the target, contains no delta, the exact source SHA has no successful \`Aegis Validation\`, the protected-state assumptions are false, or the caller supplied expected SHAs that no longer match.
+
+The verifier is read-only. It does not create promotion branches, modify branch protection, merge pull requests, or change \`develop\`/\`main\`.
+
+## Integration validation trigger
+The concurrency group includes the triggering event and pull-request number where available. This prevents a merged pull-request validation from cancelling the branch push validation that records the exact integration SHA.
+
+
+Task pull requests are validated on opened, synchronized, and reopened events. The validation workflow also handles merged pull requests explicitly with the closed activity and a merged == true condition.
+
+For a merge into ai/integration, the closed-PR path checks out the pull request's actual merge commit SHA. This is a second validation path for the resulting integration state, independent of whether the repository emits an observable push-triggered run.
+
+The workflow keeps contents: read and does not use pull_request_target. No credentials with write access are introduced for post-merge verification.
+
+## Autonomous integration merge
+
+The autonomous merge boundary is limited to task pull requests targeting ai/integration.
+
+Aegis may merge a non-draft Aegis task pull request into protected ai/integration only after:
+- the work item is in review;
+- the pull-request head is verified for the same work item;
+- the base is exactly ai/integration;
+- ai/integration remains protected;
+- mergeable_state is clean;
+- the exact current head SHA is supplied as the merge precondition;
+- the merge uses squash;
+- the resulting merged PR and merge commit are read back and verified.
+
+This boundary does not permit merges into develop or main. Those branches remain human-controlled promotion targets.
+
+## Validation evidence identity
+
+A successful Aegis Validation workflow may be associated with a pull-request head SHA even when the workflow checks out the merge commit. Promotion readiness therefore keeps workflow head_sha separate from validated_sha. For merged PR evidence, validated_sha is the verified merge_commit_sha and must equal the current ai/integration SHA.

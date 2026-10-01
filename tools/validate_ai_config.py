@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
+from evidence_contract import EvidenceContractError, load_json_object
+
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "config" / "ai-backends.json"
@@ -31,8 +33,8 @@ class ConfigurationError(ValueError):
 
 def load_json(path: Path) -> dict:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        value = load_json_object(path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
         raise ConfigurationError(f"Unable to read {path}: {exc}") from exc
 
     if not isinstance(value, dict):

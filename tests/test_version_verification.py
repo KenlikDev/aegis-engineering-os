@@ -1,0 +1,363 @@
+import hashlib
+import json
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+from version_verification import (  # noqa: E402
+    VersionVerificationError,
+    record_version_evidence,
+    validate_version_evidence,
+)
+
+
+class VersionVerificationTests(unittest.TestCase):
+    def _project(self):
+        temp = tempfile.TemporaryDirectory()
+        root = Path(temp.name)
+        (root / "pyproject.toml").write_text(
+            '[project]\nrequires-python = ">=3.13"\n',
+            encoding="utf-8",
+        )
+        (root / "gradle.properties").write_text(
+            "kotlin.version=2.2.20\n",
+            encoding="utf-8",
+        )
+        claims = root / "claims.json"
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "pyproject.toml",
+                        },
+                        {
+                            "component": "kotlin",
+                            "version": "2.2.20",
+                            "scope": "compiler",
+                            "source": "gradle.properties",
+                        },
+                    ],
+                    "external_verification_pending": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.addCleanup(temp.cleanup)
+        return root, claims
+
+    def test_record_creates_sha_pinned_deterministic_evidence(self):
+        root, claims = self._project()
+        output = root / ".aegis" / "version-evidence.json"
+
+        first = record_version_evidence(root, claims, output)
+        second = record_version_evidence(root, claims, output)
+
+        self.assertEqual(first, second)
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(2, len(payload["claims"]))
+        digest = hashlib.sha256(
+            (root / "pyproject.toml").read_bytes()
+        ).hexdigest()
+        self.assertEqual(digest, payload["claims"][0]["source_sha256"])
+
+    def test_hash_and_version_match_same_source_snapshot(self):
+        root, _ = self._project()
+        source = root / "pyproject.toml"
+        snapshot = b'[project]\nrequires-python = ">=3.13"\n'
+
+        import version_verification as module
+
+        with patch.object(
+            module,
+            "read_bytes_no_follow",
+            return_value=snapshot,
+        ) as read_bytes_no_follow:
+            digest, content = module._sha256_and_text(source)
+
+        self.assertEqual(hashlib.sha256(snapshot).hexdigest(), digest)
+        self.assertEqual(snapshot.decode("utf-8"), content)
+        read_bytes_no_follow.assert_called_once()
+    def test_record_rejects_duplicate_json_keys(self):
+        root, claims = self._project()
+        claims.write_text(
+            '{"schema_version":1,"schema_version":1,"claims":[]}',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(VersionVerificationError, "Unable to read version"):
+            record_version_evidence(
+                root,
+                claims,
+                root / ".aegis" / "version-evidence.json",
+            )
+
+    def test_validate_rejects_source_drift(self):
+        root, claims = self._project()
+        output = root / ".aegis" / "version-evidence.json"
+        record_version_evidence(root, claims, output)
+
+        (root / "pyproject.toml").write_text(
+            '[project]\nrequires-python = ">=3.14"\n',
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(VersionVerificationError, "SHA-256 changed"):
+            validate_version_evidence(root, output)
+
+    def test_validate_rejects_version_not_present_in_source(self):
+        root, claims = self._project()
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "9.99",
+                            "scope": "language",
+                            "source": "pyproject.toml",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        output = root / ".aegis" / "version-evidence.json"
+
+        with self.assertRaisesRegex(VersionVerificationError, "was not found"):
+            record_version_evidence(root, claims, output)
+
+    def test_source_path_must_stay_inside_project(self):
+        root, _ = self._project()
+        claims = root / "claims.json"
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "external",
+                            "version": "1.0",
+                            "scope": "other",
+                            "source": "../outside.txt",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        output = root / ".aegis" / "version-evidence.json"
+
+        with self.assertRaisesRegex(VersionVerificationError, "inside the project root"):
+            record_version_evidence(root, claims, output)
+
+    def test_duplicate_component_claims_are_rejected(self):
+        root, _ = self._project()
+        claims = root / "claims.json"
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "pyproject.toml",
+                        },
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "runtime",
+                            "source": "pyproject.toml",
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(VersionVerificationError, "Duplicate"):
+            record_version_evidence(
+                root,
+                claims,
+                root / ".aegis" / "version-evidence.json",
+            )
+
+    def test_pending_flag_must_be_boolean(self):
+        root, claims = self._project()
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "pyproject.toml",
+                        }
+                    ],
+                    "external_verification_pending": "yes",
+                }
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(VersionVerificationError, "must be boolean"):
+            record_version_evidence(
+                root,
+                claims,
+                root / ".aegis" / "version-evidence.json",
+            )
+
+    def test_cli_validate_can_emit_canonical_evidence(self):
+        root, claims = self._project()
+        output = root / ".aegis" / "version-evidence.json"
+        canonical = root / ".aegis" / "canonical-version-evidence.json"
+        record_version_evidence(root, claims, output)
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tools" / "version_verification.py"),
+                "validate",
+                str(root),
+                str(output),
+                "--revision",
+                "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+                "--evidence-output",
+                str(canonical),
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn('"external_verification_pending": false', completed.stdout)
+        payload = json.loads(canonical.read_text(encoding="utf-8"))
+        self.assertEqual(1, payload["schema_version"])
+        self.assertEqual("version-verification", payload["kind"])
+        self.assertEqual(
+            "7c2d2247abf2d4463a2167d20e7ab18a808a24ee",
+            payload["revision"],
+        )
+        self.assertEqual("verified", payload["status"])
+        self.assertTrue(canonical.is_file())
+        self.assertEqual(
+            "2.2.20",
+            next(
+                claim["version"]
+                for claim in payload["result"]["claims"]
+                if claim["component"] == "kotlin"
+            ),
+        )
+
+    def test_version_source_symlink_is_rejected(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root.parent / f"{root.name}-outside.txt"
+            outside.write_text("tool 1.2.3\n", encoding="utf-8")
+            source = root / "source.txt"
+            try:
+                source.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            claims = root / "claims.json"
+            claims.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "claims": [
+                            {
+                                "component": "tool",
+                                "version": "1.2.3",
+                                "scope": "toolchain",
+                                "source": "source.txt",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                VersionVerificationError,
+                "securely open atomic copy source",
+            ):
+                record_version_evidence(root, claims, root / "evidence.json")
+            outside.unlink(missing_ok=True)
+
+    def test_record_refuses_to_overwrite_input_or_source(self):
+        root, claims = self._project()
+        with self.assertRaisesRegex(VersionVerificationError, "differ"):
+            record_version_evidence(root, claims, claims)
+
+        with self.assertRaisesRegex(VersionVerificationError, "overwrite"):
+            record_version_evidence(
+                root,
+                claims,
+                root / "pyproject.toml",
+            )
+
+    def test_record_rejects_symlinked_output(self):
+        root, claims = self._project()
+        target = root / "evidence-target.json"
+        target.write_text("preserve\n", encoding="utf-8")
+        output = root / ".aegis" / "version-evidence.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            output.symlink_to(target)
+        except OSError as exc:
+            self.skipTest(f"symbolic links unavailable: {exc}")
+
+        with self.assertRaisesRegex(VersionVerificationError, "symbolic link"):
+            record_version_evidence(root, claims, output)
+
+        self.assertEqual("preserve\n", target.read_text(encoding="utf-8"))
+    def test_external_verification_pending_is_preserved(self):
+        root, claims = self._project()
+        claims.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "claims": [
+                        {
+                            "component": "python",
+                            "version": "3.13",
+                            "scope": "language",
+                            "source": "pyproject.toml",
+                        }
+                    ],
+                    "external_verification_pending": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+        evidence = record_version_evidence(
+            root,
+            claims,
+            root / ".aegis" / "version-evidence.json",
+        )
+        self.assertTrue(evidence.external_verification_pending)
+        validated = validate_version_evidence(
+            root,
+            root / ".aegis" / "version-evidence.json",
+        )
+        self.assertTrue(validated.external_verification_pending)
+
+
+if __name__ == "__main__":
+    unittest.main()

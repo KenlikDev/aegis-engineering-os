@@ -6,7 +6,13 @@ on:
     branches:
       - main
       - develop
+      - ai/integration
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     branches:
       - main
       - develop
@@ -16,12 +22,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: aegis-validation-${{ github.ref }}
-  cancel-in-progress: true
+  group: aegis-validation-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.event.pull_request.number || github.ref }}-${{ github.event.action || 'none' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'closed' }}
 
 jobs:
   validate:
     name: Validate Aegis
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.action != 'closed' ||
+      (
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.base.ref == 'ai/integration'
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -30,6 +43,29 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: >-
+            ${{ github.event_name == 'pull_request' &&
+            github.event.action != 'closed' &&
+            github.event.pull_request.head.sha ||
+            github.event.action == 'closed' &&
+            github.event.pull_request.merged == true &&
+            github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Verify pull request head checkout
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.action != 'closed'
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Verify merged integration checkout
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+          github.event.pull_request.base.ref == 'ai/integration'
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.merge_commit_sha }}"
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -41,6 +77,8 @@ jobs:
 
       - name: Validate repository structure
         run: python tools/validate_aegis.py
+      - name: Run security review
+        run: python tools/security_review.py .
 
       - name: Run policy tests
         run: python -m unittest discover -s tests

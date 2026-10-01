@@ -3,7 +3,112 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- serialize GitHub lifecycle transitions per work item with conditional fast-forward Git-ref locks and bounded stale-lock recovery;
+- require successful Aegis Validation for the exact integration merge commit before advancing work items to integration;
+- preserve separate task-head and post-merge validation provenance in integration evidence;
+- prevent quality-gate commands from inheriting common credential-like environment variables;
+- enforce loopback-only OpenHands Agent Server URLs in runtime preflight;
+- add mandatory instruction-refresh checkpoints for long-running AI sessions;
+- harden security review to fail closed on dynamic subprocess shell settings and unrelated HTTP request sinks;
+- harden canonical integration-merge evidence to require the complete verified producer contract and preserve missing validation as explicit uncertainty;
+- bind prepared promotion pull requests to the exact promotion snapshot head SHA;
+- harden atomic bootstrap source copies with anchored no-follow descriptors and single-file snapshots;
+- fix GitHub REST error handling so strict JSON parse failures preserve HTTP status without escaping the transport boundary;
+- harden knowledge-gap lifecycle history with tamper-evident transition hashes and explicit legacy uncertainty;
+- reject symlinked or externally resolving bootstrap source files so source_commit covers the contents actually consumed;
+- pin release-readiness metadata to the exact main SHA and reject target drift during assessment;
+- harden promotion readiness to reject semantically inconsistent GitHub compare relationships and negative commit counts;
+- require promotion readiness to expose a non-empty changed-file delta instead of treating history-only divergence as promotable;
+- align promotion documentation with the executable squash-divergence readiness contract;
+- harden verifier file-descriptor cleanup so validation errors are preserved deterministically;
+- support repeated squash-based human promotion without treating divergent Git ancestry as an automatic readiness blocker;
+- define human promotion checkpoints for completed engineering stages on develop and release checkpoints on main;
+- refuse to infer Aegis lifecycle completion from an unlabeled closed GitHub issue;
+- retain newly published promotion snapshot branches after late preparation failures so retries remain idempotent without non-atomic branch deletion;
+- harden installed-project verification reads against symlink TOCTOU by using anchored no-follow file descriptors;
 
+- preserve pull request head and base repository origin in verified integration and promotion provenance;
+
+- make GitHub API-version security review fail closed when unsafe header assignments can be masked by later compliant assignments;
+- bind workflow GitHub API-version findings to executable run blocks so unrelated YAML text cannot mask missing request headers;
+- reject fork-origin pull requests at autonomous integration, delivery, and promotion synchronization boundaries;
+- reject ambiguous workflow skill-registry JSON before workflow composition;
+- bind Python GitHub API-version security findings to the executable GitHub request sink so compliant requests cannot mask unsafe ones;
+- centralize strict parsing for credential-bearing GitHub REST JSON responses;
+- reject ambiguous JSON responses from local Ollama and OpenHands runtime trust boundaries;
+- enforce the canonical evidence 65,536-byte persisted JSON limit at construction and write time;
+- harden installed-project verification against ambiguous state JSON and symlinked Aegis state and skill paths;
+- reject ambiguous release metadata JSON in structural and release-readiness validation;
+- harden knowledge-gap record persistence with strict JSON parsing and anchored atomic writes;
+- remove the redundant path-based bootstrap destination mkdir before atomic managed-file publication;
+- bound OpenHands event pagination by page count and accumulated event count;
+- bound local Ollama and OpenHands JSON response bodies before parsing;
+- harden bootstrap managed-file installation against destination symlink races with anchored atomic byte writes;
+- harden Python GitHub API-version review to require the header to reach an executable Request sink;
+- confine bootstrap registry skill paths to the Aegis source tree and reject symbolic-link resolution;
+- harden workflow API-version security review so YAML comments cannot satisfy the GitHub header requirement;
+- harden workflow GitHub API-version review so stale shared-header symbols cannot mask missing version headers;
+- harden Python GitHub API-version review to require executable header mappings;
+- harden security review to recognize shared GitHub API header usage only through executable AST call nodes;
+- update security review to recognize the shared GitHub REST baseline header helper;
+- centralize GitHub REST baseline headers in the shared transport security policy;
+- fail security review closed on symbolic-link inputs and review roots;
+- bound credential-bearing GitHub REST JSON responses before decoding;
+- pin release readiness GitHub bearer credentials to the exact api.github.com origin;
+- pin CI diagnosis GitHub bearer credentials to the exact api.github.com origin;
+- pin GitHub API bearer credential destinations to the exact api.github.com origin;
+- pin the Aegis source commit across the full bootstrap transaction and fail closed on source drift;
+- bound CI job-log downloads before decoding to prevent unbounded response memory use;
+- anchor bootstrap state persistence to the secure destination directory used by the canonical atomic JSON writer;
+- anchor atomic evidence persistence to the opened destination directory to resist ancestor symlink substitution;
+- harden legacy AGENTS ownership classification to use one observed SHA-256 snapshot;
+- make canonical and specialized evidence JSON persistence atomic against destination symlink races;
+- bind pull-request validation checkout to the exact pull-request head SHA instead of a synthetic merge revision;
+- reject ambiguous duplicate-key JSON across configuration, policy, and state input boundaries;
+- reject symlinked and externally resolving bootstrap managed roots before state access or skill installation;
+- add caller-level regression coverage preventing canonical evidence output symlink checks from being bypassed by pre-write path resolution;
+- bind promotion snapshots to the exact source revision validated by promotion readiness and remove the unused ref-update mutation surface;
+- reject broken symbolic-link bootstrap skill targets before managed filesystem mutation;
+- reject symbolic-link destinations across specialized evidence writers and validate managed-execution evidence output before execution;
+- harden promotion snapshot mutation ordering to avoid publishing incomplete promotion branches;
+- harden version verification to hash and validate each source from one byte snapshot;
+- harden validation concurrency so post-merge ai/integration runs cannot be cancelled by later pushes;
+- verify integrity of Aegis-managed AGENTS.md without claiming user-owned instruction files;
+- harden runtime preflight redirects, managed bootstrap symlinks, and evidence output symlink boundaries;
+- preserve already-merged integration delivery provenance without inventing a fresh validation run;
+
+- enforce read-after-write mutation verification across managed execution, quality-gate synchronization, and lifecycle CLI output;
+- add canonical provenance for human-controlled protected-branch promotion synchronization;
+- harden protected-branch promotion synchronization to require exact target identity and verified lifecycle mutations;
+- add canonical provenance for composed integration delivery, binding exact validation and post-merge identities into one consistency-checked observation;
+- add canonical provenance for local runtime preflight observations with optional exact Agent Server build revision and secret-free credential presence;
+- enforce read-after-write verification for pull-request delivery and review-to-integration lifecycle mutations;
+- add canonical integration-merge provenance and fail-closed verification for traceability and lifecycle mutations;
+- harden autonomous integration merge to require exact validation head evidence and exact post-merge `ai/integration` identity;
+- connect explicit evidence-set requirements to implementation readiness and support exact evidence revision selectors while preserving fail-closed semantics;
+- add the read-only security review workflow with deterministic high/medium findings for Actions, Git, GitHub API, subprocess, and credential risks;
+- add the read-only CI remediation workflow for deterministic GitHub Actions failure diagnosis and bounded redacted evidence;
+- add the read-only requirements clarification workflow for deterministic work-item completeness checks and user-owned decision questions;
+- add the deterministic read-only architecture planning workflow with evidence/deduction separation, lifecycle readiness verification, and ADR guidance;
+- add the provider-neutral testing workflow boundary over the explicit project quality-gate executor;
+- add the controlled refactoring workflow for behavior-preserving structural changes using baseline/post-change testing and independent review;
+- add the deterministic workflow-composition boundary for explicit work-item kinds and registry-validated workflow sequences;
+- add the fail-closed implementation-readiness gate between workflow planning and managed execution;
+- add the source-pinned version verification evidence contract with SHA-256 provenance and readiness integration;
+- add a provider-neutral evidence provenance envelope with canonical self-hashing and executable state-verification recording/validation;
+- add explicit promotion and release readiness adapters that preserve specialized schemas while emitting canonical provenance evidence;
+- add deterministic evidence bundles that compose validated provenance artifacts without changing their individual schemas;
+- add the version-verification provenance adapter while preserving source-pinned specialized evidence semantics;
+- add the implementation-readiness provenance adapter while preserving the existing readiness decision contract;
+- add the testing provenance adapter while preserving the existing quality-gate execution and lifecycle contract;
+- add the security-review provenance adapter while preserving deterministic findings and exit-code semantics;
+- add the CI-diagnosis provenance adapter while preserving deterministic classification and redacted evidence;
+- add the OpenHands execution provenance adapter while preserving the existing redaction and execution boundary;
+- add the lifecycle mutation provenance adapter while preserving read-after-write verification semantics;
+- add the knowledge-gap provenance adapter while preserving candidate-only activation semantics;
+- add an explicit evidence-set requirements consumer for semantic bundle completeness checks;
+- add canonical provenance adapters for requirements clarification, workflow composition, and architecture planning;
+- harden promotion readiness to accept verified merged-pull-request CI evidence when GitHub does not expose an equivalent integration push run;
 - add provider-neutral AI backend registry for OpenAI, Anthropic, Google, Meta, xAI, and local Ollama;
 - add explicit user-selected AI profiles without automatic provider fallback;
 - distinguish subscription login from direct API authentication and billing;
@@ -19,7 +124,20 @@ All notable changes to Aegis Engineering OS will be documented here.
 - add offline project integrity verification with per-skill SHA-256 checksums;
 - validate source metadata before installation;
 - add regression coverage for bootstrap ownership and dirty-source rejection;
-- add the OpenHands Agent Server execution adapter contract with exact version gating, explicit task execution sequencing, and execution evidence collection.
+- add the OpenHands Agent Server execution adapter contract with exact version gating, explicit task execution sequencing, and execution evidence collection;
+- add the managed project execution coordinator with work-item branch safety, runtime preflight reuse, OpenHands boundary prompts, and post-execution Git integrity checks;
+- add the executable provider-neutral work-item lifecycle bridge with GitHub Issues persistence, optimistic state checks, blocked-state resume metadata, traceability comments, and read-after-write verification;
+- compose managed OpenHands execution with explicit work-item lifecycle synchronization, safe failure blocking, and verification-stage traceability;
+- add the executable project quality-gate runner with explicit manifest commands, bounded redacted evidence, and verification-to-review/blocked lifecycle synchronization.
+- add the read-only promotion readiness verifier for ai/integration -> develop/main, including exact-SHA CI evidence and protection checks;
+- add the owner-controlled promotion snapshot bridge, which prepares an exact integration-tree snapshot on a short-lived target-based branch and opens or reuses a draft promotion pull request without merging protected branches;
+- add the read-only release readiness verifier and release-preparation workflow for protected main;
+- guarantee an explicit validation path after merged pull requests, including the actual merge commit for ai/integration, with event-isolated concurrency so the exact integration push validation is not cancelled;
+- add promotion merge synchronization so an owner-controlled develop/main merge can advance an integration work item to done after exact merge verification;
+- add the controlled ai/integration merge boundary using exact-head SHA preconditions, squash-only merges, and post-merge verification;
+- reconcile the workflow catalog and architecture index with the implemented integration, promotion, release, and OpenHands architecture boundaries;
+- add the executable knowledge-gap candidate registry with provenance hashes, validated evidence, and fail-closed lifecycle transitions;
+- add a composed integration delivery controller that binds exact-head validation to the controlled ai/integration merge;
 
 ## 0.1.0-alpha.1
 

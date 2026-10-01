@@ -6,20 +6,36 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime, timezone
 import sys
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from evidence_contract import EvidenceContractError, parse_json_object
 from validate_ai_config import load_registry, validate_profile_config
 
 
 DEFAULT_TIMEOUT_SECONDS = 5
+MAX_JSON_RESPONSE_BYTES = 1024 * 1024
 
 
 class RuntimePreflightError(RuntimeError):
     """Raised when the selected local runtime cannot be verified."""
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject runtime redirects so local authentication cannot cross origins."""
+
+    def redirect_request(self, request, *args: Any, **kwargs: Any) -> Request:
+        raise RuntimePreflightError(
+            "Runtime preflight endpoint returned an unexpected redirect."
+        )
+
+
+_NO_REDIRECT_OPENER = build_opener(_NoRedirectHandler)
 
 
 def _request_json(
@@ -33,17 +49,50 @@ def _request_json(
 
     request = Request(url, headers=request_headers)
     try:
-        with urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        with _NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
+            raw = response.read(MAX_JSON_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_JSON_RESPONSE_BYTES:
+                raise RuntimePreflightError(
+                    "Local runtime JSON response exceeds the "
+                    f"{MAX_JSON_RESPONSE_BYTES}-byte download limit."
+                )
+            payload = parse_json_object(
+                raw,
+                label="Local runtime JSON response",
+                max_bytes=MAX_JSON_RESPONSE_BYTES,
+            )
+    except (HTTPError, URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError, EvidenceContractError) as exc:
         raise RuntimePreflightError(f"Unable to verify local runtime at {url}: {exc}") from exc
 
-    if not isinstance(payload, dict):
-        raise RuntimePreflightError(f"Runtime endpoint returned a non-object JSON document: {url}")
     return payload
 
 
 def _normalize_base_url(value: str) -> str:
+    return value.rstrip("/")
+
+
+def _normalize_agent_server_url(value: str) -> str:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must use http or https."
+        )
+    if parsed.username or parsed.password:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must not contain credentials."
+        )
+    if parsed.query or parsed.fragment:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must not contain a query or fragment."
+        )
+    if not parsed.hostname:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server URL must contain a hostname."
+        )
+    if parsed.hostname.lower() not in {"localhost", "127.0.0.1", "::1"}:
+        raise RuntimePreflightError(
+            "OpenHands Agent Server preflight requires a loopback server URL."
+        )
     return value.rstrip("/")
 
 
@@ -101,6 +150,7 @@ def preflight(
 
     result = {
         "status": "verified",
+        "profile_name": profile_name,
         "provider": profile["provider"],
         "surface": profile["surface"],
         "integration": integration,
@@ -112,7 +162,9 @@ def preflight(
     }
 
     if openhands_agent_server_url:
-        agent_server_base_url = _normalize_base_url(openhands_agent_server_url)
+        agent_server_base_url = _normalize_agent_server_url(
+            openhands_agent_server_url
+        )
 
         alive = _request_json(f"{agent_server_base_url}/alive", timeout)
         if alive.get("status") != "ok":
@@ -231,6 +283,11 @@ def main() -> int:
         help="Environment variable containing the optional OpenHands Agent Server session API key.",
     )
     parser.add_argument(
+        "--canonical-evidence-output",
+        type=Path,
+        help="Optional canonical evidence-provenance output path.",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=DEFAULT_TIMEOUT_SECONDS,
@@ -253,6 +310,27 @@ def main() -> int:
             args.agent_server_url,
             agent_server_api_key,
         )
+    except (ValueError, RuntimePreflightError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        if args.canonical_evidence_output is not None:
+            from evidence_adapters import runtime_preflight_evidence
+            from evidence_contract import write_evidence
+
+            canonical_path = args.canonical_evidence_output.expanduser()
+            resolved_canonical_path = canonical_path.resolve()
+            profile_path = args.profile_config.expanduser().resolve()
+            if resolved_canonical_path == profile_path:
+                raise RuntimePreflightError(
+                    "Canonical evidence output must not overwrite the AI profile configuration."
+                )
+            canonical = runtime_preflight_evidence(
+                result,
+                observed_at=datetime.now(timezone.utc),
+            )
+            write_evidence(canonical, canonical_path)
     except (ValueError, RuntimePreflightError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

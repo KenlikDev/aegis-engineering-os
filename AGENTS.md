@@ -71,6 +71,10 @@ Ask the user when a decision has material product, business, security, privacy, 
 - Use task branches under ai/.
 - The shared AI integration branch is ai/integration.
 - Target flow: ai/* -> ai/integration -> develop -> main.
+- Autonomous engineering work may be merged into ai/integration through the exact-head integration workflow.
+- Prepare a develop promotion pull request only at a declared completed engineering-stage checkpoint; do not create one for every small ai/integration change.
+- Prepare a main promotion pull request only at a release-candidate or explicitly declared release checkpoint after develop readiness is verified.
+- Aegis may prepare and verify protected-branch promotion artifacts but must never approve or merge develop or main.
 - Short-lived promotion branches are prepared from the target branch for develop/main promotion.
 - Treat develop and main as human-controlled protected branches.
 - Prefer coherent, atomic commits.
@@ -81,6 +85,18 @@ Ask the user when a decision has material product, business, security, privacy, 
 - Do not push every minor change. Push at meaningful, verified checkpoints.
 - For long-running work, a clean recovery checkpoint may be pushed when it reduces the risk of losing work.
 - Never force-push develop or main.
+
+## Instruction refresh checkpoints
+
+Instruction files are operational controls, not one-time onboarding text. Re-read the authoritative instructions at these checkpoints:
+
+- at session start and before the first repository mutation;
+- after every three substantial engineering phases or whenever context has been compacted or interrupted;
+- whenever the task, branch, provider, work-item kind, or decision authority changes;
+- immediately before creating or merging a pull request;
+- immediately before any protected-branch promotion or task completion.
+
+At minimum, refresh AGENTS.md, 00-constitution/core-principles.md, 01-orchestrator/SKILL.md, and the active project/workflow instructions. Re-run the relevant state and policy checks when refreshed instructions can change the decision. If an instruction file changed during the session, treat the new content as authoritative and re-evaluate the plan before continuing.
 
 ## Knowledge safety
 

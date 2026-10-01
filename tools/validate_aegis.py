@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
 
+from evidence_contract import (
+    EvidenceContractError,
+    load_json_object,
+    read_bytes_no_follow,
+)
 from validate_ai_config import load_registry, validate_profile_config
 
 
@@ -21,8 +25,58 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def read_text_no_follow(path: Path, label: str) -> str:
+    """Read repository text without following symlinked path components."""
+    try:
+        return read_bytes_no_follow(
+            path,
+            error_type=EvidenceContractError,
+        ).decode("utf-8")
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        fail(f"{label}: unable to read securely: {exc}")
+
+
+def require_regular_file(path: Path, label: str) -> None:
+    """Reject missing or symlinked repository files before they are consumed."""
+    if path.is_symlink():
+        fail(f"{label} must not be a symbolic link: {path}")
+    if not path.is_file():
+        fail(f"{label} is missing: {path}")
+
+
+def load_metadata(path: Path) -> dict:
+    """Load repository metadata through the shared strict JSON contract."""
+    try:
+        return load_json_object(path)
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        fail(f"Unable to read {path}: {exc}")
+
+
+def validate_pull_request_template(path: Path) -> None:
+    """Validate the repository PR template as part of the structural policy."""
+    text = read_text_no_follow(path, f"{path}: pull-request template")
+
+    required_markers = (
+        "## Work item",
+        "Issue: #",
+        "## Validation",
+        "## Verification evidence",
+        "exact validated commit SHA",
+        "## Risks",
+        "professional English",
+    )
+    missing = [marker for marker in required_markers if marker not in text]
+    if missing:
+        fail(
+            f"{path}: missing required pull-request template markers: "
+            + ", ".join(missing)
+        )
+    if re.search(r"\b(?:in Russian|по-русски|на русском)\b", text, re.IGNORECASE):
+        fail(f"{path}: pull-request template must not require Russian PR content.")
+
+
 def validate_skill(path: Path, seen_names: dict[str, str]) -> None:
-    text = path.read_text(encoding="utf-8")
+    text = read_text_no_follow(path, f"Skill {path}")
 
     if not text.startswith("---\n"):
         fail(f"{path}: missing Agent Skills front matter.")
@@ -57,18 +111,21 @@ def main() -> int:
     manifest_file = ROOT / "aegis-manifest.json"
     registry_file = ROOT / "skills" / "registry.json"
 
-    if not version_file.is_file():
-        fail("VERSION file is missing.")
-    if not manifest_file.is_file():
-        fail("aegis-manifest.json is missing.")
-    if not registry_file.is_file():
-        fail("skills/registry.json is missing.")
+    require_regular_file(version_file, "VERSION file")
+    require_regular_file(manifest_file, "Aegis manifest")
+    require_regular_file(registry_file, "Aegis skill registry")
+    pull_request_template = ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
+    require_regular_file(
+        pull_request_template,
+        "Pull-request template",
+    )
+    validate_pull_request_template(pull_request_template)
 
-    version = version_file.read_text(encoding="utf-8").strip()
+    version = read_text_no_follow(version_file, "VERSION file").strip()
     if not VERSION_PATTERN.fullmatch(version):
         fail(f"Unsupported experimental version format: {version!r}")
 
-    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    manifest = load_metadata(manifest_file)
     if manifest.get("version") != version:
         fail("VERSION and aegis-manifest.json disagree.")
     for key in (
@@ -81,7 +138,7 @@ def main() -> int:
         if key not in manifest:
             fail(f"aegis-manifest.json is missing required key: {key}")
 
-    registry = json.loads(registry_file.read_text(encoding="utf-8"))
+    registry = load_metadata(registry_file)
     if registry.get("version") != version:
         fail("VERSION and skills/registry.json disagree.")
     if not isinstance(registry.get("skills"), list):
@@ -112,8 +169,21 @@ def main() -> int:
         "skills/workflows/feature-implementation/SKILL.md",
         "skills/workflows/bug-fix/SKILL.md",
         "skills/workflows/code-review/SKILL.md",
+        "skills/workflows/security-review/SKILL.md",
+        "skills/workflows/ci-remediation/SKILL.md",
+        "skills/workflows/requirements-clarification/SKILL.md",
+        "skills/workflows/architecture-planning/SKILL.md",
+        "skills/workflows/testing/SKILL.md",
+        "skills/workflows/refactoring/SKILL.md",
         "skills/workflows/work-item-lifecycle/SKILL.md",
+        "skills/workflows/workflow-composition/SKILL.md",
+        "skills/workflows/implementation-readiness/SKILL.md",
         "skills/workflows/aegis-update-validation/SKILL.md",
+        "skills/workflows/release-preparation/SKILL.md",
+        "skills/workflows/promotion-synchronization/SKILL.md",
+        "skills/workflows/integration-merge/SKILL.md",
+        "skills/workflows/integration-delivery/SKILL.md",
+        "skills/workflows/knowledge-gap-creation/SKILL.md",
         "skills/integrations/github-issues/SKILL.md",
         "skills/integrations/jira/SKILL.md",
         "skills/integrations/confluence/SKILL.md",
@@ -122,8 +192,23 @@ def main() -> int:
         "07-knowledge/knowledge-lifecycle.md",
         "08-offline/offline-architecture.md",
         "docs/architecture/overview.md",
+        "docs/architecture/context-loading.md",
+        "docs/architecture/integration-delivery.md",
+        "docs/architecture/openhands-execution.md",
+        "docs/architecture/promotion.md",
+        "docs/architecture/release.md",
         "docs/architecture/work-management.md",
         "docs/architecture/ai-backends.md",
+        "docs/architecture/knowledge.md",
+        "docs/architecture/security.md",
+        "docs/architecture/ci-remediation.md",
+        "docs/architecture/requirements.md",
+        "docs/architecture/architecture-planning.md",
+        "docs/architecture/workflow-composition.md",
+        "docs/architecture/implementation-readiness.md",
+        "docs/architecture/version-verification.md",
+        "docs/architecture/testing.md",
+        "docs/architecture/refactoring.md",
         "docs/architecture/runtime.md",
         "docs/governance/state-verification.md",
         "docs/product/discovery-mode.md",
@@ -138,16 +223,56 @@ def main() -> int:
         "tools/validate_ai_config.py",
         "tools/render_openhands_profile.py",
         "tools/preflight_runtime.py",
+        "tools/openhands_execution.py",
+        "tools/live_e2e_smoke_test.py",
+        "tools/aegis_orchestrator.py",
+        "tools/quality_gates.py",
+        "tools/delivery.py",
+        "tools/promotion_readiness.py",
+        "tools/promotion_snapshot.py",
+        "tools/release_readiness.py",
+        "tools/promotion_sync.py",
+        "tools/integration_merge.py",
+        "tools/integration_delivery.py",
+        "tools/knowledge_gap.py",
+        "tools/security_review.py",
+        "tools/ci_diagnosis.py",
+        "tools/requirements_clarification.py",
+        "tools/architecture_planning.py",
+        "tools/workflow_composition.py",
+        "tools/implementation_readiness.py",
+        "tools/version_verification.py",
+        "tools/evidence_contract.py",
+        "tools/state_verification.py",
+        "tools/evidence_adapters.py",
+        "tools/evidence_bundle.py",
+        "tools/evidence_bundle_requirements.py",
+        "tools/testing.py",
+        "templates/quality-gates.example.json",
+        "templates/knowledge-candidate.example.json",
+        "templates/version-claims.example.json",
+        "templates/state-evidence.example.json",
+        "docs/architecture/evidence-provenance.md",
+        "docs/architecture/evidence-bundles.md",
+        "templates/evidence-bundle.example.json",
+        "templates/evidence-set-requirements.example.json",
         "config/ai-backends.json",
         "skills/registry.json",
     ]
 
-    missing = [path for path in required if not (ROOT / path).is_file()]
-    if missing:
-        fail("Missing required files: " + ", ".join(missing))
+    for relative_path in required:
+        require_regular_file(
+            ROOT / relative_path,
+            f"Required repository file {relative_path}",
+        )
+
+    skills_root = ROOT / "skills"
+    for entry in skills_root.rglob("*"):
+        if entry.is_symlink():
+            fail(f"Skills tree must not contain symbolic links: {entry}")
 
     discovered: dict[str, str] = {}
-    for skill in sorted((ROOT / "skills").rglob("SKILL.md")):
+    for skill in sorted(skills_root.rglob("SKILL.md")):
         validate_skill(skill, discovered)
 
     registry_names: set[str] = set()

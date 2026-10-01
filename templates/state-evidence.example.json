@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "kind": "repository-state",
+  "source": "github:OWNER/REPOSITORY",
+  "subject": "branch:ai/integration",
+  "revision": "40-character-commit-sha-or-provider-revision",
+  "observed_at": "2026-09-28T18:00:00Z",
+  "status": "verified",
+  "result": {
+    "state": "expected"
+  },
+  "uncertainty": [],
+  "references": [
+    "https://github.com/OWNER/REPOSITORY"
+  ],
+  "artifact_sha256": null
+}

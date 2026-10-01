@@ -1,0 +1,323 @@
+import base64
+import json
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+from release_readiness import (  # noqa: E402
+    GitHubReleaseReadinessProvider,
+    ReleaseReadinessError,
+    _default_transport,
+    assess_release_readiness,
+)
+
+REPOSITORY = "KenlikDev/aegis-engineering-os"
+MAIN_SHA = "1111111111111111111111111111111111111111"
+MOVED_MAIN_SHA = "2222222222222222222222222222222222222222"
+
+BASE_FILES = {
+    "VERSION": "0.1.0-alpha.1\n",
+    "aegis-manifest.json": json.dumps({"version": "0.1.0-alpha.1"}),
+    "skills/registry.json": json.dumps(
+        {"version": "0.1.0-alpha.1", "skills": []}
+    ),
+    "CHANGELOG.md": (
+        "# Changelog\n\n"
+        "## Unreleased\n\n"
+        "## 0.1.0-alpha.1\n\n"
+        "- Initial foundation.\n"
+    ),
+}
+
+
+class FakeTransport:
+    def __init__(
+        self,
+        *,
+        protected=True,
+        validation=True,
+        version=BASE_FILES["VERSION"],
+        manifest_version="0.1.0-alpha.1",
+        registry_version="0.1.0-alpha.1",
+        changelog=BASE_FILES["CHANGELOG.md"],
+        manifest_text=None,
+        registry_text=None,
+        moved_after_first_branch_read=False,
+    ):
+        self.protected = protected
+        self.validation = validation
+        self.version = version
+        self.manifest_version = manifest_version
+        self.registry_version = registry_version
+        self.changelog = changelog
+        self.manifest_text = manifest_text
+        self.registry_text = registry_text
+        self.moved_after_first_branch_read = moved_after_first_branch_read
+        self.branch_reads = 0
+        self.requests = []
+
+    def __call__(self, method, url, headers):
+        self.requests.append((method, url, headers))
+        if method != "GET":
+            raise AssertionError("Release readiness must remain read-only.")
+
+        if url.endswith("/branches/main"):
+            self.branch_reads += 1
+            sha = (
+                MOVED_MAIN_SHA
+                if self.moved_after_first_branch_read and self.branch_reads > 1
+                else MAIN_SHA
+            )
+            return 200, {
+                "name": "main",
+                "protected": self.protected,
+                "commit": {"sha": sha},
+            }
+
+        if "/actions/workflows/" in url and "/runs?" in url:
+            if not self.validation:
+                return 200, {"workflow_runs": []}
+            return 200, {
+                "workflow_runs": [
+                    {
+                        "id": 7,
+                        "name": "Aegis Validation",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "head_sha": MAIN_SHA,
+                        "html_url": "https://github.com/example/actions/runs/7",
+                    }
+                ]
+            }
+
+        files = {
+            "VERSION": self.version,
+            "aegis-manifest.json": (
+                self.manifest_text
+                if self.manifest_text is not None
+                else json.dumps({"version": self.manifest_version})
+            ),
+            "skills/registry.json": (
+                self.registry_text
+                if self.registry_text is not None
+                else json.dumps({"version": self.registry_version, "skills": []})
+            ),
+            "CHANGELOG.md": self.changelog,
+        }
+        for path, content in files.items():
+            marker = f"/contents/{path}?ref={MAIN_SHA}"
+            if url.endswith(marker):
+                encoded = base64.b64encode(
+                    content.encode("utf-8")
+                ).decode("ascii")
+                return 200, {
+                    "encoding": "base64",
+                    "content": encoded,
+                    "path": path,
+                }
+
+        raise AssertionError(f"Unexpected request: {method} {url}")
+
+
+class ReleaseReadinessTests(unittest.TestCase):
+    def test_github_provider_rejects_untrusted_credential_destination(self):
+        from release_readiness import GitHubReleaseReadinessProvider
+
+        invalid_urls = (
+            "https://api.github.com.attacker.example",
+            "https://attacker.example",
+            "https://api.github.com/api/v1",
+            "https://user:password@api.github.com",
+        )
+
+        for invalid_url in invalid_urls:
+            with self.subTest(api_base_url=invalid_url):
+                with self.assertRaises(ReleaseReadinessError):
+                    GitHubReleaseReadinessProvider(
+                        "KenlikDev/aegis-engineering-os",
+                        "test-token",
+                        api_base_url=invalid_url,
+                    )
+
+    def _provider(self, transport):
+        return GitHubReleaseReadinessProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+    def test_ready_when_release_contract_is_clean(self):
+        transport = FakeTransport()
+        result = assess_release_readiness(self._provider(transport))
+
+        self.assertTrue(result.ready)
+        self.assertEqual(MAIN_SHA, result.target.sha)
+        self.assertEqual("0.1.0-alpha.1", result.version)
+        self.assertTrue(result.version_valid)
+        self.assertTrue(result.changelog.version_heading_present)
+        self.assertTrue(result.changelog.version_section_has_content)
+        self.assertFalse(result.changelog.unreleased_content_present)
+        self.assertEqual(0, len(result.blockers))
+        self.assertTrue(all(request[0] == "GET" for request in transport.requests))
+
+    def test_default_transport_adds_required_api_version_header(self):
+        class FakeResponse:
+            status = 200
+
+            def read(self, limit):
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+        with patch("release_readiness._HTTP_OPENER.open", return_value=FakeResponse()) as open_request:
+            _default_transport(
+                "GET",
+                "https://api.github.com/repos/example/project",
+                {"Authorization": "Bearer test-token"},
+            )
+
+        request = open_request.call_args.args[0]
+        self.assertEqual(
+            "2026-03-10",
+            request.get_header("X-github-api-version"),
+        )
+
+    def test_reads_release_metadata_from_exact_main_sha(self):
+        transport = FakeTransport()
+        result = assess_release_readiness(self._provider(transport))
+
+        self.assertTrue(result.ready)
+        file_requests = [
+            request[1]
+            for request in transport.requests
+            if "/contents/" in request[1]
+        ]
+        self.assertTrue(file_requests)
+        self.assertTrue(all(f"?ref={MAIN_SHA}" in url for url in file_requests))
+
+    def test_rejects_main_sha_drift_during_assessment(self):
+        transport = FakeTransport(moved_after_first_branch_read=True)
+
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "main changed during release-readiness assessment",
+        ):
+            assess_release_readiness(self._provider(transport))
+
+    def test_blocks_unreleased_notes(self):
+        changelog = (
+            "# Changelog\n\n"
+            "## Unreleased\n\n"
+            "- Pending note.\n\n"
+            "## 0.1.0-alpha.1\n\n"
+            "- Initial foundation.\n"
+        )
+        result = assess_release_readiness(
+            self._provider(FakeTransport(changelog=changelog))
+        )
+
+        self.assertTrue(result.changelog.unreleased_section_present)
+        self.assertTrue(result.changelog.unreleased_content_present)
+        self.assertIn(
+            "unreleased notes",
+            " ".join(result.blockers),
+        )
+
+    def test_blocks_unprotected_main(self):
+        result = assess_release_readiness(
+            self._provider(FakeTransport(protected=False))
+        )
+        self.assertIn("main must remain protected.", result.blockers)
+
+    def test_blocks_missing_exact_sha_validation(self):
+        result = assess_release_readiness(
+            self._provider(FakeTransport(validation=False))
+        )
+        self.assertIn("exact main SHA", " ".join(result.blockers))
+
+    def test_rejects_duplicate_manifest_keys(self):
+        transport = FakeTransport(
+            manifest_text='{"version":"0.1.0-alpha.1","version":"0.1.0-alpha.1"}'
+        )
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "Duplicate JSON key",
+        ):
+            assess_release_readiness(self._provider(transport))
+
+    def test_rejects_duplicate_registry_keys(self):
+        transport = FakeTransport(
+            registry_text='{"version":"0.1.0-alpha.1","version":"0.1.0-alpha.1","skills":[]}'
+        )
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "Duplicate JSON key",
+        ):
+            assess_release_readiness(self._provider(transport))
+
+    def test_blocks_version_mismatch(self):
+        result = assess_release_readiness(
+            self._provider(FakeTransport(manifest_version="9.9.9"))
+        )
+        self.assertIn("VERSION and aegis-manifest.json disagree.", result.blockers)
+
+    def test_blocks_registry_mismatch(self):
+        result = assess_release_readiness(
+            self._provider(FakeTransport(registry_version="9.9.9"))
+        )
+        self.assertIn("VERSION and skills/registry.json disagree.", result.blockers)
+
+    def test_blocks_invalid_version(self):
+        result = assess_release_readiness(
+            self._provider(FakeTransport(version="not-a-version\n"))
+        )
+        self.assertIn("invalid release version", " ".join(result.blockers))
+
+    def test_blocks_missing_changelog_heading(self):
+        changelog = (
+            "# Changelog\n\n"
+            "## Unreleased\n\n"
+            "## 9.9.9\n\n"
+            "- Wrong version.\n"
+        )
+        result = assess_release_readiness(
+            self._provider(FakeTransport(changelog=changelog))
+        )
+        self.assertIn(
+            "does not contain a version heading",
+            " ".join(result.blockers),
+        )
+
+    def test_blocks_empty_changelog_version_section(self):
+        changelog = "# Changelog\n\n## Unreleased\n\n## 0.1.0-alpha.1\n"
+        result = assess_release_readiness(
+            self._provider(FakeTransport(changelog=changelog))
+        )
+        self.assertIn(
+            "CHANGELOG.md version section for 0.1.0-alpha.1 is empty.",
+            result.blockers,
+        )
+
+    def test_rejects_non_main_target_before_network_access(self):
+        transport = FakeTransport()
+        with self.assertRaisesRegex(
+            ReleaseReadinessError,
+            "target must be main",
+        ):
+            assess_release_readiness(
+                self._provider(transport),
+                target_branch="develop",
+            )
+        self.assertEqual([], transport.requests)
+
+
+if __name__ == "__main__":
+    unittest.main()

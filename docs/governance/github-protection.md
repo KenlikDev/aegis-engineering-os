@@ -45,6 +45,14 @@ The repository is currently configured as follows.
 - allowed merge method: squash only;
 - linear history: required.
 
+## Promotion ownership
+
+The protected-branch merge authority remains human-controlled even when Aegis is allowed to prepare promotion artifacts. Aegis may create and verify a deterministic promotion pull request, but it must not approve or merge `develop` or `main`.
+
+A develop promotion pull request is a bounded engineering-stage checkpoint, not a mirror of every `ai/integration` change. Main promotion is reserved for release-candidate or explicitly declared release checkpoints.
+
+See [Human Promotion Checkpoints](promotion-checkpoints.md) for the operational cadence.
+
 ## Approval model
 
 The current repository uses one GitHub account for the owner and autonomous agent. Therefore the rulesets do not require an approving review.

@@ -65,7 +65,7 @@ Before acting on any state-dependent claim, classify it as user intent, user cla
 
 Invoke state-verification when the task depends on current external or repository state.
 
-Load only the skills required by the task:
+Refresh authoritative instructions before mutation and at each instruction-refresh checkpoint defined by the repository. At minimum, re-read AGENTS.md, the constitution, this orchestrator skill, and every currently active project/workflow instruction. Do not continue from a stale context after compaction, interruption, task/provider/branch changes, or before a merge/promotion/completion mutation.
 
 Load only the skills required by the task:
 - role skills;
@@ -76,6 +76,8 @@ Load only the skills required by the task:
 - selected work-management and external knowledge integrations.
 
 If a required skill is missing, invoke knowledge-gap handling.
+
+Establish the explicit work-item kind before workflow execution and run the implementation-readiness gate before managed implementation. Managed execution must not start while readiness blockers remain. For supported engineering kinds, build the deterministic workflow composition and treat any missing or ambiguous kind as an input/decision problem rather than inferring it from free-form text.
 
 ### 5. Plan
 

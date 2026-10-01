@@ -56,6 +56,18 @@
       "stability": "core"
     },
     {
+      "name": "workflow-composition",
+      "path": "skills/workflows/workflow-composition/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "implementation-readiness",
+      "path": "skills/workflows/implementation-readiness/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
       "name": "github-issues",
       "path": "skills/integrations/github-issues/SKILL.md",
       "domain": "integration",
@@ -140,8 +152,74 @@
       "stability": "core"
     },
     {
+      "name": "security-review",
+      "path": "skills/workflows/security-review/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "ci-remediation",
+      "path": "skills/workflows/ci-remediation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "requirements-clarification",
+      "path": "skills/workflows/requirements-clarification/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "architecture-planning",
+      "path": "skills/workflows/architecture-planning/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "testing",
+      "path": "skills/workflows/testing/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "refactoring",
+      "path": "skills/workflows/refactoring/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
       "name": "aegis-update-validation",
       "path": "skills/workflows/aegis-update-validation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "release-preparation",
+      "path": "skills/workflows/release-preparation/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "promotion-synchronization",
+      "path": "skills/workflows/promotion-synchronization/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "integration-merge",
+      "path": "skills/workflows/integration-merge/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "integration-delivery",
+      "path": "skills/workflows/integration-delivery/SKILL.md",
+      "domain": "workflow",
+      "stability": "core"
+    },
+    {
+      "name": "knowledge-gap-creation",
+      "path": "skills/workflows/knowledge-gap-creation/SKILL.md",
       "domain": "workflow",
       "stability": "core"
     }
