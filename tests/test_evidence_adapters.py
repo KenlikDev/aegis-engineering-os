@@ -249,6 +249,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -298,6 +299,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "traceability_verified": True,
             "work_item": {
@@ -355,6 +357,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -416,6 +419,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -456,6 +460,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -494,6 +499,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": SOURCE_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -537,6 +543,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -1520,6 +1527,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "traceability_verified": True,
             "work_item": {
@@ -1582,6 +1590,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "traceability_verified": True,
             "work_item": {
@@ -1647,6 +1656,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": SOURCE_SHA,
                 "protected": True,
+            "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "review",
