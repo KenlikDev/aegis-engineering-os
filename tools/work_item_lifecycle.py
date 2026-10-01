@@ -13,8 +13,8 @@ import json
 import os
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
@@ -165,7 +165,6 @@ def require_verified_mutation(
 class WorkItemProvider(Protocol):
     """Minimal provider-neutral work-item contract."""
 
-
     def get(self, work_item_id: str) -> WorkItem:
         ...
 
@@ -177,6 +176,7 @@ class WorkItemProvider(Protocol):
         expected_state: LifecycleState | None = None,
     ) -> MutationEvidence:
         ...
+
     def comment(
         self,
         work_item_id: str,
