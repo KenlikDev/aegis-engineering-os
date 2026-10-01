@@ -377,6 +377,40 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(LifecycleState.REVIEW, work_items.get("60").state)
         self.assertIn(request().head, work_items.comments["60"][0])
 
+    def test_sync_rejects_task_branch_for_different_work_item(self) -> None:
+        work_items = review_item_provider()
+        pull_request = PullRequest(
+            number=60,
+            title="test",
+            body="",
+            head=request().head,
+            base=request().base,
+            state="open",
+            merged=False,
+            draft=False,
+            mergeable=True,
+            mergeable_state="clean",
+            url=PR_URL,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
+        )
+
+        class Provider(FakePullRequestProvider):
+            pass
+
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "task branch for this work item",
+        ):
+            sync_merged_pull_request(
+                Provider(pull_request),
+                work_items,
+                "61",
+                60,
+                integration_branch="ai/integration",
+                expected_head=request().head,
+            )
+
     def test_github_provider_creates_and_reads_back_pull_request(self) -> None:
         transport = FakeGitHubTransport()
         provider = GitHubPullRequestProvider(
