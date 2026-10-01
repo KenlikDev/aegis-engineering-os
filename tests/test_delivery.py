@@ -208,6 +208,36 @@ class DeliveryTests(unittest.TestCase):
                 )
             )
 
+    def test_create_rejects_task_branch_for_different_work_item(self) -> None:
+        work_items = review_item_provider()
+        pr_provider = FakePullRequestProvider(
+            PullRequest(
+                number=60,
+                title="test",
+                body="",
+                head="ai/feature/60-pull-request-lifecycle",
+                base="ai/integration",
+                state="open",
+                merged=False,
+                draft=False,
+                mergeable=True,
+                mergeable_state="clean",
+                url=PR_URL,
+                head_repository=REPOSITORY,
+                base_repository=REPOSITORY,
+            )
+        )
+        with self.assertRaisesRegex(
+            DeliveryError,
+            "task branch for this work item",
+        ):
+            create_review_pull_request(
+                pr_provider,
+                work_items,
+                "61",
+                request(),
+            )
+
     def test_create_rejects_unverified_pull_request_mutation(self) -> None:
         work_items = review_item_provider()
         pr_provider = UnverifiedCreateProvider(
