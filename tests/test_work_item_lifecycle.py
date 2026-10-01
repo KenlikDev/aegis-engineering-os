@@ -43,7 +43,7 @@ class FakeGitHubTransport:
                 "message": "integration base",
             }
         }
-        self.next_git_sha = 3
+        self.next_git_sha = 4
         self.lock_sha: str | None = None
         self.lock_conflict = False
         self.mutate_after_first_issue_get = False
