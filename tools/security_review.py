@@ -391,6 +391,11 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                 assignment_results.append(all(assignments))
         return bool(assignment_results) and all(assignment_results)
 
+    def _target_key(target: ast.AST) -> str | None:
+        if isinstance(target, (ast.Name, ast.Attribute)):
+            return ast.unparse(target)
+        return None
+
     def expression_contains_github_url(
         expression: ast.AST | None,
         github_url_names: set[str],
@@ -398,11 +403,24 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
         if expression is None:
             return False
         for child in ast.walk(expression):
+            if isinstance(child, ast.Call) and (
+                (
+                    isinstance(child.func, ast.Name)
+                    and child.func.id == "validate_github_api_base_url"
+                )
+                or (
+                    isinstance(child.func, ast.Attribute)
+                    and child.func.attr == "validate_github_api_base_url"
+                )
+            ):
+                return True
             if isinstance(child, ast.Constant) and isinstance(child.value, str):
                 if GITHUB_API_RE.search(child.value):
                     return True
-            if isinstance(child, ast.Name) and child.id in github_url_names:
-                return True
+            if isinstance(child, (ast.Name, ast.Attribute)):
+                key = ast.unparse(child)
+                if key in github_url_names:
+                    return True
         return False
 
     github_url_names: set[str] = set()
@@ -415,8 +433,9 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
             if not expression_contains_github_url(node.value, github_url_names):
                 continue
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id not in github_url_names:
-                    github_url_names.add(target.id)
+                key = _target_key(target)
+                if key is not None and key not in github_url_names:
+                    github_url_names.add(key)
                     changed = True
 
     request_sinks: list[tuple[ast.Call, bool]] = []
