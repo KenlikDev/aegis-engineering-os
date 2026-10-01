@@ -67,10 +67,11 @@ def _relative_member_path(root: Path, raw_path: str | Path) -> tuple[Path, str]:
     if not RELATIVE_PATH_RE.fullmatch(value):
         raise EvidenceBundleError("Evidence member path contains invalid characters.")
     candidate = Path(value).expanduser()
-    if candidate.is_absolute():
-        resolved = candidate.resolve()
-    else:
-        resolved = (root / candidate).resolve()
+    if candidate.is_absolute() or any(part == ".." for part in candidate.parts):
+        raise EvidenceBundleError(
+            "Evidence member path must be relative and must not contain traversal."
+        )
+    resolved = Path((root / candidate).absolute())
     try:
         relative = resolved.relative_to(root)
     except ValueError as exc:
@@ -322,7 +323,7 @@ def read_and_validate_evidence_bundle(
     path = Path(bundle_path).expanduser()
     if not path.is_absolute():
         path = root / path
-    path = path.resolve()
+    path = Path(path.absolute())
     try:
         path.relative_to(root)
     except ValueError as exc:
