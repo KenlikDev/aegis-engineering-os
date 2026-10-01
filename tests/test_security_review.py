@@ -283,6 +283,47 @@ class SecurityReviewTests(unittest.TestCase):
                 )
             )
 
+    def test_accepts_parameterized_github_request_via_shared_header_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "github_adapter.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import github_api_headers\n"
+                "def send(url):\n"
+                "    headers = github_api_headers()\n"
+                "    return Request(url, headers=dict(headers))\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertFalse(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
+    def test_rejects_parameterized_request_after_untrusted_header_reassignment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "github_adapter.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import github_api_headers\n"
+                "def send(url):\n"
+                "    headers = github_api_headers()\n"
+                "    headers = {}\n"
+                "    return Request(url, headers=dict(headers))\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_compliant_non_github_request_does_not_mask_github_api_gap(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
