@@ -163,7 +163,9 @@ class FakeValidationProvider:
             status="completed",
             conclusion="success",
             head_sha=head_sha,
-            url="https://github.com/KenlikDev/aegis-engineering-os/actions/runs/99",
+            validated_sha=head_sha,
+            evidence_type="branch-push",
+            url="https://github.com/kenlikdev/aegis-engineering-os/actions/runs/99",
         )
 
 
@@ -239,7 +241,10 @@ class IntegrationDeliveryTests(unittest.TestCase):
         self.assertEqual("integration", items.get(WORK_ITEM).state)
         self.assertEqual([(PR_NUMBER, HEAD)], merge.merge_calls)
         self.assertEqual(
-            [(".github/workflows/validate.yml", HEAD)],
+            [
+                (".github/workflows/validate.yml", HEAD),
+                (".github/workflows/validate.yml", MERGE),
+            ],
             validation.calls,
         )
         self.assertEqual(MERGE, result["pull_request"]["merge_commit_sha"])
@@ -316,7 +321,7 @@ class IntegrationDeliveryTests(unittest.TestCase):
 
         self.assertEqual([], merge.merge_calls)
 
-    def test_already_merged_path_skips_new_validation(self):
+    def test_already_merged_path_requires_post_merge_validation(self):
         pr, merge, validation, items = self.providers()
         merge.pull_request = IntegrationPullRequest(
             number=PR_NUMBER,
@@ -342,7 +347,10 @@ class IntegrationDeliveryTests(unittest.TestCase):
         )
 
         self.assertEqual("verified", result["status"])
-        self.assertEqual([], validation.calls)
+        self.assertEqual(
+            [(".github/workflows/validate.yml", MERGE)],
+            validation.calls,
+        )
         self.assertEqual([], merge.merge_calls)
         self.assertEqual(LifecycleState.INTEGRATION, items.get(WORK_ITEM).state)
 
