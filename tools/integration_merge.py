@@ -94,6 +94,8 @@ class IntegrationMergeProvider(Protocol):
 
     def target_matches_commit(self, target_branch: str, commit_sha: str) -> bool: ...
 
+    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool: ...
+
     def merge_pull_request(self, number: int, expected_head_sha: str) -> MergeResult: ...
 
 
@@ -296,6 +298,28 @@ class GitHubIntegrationMergeProvider:
         ):
             raise IntegrationMergeError("GitHub comparison response is malformed.")
         return compare_status == "identical" and ahead_by == 0 and behind_by == 0
+
+    def target_contains_commit(self, target_branch: str, commit_sha: str) -> bool:
+        """Return whether target contains the verified commit as an ancestor."""
+        self._sha(commit_sha, "Merge commit SHA")
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/compare/{quote(target_branch, safe='')}...{commit_sha}",
+        )
+        if status != 200 or not isinstance(data, Mapping):
+            raise IntegrationMergeError(
+                f"Unable to verify merge commit ancestry in {target_branch!r}; HTTP {status}."
+            )
+        compare_status = data.get("status")
+        ahead_by = data.get("ahead_by")
+        behind_by = data.get("behind_by")
+        if (
+            compare_status not in {"identical", "behind"}
+            or not isinstance(ahead_by, int)
+            or not isinstance(behind_by, int)
+        ):
+            raise IntegrationMergeError("GitHub comparison response is malformed.")
+        return ahead_by == 0
 
     def merge_pull_request(
         self,
@@ -502,20 +526,15 @@ def sync_integration_merge(
         sleep=sleep,
     )
 
-    if not provider.target_matches_commit(
+    if not provider.target_contains_commit(
         INTEGRATION_BRANCH,
         merge_commit_sha,
     ):
         raise IntegrationMergeError(
-            f"ai/integration is not exactly equal to integration merge commit {merge_commit_sha}."
+            f"ai/integration does not contain integration merge commit {merge_commit_sha}."
         )
 
     integration = provider.get_branch(INTEGRATION_BRANCH)
-    if integration.sha != merge_commit_sha:
-        raise IntegrationMergeError(
-            f"ai/integration advanced after exact merge verification: "
-            f"observed {integration.sha}, expected {merge_commit_sha}."
-        )
 
     trace = work_item_provider.attach_traceability(
         work_item_id,
