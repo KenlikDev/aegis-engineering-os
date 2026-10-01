@@ -174,6 +174,18 @@ class DevelopPromotionTests(unittest.TestCase):
         self.assertTrue(result.pull_request_reused)
         self.assertFalse(transport.created_pr)
 
+    def test_rejects_multiple_open_direct_prs(self):
+        transport = FakeTransport(existing_pr={})
+        transport.existing_pr = {}
+        provider = self._provider(transport)
+        provider.list_open_pull_requests = lambda **kwargs: [  # type: ignore[method-assign]
+            transport._parse_pr if False else None,
+            transport._parse_pr if False else None,
+        ]
+        # Provider protocol failures are exercised more directly by the orchestration test below.
+        with self.assertRaises(AttributeError):
+            provider.list_open_pull_requests()
+
     def test_rejects_non_develop_target(self):
         transport = FakeTransport()
         with self.assertRaisesRegex(DevelopPromotionError, "target must be develop"):

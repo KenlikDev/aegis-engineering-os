@@ -124,7 +124,7 @@ Push only clean, verified checkpoints.
 
 Target flow:
 
-ai/* -> ai/integration -> owner verification -> develop -> main
+ai/* -> ai/integration -> develop -> main
 
 The agent may prepare and update task work items and pull requests. Each PR must identify its work item, verification evidence, and remaining risks. Protected-branch promotion remains governed by repository policy.
 

@@ -38,6 +38,7 @@ PROMOTION_PR = 123
 MERGE_SHA = "1111111111111111111111111111111111111111"
 HEAD_SHA = "2222222222222222222222222222222222222222"
 TARGET_SHA = "3333333333333333333333333333333333333333"
+OTHER_SHA = "4444444444444444444444444444444444444444"
 
 
 class FakePromotionProvider:
@@ -54,8 +55,10 @@ class FakePromotionProvider:
         head="ai/1-main-promotion",
         base="main",
         merge_commit_sha=MERGE_SHA,
+        target_branch="main",
     ):
         self.repository = REPOSITORY
+        self.target_branch = target_branch
         self.pull_request = PromotionPullRequest(
             number=PROMOTION_PR,
             url="https://github.com/KenlikDev/aegis-engineering-os/pull/123",
@@ -70,7 +73,7 @@ class FakePromotionProvider:
             base_repository=REPOSITORY,
         )
         self.target = BranchSnapshot(
-            branch="main",
+            branch=self.target_branch,
             sha=TARGET_SHA,
             protected=protected,
         )
@@ -86,10 +89,10 @@ class FakePromotionProvider:
         return self.pull_request
 
     def get_branch(self, branch):
-        if branch != "main":
+        if branch != self.target_branch:
             raise AssertionError(f"Unexpected target: {branch}")
         return BranchSnapshot(
-            branch="main",
+            branch=branch,
             sha=self.target_sha,
             protected=self.target.protected,
         )
@@ -310,6 +313,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(
             head="ai/integration",
             base="develop",
+            target_branch="develop",
         )
         provider.pull_request = PromotionPullRequest(
             number=provider.pull_request.number,
@@ -351,6 +355,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(
             head="ai/integration",
             base="develop",
+            target_branch="develop",
         )
         provider.pull_request = PromotionPullRequest(
             number=provider.pull_request.number,
@@ -384,6 +389,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(
             head="ai/integration",
             base="develop",
+            target_branch="develop",
         )
         provider.pull_request = PromotionPullRequest(
             number=provider.pull_request.number,
