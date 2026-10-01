@@ -69,6 +69,10 @@ def _clean_text(value: object, field: str, *, max_length: int = 512) -> str:
 
 def _relative_source(project: Path, source: str) -> tuple[Path, str]:
     relative = Path(_clean_text(source, "source"))
+    if any(part == ".." for part in relative.parts):
+        raise VersionVerificationError(
+            f"Version source must remain inside the project root: {source}"
+        )
     if relative.is_absolute():
         candidate = relative.expanduser()
     else:
