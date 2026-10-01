@@ -199,7 +199,6 @@ def main() -> int:
         "tools/evidence_bundle.py",
         "tools/evidence_bundle_requirements.py",
         "tools/testing.py",
-        "tools/version_verification.py",
         "templates/quality-gates.example.json",
         "templates/knowledge-candidate.example.json",
         "templates/version-claims.example.json",
