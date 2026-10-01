@@ -58,9 +58,9 @@ class FakeTransport:
                 "protected": self.protected,
                 "commit": {"sha": self.source_sha},
             }
-        if method == "GET" and path == f"/repos/{REPOSITORY}/branches/develop":
+        if method == "GET" and path == f"/repos/{REPOSITORY}/branches/main":
             return 200, {
-                "name": "develop",
+                "name": "main",
                 "protected": self.protected,
                 "commit": {"sha": self.target_sha},
             }
@@ -71,7 +71,7 @@ class FakeTransport:
                 "commit": {"tree": {"sha": SOURCE_TREE}},
                 "parents": [{"sha": OTHER_SHA}],
             }
-        if method == "GET" and path == f"/repos/{REPOSITORY}/commits/develop":
+        if method == "GET" and path == f"/repos/{REPOSITORY}/commits/main":
             self.target_reads += 1
             return 200, {
                 "sha": self.target_sha,
@@ -107,7 +107,7 @@ class FakeTransport:
                 "commit": {"tree": {"sha": OTHER_SHA}},
                 "parents": [],
             }
-        if method == "GET" and path == f"/repos/{REPOSITORY}/git/ref/heads/ai%2F1-develop-promotion":
+        if method == "GET" and path == f"/repos/{REPOSITORY}/git/ref/heads/ai%2F1-main-promotion":
             if self.existing_branch is None and not self.created_branch:
                 return 404, {}
             return 200, {"object": {"sha": self.existing_branch or SNAPSHOT_SHA}}
@@ -115,7 +115,7 @@ class FakeTransport:
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/refs":
             self.created_branch = True
             self.created_ref_sha = payload["sha"]
-            return 201, {"ref": "refs/heads/ai/1-develop-promotion"}
+            return 201, {"ref": "refs/heads/ai/1-main-promotion"}
         if method == "POST" and path == f"/repos/{REPOSITORY}/git/commits":
             self.created_commit = True
             self.create_commit_payload = payload
@@ -172,16 +172,16 @@ class FakeTransport:
             "state": "open",
             "merged": False,
             "head": {
-                "ref": "ai/1-develop-promotion",
+                "ref": "ai/1-main-promotion",
                 "sha": head_sha,
             },
-            "base": {"ref": "develop"},
+            "base": {"ref": "main"},
             "draft": True,
         }
 
 
 class PromotionSnapshotTests(unittest.TestCase):
-    def _request(self, target="develop"):
+    def _request(self, target="main"):
         return PromotionSnapshotRequest(
             repository=REPOSITORY,
             work_item_id="1",
@@ -201,7 +201,7 @@ class PromotionSnapshotTests(unittest.TestCase):
 
         self.assertEqual(SOURCE_SHA, result.source_sha)
         self.assertEqual(TARGET_SHA, result.target_sha)
-        self.assertEqual("ai/1-develop-promotion", result.promotion_branch)
+        self.assertEqual("ai/1-main-promotion", result.promotion_branch)
         self.assertEqual(SNAPSHOT_SHA, result.promotion_sha)
         self.assertEqual(SNAPSHOT_SHA, result.pull_request.head_sha)
         self.assertFalse(result.branch_reused)
@@ -215,8 +215,8 @@ class PromotionSnapshotTests(unittest.TestCase):
             transport.create_commit_payload["parents"],
         )
         self.assertEqual(SOURCE_TREE, transport.create_commit_payload["tree"])
-        self.assertEqual(["KenlikDev:ai/1-develop-promotion"], transport.assert_query["head"])
-        self.assertEqual(["develop"], transport.assert_query["base"])
+        self.assertEqual(["KenlikDev:ai/1-main-promotion"], transport.assert_query["head"])
+        self.assertEqual(["main"], transport.assert_query["base"])
 
     def test_does_not_publish_incomplete_branch_when_snapshot_commit_fails(self):
         transport = FakeTransport()
@@ -373,7 +373,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         transport = FakeTransport(behind=1)
         with self.assertRaisesRegex(
             PromotionSnapshotError,
-            "ai/integration is behind develop by 1 commit",
+            "ai/integration is behind main by 1 commit",
         ):
             prepare_promotion_snapshot(self._provider(transport), self._request())
 
@@ -410,12 +410,24 @@ class PromotionSnapshotTests(unittest.TestCase):
         self.assertFalse(transport.created_branch)
         self.assertFalse(transport.created_pr)
 
+    def test_rejects_develop_target_before_network_access(self):
+        transport = FakeTransport()
+        request = self._request(target="develop")
+        with self.assertRaisesRegex(
+            PromotionSnapshotError,
+            "Develop promotion snapshots are disabled",
+        ):
+            prepare_promotion_snapshot(self._provider(transport), request)
+        self.assertFalse(transport.created_branch)
+        self.assertFalse(transport.created_commit)
+        self.assertFalse(transport.created_pr)
+
     def test_blocks_target_change_before_snapshot_branch_publication(self):
         transport = FakeTransport()
         calls = {"target_reads": 0}
 
         def changing_call(method, url, headers, payload):  # noqa: ANN001
-            if method == "GET" and url.endswith("/commits/develop"):
+            if method == "GET" and url.endswith("/commits/main"):
                 calls["target_reads"] += 1
                 if calls["target_reads"] >= 1:
                     return 200, {

@@ -12,18 +12,22 @@ ai/chore/*
         -> develop
         -> main
 
-Short-lived promotion branches are created from the promotion target so squash-only promotion does not replay the shared integration history:
+Develop promotion uses the verified ai/integration branch directly:
 
-ai/<issue>-develop-promotion -> develop
+ai/integration -> develop
+
+For main release promotion only, the snapshot mechanism may still use a short-lived owner-controlled branch:
+
 ai/<issue>-main-promotion -> main
 
-Promotion branches are owner-controlled delivery mechanisms and are not autonomous task branches.
+Develop promotion is never sourced from a temporary promotion branch. After the owner verifies the exact current ai/integration SHA, the develop pull request head is ai/integration directly.
 
 ## Ownership
 
 - task ai/* branches: autonomous engineering workspace;
 - ai/integration: AI staging and integration branch;
-- promotion branches: prepared by Aegis, merged only according to the target branch policy;
+- develop promotion PRs: sourced directly from owner-verified ai/integration;
+- main promotion branches: prepared by Aegis when the release process explicitly uses the snapshot flow;
 - develop: human-controlled development branch;
 - main: human-controlled release branch.
 
@@ -45,7 +49,9 @@ For long-running work, a clean recovery checkpoint may be pushed when useful, bu
 
 Squash merge task branches into ai/integration when that improves history clarity.
 
-For promotion branches, create a clean snapshot from the target branch containing only the verified delta from ai/integration. Use squash merge into develop or main according to the target branch policy.
+For develop, create the pull request directly from the exact ai/integration revision that the owner verified. The verified source SHA is recorded in the PR body and must still match the PR head when promotion is later synchronized.
+
+For main, the existing snapshot branch flow remains available. Use squash merge according to the target branch policy.
 
 The exact strategy can be revised after real-world validation.
 
@@ -75,7 +81,7 @@ The verifier records the exact source and target SHAs, compare divergence, chang
 
 Promotion is blocked when the source is behind the target, contains no delta, the exact source SHA has no successful \`Aegis Validation\`, the protected-state assumptions are false, or the caller supplied expected SHAs that no longer match.
 
-The verifier is read-only. It does not create promotion branches, modify branch protection, merge pull requests, or change \`develop\`/\`main\`.
+The verifier is read-only. It does not create promotion branches, create develop promotion PRs, modify branch protection, merge pull requests, or change \`develop\`/\`main\`.
 
 ## Integration validation trigger
 The concurrency group includes the triggering event and pull-request number where available. This prevents a merged pull-request validation from cancelling the branch push validation that records the exact integration SHA.
