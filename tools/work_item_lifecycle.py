@@ -794,7 +794,6 @@ class GitHubIssuesProvider:
             target,
             resume_state=current.resume_state,
         )
-        self._ensure_status_label(target)
 
         lock = self._acquire_lifecycle_lock(work_item_id)
         try:
@@ -809,6 +808,7 @@ class GitHubIssuesProvider:
                 target,
                 resume_state=current.resume_state,
             )
+            self._ensure_status_label(target)
             if target == LifecycleState.BLOCKED:
                 if current.state not in ACTIVE_STATES:
                     raise WorkItemLifecycleError(
