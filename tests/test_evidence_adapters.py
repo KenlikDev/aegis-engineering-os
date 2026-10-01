@@ -355,6 +355,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
@@ -416,6 +417,7 @@ class EvidenceAdapterTests(unittest.TestCase):
                 "branch": "ai/integration",
                 "sha": TARGET_SHA,
                 "protected": True,
+                "contains_merge_commit": True,
             },
             "work_item": {
                 "state_after": "integration",
