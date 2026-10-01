@@ -322,18 +322,6 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                     return True
         return False
 
-    header_assignments: dict[str, list[tuple[int, bool]]] = {}
-    for node in sorted(
-        (candidate for candidate in ast.walk(tree) if isinstance(candidate, ast.Assign)),
-        key=lambda candidate: candidate.lineno,
-    ):
-        compliant = contains_api_version_header(node.value)
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                header_assignments.setdefault(target.id, []).append(
-                    (node.lineno, compliant)
-                )
-
     def contains_shared_api_headers(expression: ast.AST | None) -> bool:
         if expression is None:
             return False
@@ -351,6 +339,23 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
                 return True
         return False
 
+    header_assignments: dict[str, list[tuple[int, bool]]] = {}
+    shared_header_assignments: dict[str, list[tuple[int, bool]]] = {}
+    for node in sorted(
+        (candidate for candidate in ast.walk(tree) if isinstance(candidate, ast.Assign)),
+        key=lambda candidate: candidate.lineno,
+    ):
+        compliant = contains_api_version_header(node.value)
+        shared_compliant = contains_shared_api_headers(node.value)
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                header_assignments.setdefault(target.id, []).append(
+                    (node.lineno, compliant)
+                )
+                shared_header_assignments.setdefault(target.id, []).append(
+                    (node.lineno, shared_compliant)
+                )
+
     def request_headers_are_compliant(expression: ast.AST | None, line: int) -> bool:
         if expression is None:
             return False
@@ -366,6 +371,25 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
             if contains_api_version_header(child):
                 return True
         return False
+
+    def request_headers_are_shared(expression: ast.AST | None, line: int) -> bool:
+        if expression is None:
+            return False
+        if contains_shared_api_headers(expression):
+            return True
+
+        assignment_results: list[bool] = []
+        for child in ast.walk(expression):
+            if not isinstance(child, ast.Name):
+                continue
+            assignments = [
+                shared
+                for assignment_line, shared in shared_header_assignments.get(child.id, [])
+                if assignment_line < line
+            ]
+            if assignments:
+                assignment_results.append(all(assignments))
+        return bool(assignment_results) and all(assignment_results)
 
     def expression_contains_github_url(
         expression: ast.AST | None,
@@ -445,11 +469,12 @@ def _review_python(path: Path, text: str, root: Path, findings: list[SecurityFin
 
         if not github_request_sinks:
             parameterized_transport_compliant = bool(request_sinks) and all(
-                contains_shared_api_headers(
+                request_headers_are_shared(
                     next(
                         (keyword.value for keyword in node.keywords if keyword.arg == "headers"),
                         None,
-                    )
+                    ),
+                    node.lineno,
                 )
                 for node, _ in request_sinks
             )
