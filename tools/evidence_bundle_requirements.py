@@ -146,7 +146,7 @@ def load_requirements(path: str | Path) -> EvidenceSetRequirements:
         )
     except EvidenceSetRequirementsError:
         raise
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (EvidenceContractError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise EvidenceSetRequirementsError(
             f"Unable to read evidence-set requirements: {requirements_path}"
         ) from exc
