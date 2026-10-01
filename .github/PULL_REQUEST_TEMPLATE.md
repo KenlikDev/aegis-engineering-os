@@ -1,6 +1,6 @@
 ## Work item
 
-Issue:
+Issue: #
 
 ## Summary
 
@@ -15,14 +15,15 @@ Describe what changed and why.
 - [ ] Version compatibility was verified
 - [ ] Documentation was updated when needed
 - [ ] Final diff was reviewed
+- [ ] Pull request is written in professional English
 
 ## Verification evidence
 
-Link the relevant CI runs, test output, build evidence, or external verification.
+Link the relevant CI runs, test output, build evidence, or external verification. Include the exact validated commit SHA and workflow/run identity.
 
 ## User-facing impact
 
-Describe product impact in Russian when this PR changes product behavior.
+Describe product impact in professional English when this PR changes product behavior.
 
 ## Risks
 
