@@ -47,6 +47,41 @@ class AegisPolicyTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 validate_aegis.load_metadata(path)
 
+    def test_bootstrapped_agent_instructions_require_refresh_checkpoints(self) -> None:
+        template = self.read("templates/AGENTS.md")
+        self.assertIn("Instruction refresh checkpoints", template)
+        self.assertIn("after every three substantial engineering phases", template)
+        self.assertIn("immediately before pull-request creation or merge", template)
+        self.assertIn("immediately before protected-branch promotion or task completion", template)
+
+    def test_bootstrap_backup_rejects_symlinked_managed_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "project"
+            target_root = project / ".agents" / "skills"
+            state_path = project / ".aegis" / "aegis-version.json"
+            backup_root = root / "backup"
+            project.mkdir()
+            target_root.mkdir(parents=True)
+            external = root / "external-skill"
+            external.mkdir()
+            (external / "SKILL.md").write_text("external\n", encoding="utf-8")
+            managed = target_root / "aegis-orchestrator"
+            try:
+                managed.symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            with self.assertRaisesRegex(SystemExit, "symlinked Aegis skill"):
+                bootstrap_project.backup_paths(
+                    project,
+                    target_root,
+                    state_path,
+                    {"aegis-orchestrator"},
+                    backup_root,
+                )
+            self.assertFalse((backup_root / "skills" / "aegis-orchestrator").exists())
+
     def test_bootstrap_registry_paths_stay_inside_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
