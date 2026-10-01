@@ -102,6 +102,20 @@ class EvidenceBundleTests(unittest.TestCase):
         with self.assertRaisesRegex(EvidenceBundleError, "inside the project root"):
             build_evidence_bundle(root, "Readiness input set", [outside])
 
+    def test_member_symlink_is_rejected(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        root, one, _ = self._project()
+        linked = root / ".aegis" / "linked.json"
+        try:
+            linked.symlink_to(one)
+        except OSError as exc:
+            self.skipTest(f"symbolic links unavailable: {exc}")
+
+        with self.assertRaisesRegex(EvidenceBundleError, "securely open atomic copy source"):
+            build_evidence_bundle(root, "Readiness input set", [linked])
+
     def test_malformed_bundle_schema_is_rejected(self):
         root, one, two = self._project()
         bundle = build_evidence_bundle(root, "Readiness input set", [one, two])

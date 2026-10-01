@@ -79,19 +79,15 @@ class VersionVerificationTests(unittest.TestCase):
         import version_verification as module
 
         with patch.object(
-            Path,
-            "read_bytes",
+            module,
+            "read_bytes_no_follow",
             return_value=snapshot,
-        ) as read_bytes, patch.object(
-            Path,
-            "read_text",
-            side_effect=AssertionError("source must be read once as bytes"),
-        ):
+        ) as read_bytes_no_follow:
             digest, content = module._sha256_and_text(source)
 
         self.assertEqual(hashlib.sha256(snapshot).hexdigest(), digest)
         self.assertEqual(snapshot.decode("utf-8"), content)
-        read_bytes.assert_called_once_with()
+        read_bytes_no_follow.assert_called_once()
     def test_record_rejects_duplicate_json_keys(self):
         root, claims = self._project()
         claims.write_text(
@@ -264,6 +260,45 @@ class VersionVerificationTests(unittest.TestCase):
                 if claim["component"] == "kotlin"
             ),
         )
+
+    def test_version_source_symlink_is_rejected(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root.parent / f"{root.name}-outside.txt"
+            outside.write_text("tool 1.2.3\n", encoding="utf-8")
+            source = root / "source.txt"
+            try:
+                source.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            claims = root / "claims.json"
+            claims.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "claims": [
+                            {
+                                "component": "tool",
+                                "version": "1.2.3",
+                                "scope": "toolchain",
+                                "source": "source.txt",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                VersionVerificationError,
+                "securely open atomic copy source",
+            ):
+                record_version_evidence(root, claims, root / "evidence.json")
+            outside.unlink(missing_ok=True)
 
     def test_record_refuses_to_overwrite_input_or_source(self):
         root, claims = self._project()

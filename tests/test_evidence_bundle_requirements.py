@@ -264,6 +264,29 @@ class EvidenceSetRequirementsTests(unittest.TestCase):
         ):
             validate_evidence_set(root, bundle, requirements)
 
+    def test_requirements_symlink_is_rejected(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root / "outside.json"
+            outside.write_text(
+                '{"schema_version":1,"requirements":[{"kind":"testing"}],"allow_extra_members":true}',
+                encoding="utf-8",
+            )
+            link = root / "requirements.json"
+            try:
+                link.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            with self.assertRaisesRegex(
+                EvidenceSetRequirementsError,
+                "securely open atomic copy source",
+            ):
+                load_requirements(link)
+
     def test_malformed_requirements_are_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "requirements.json"

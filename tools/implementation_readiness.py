@@ -109,9 +109,9 @@ def _validate_version_evidence(project: Path, reference: str | Path) -> tuple[st
 
     path = Path(value)
     if path.is_absolute():
-        resolved = path.expanduser().resolve()
+        resolved = Path(path.expanduser().absolute())
     else:
-        resolved = (project / path).resolve()
+        resolved = Path((project / path).absolute())
 
     try:
         resolved.relative_to(project)
@@ -147,7 +147,11 @@ def _resolve_local_reference(
         raise ImplementationReadinessError(f"{label} must reference a local project file.")
 
     candidate = Path(value).expanduser()
-    resolved = candidate.resolve() if candidate.is_absolute() else (project / candidate).resolve()
+    resolved = (
+        Path(candidate.absolute())
+        if candidate.is_absolute()
+        else Path((project / candidate).absolute())
+    )
     try:
         relative = resolved.relative_to(project)
     except ValueError as exc:

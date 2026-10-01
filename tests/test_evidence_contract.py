@@ -195,6 +195,50 @@ class EvidenceOutputSecurityTests(unittest.TestCase):
 
             self.assertEqual("source\n", output.read_text(encoding="utf-8"))
 
+    def test_load_json_object_rejects_symlinked_parent(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root / "outside"
+            outside.mkdir()
+            source = outside / "input.json"
+            source.write_text('{"ok": true}', encoding="utf-8")
+            parent = root / "linked"
+            try:
+                parent.symlink_to(outside, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            from evidence_contract import load_json_object
+            with self.assertRaisesRegex(
+                EvidenceContractError,
+                "securely open atomic copy source directory",
+            ):
+                load_json_object(parent / "input.json")
+
+    def test_load_json_object_rejects_symlinked_source(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root / "outside.json"
+            outside.write_text('{"ok": true}', encoding="utf-8")
+            link = root / "link.json"
+            try:
+                link.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            from evidence_contract import load_json_object
+            with self.assertRaisesRegex(
+                EvidenceContractError,
+                "securely open atomic copy source",
+            ):
+                load_json_object(link)
+
     def test_build_evidence_rejects_oversized_canonical_payload(self) -> None:
         large_result = {"items": ["x" * 4096 for _ in range(20)]}
 

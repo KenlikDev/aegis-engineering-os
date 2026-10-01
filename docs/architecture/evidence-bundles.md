@@ -22,8 +22,9 @@ Members are sorted by evidence ID and path before the bundle identity is calcula
 Bundle validation is fail-closed:
 
 1. the bundle must be inside the selected project root;
-2. each member path must be relative and must resolve inside the root;
-3. every member artifact must exist;
+2. each member path must be relative and must remain lexical to the root;
+3. bundle and member reads reject symlinked path components on POSIX;
+4. every member artifact must exist;
 4. every member artifact must pass the canonical evidence contract;
 5. the recorded evidence ID must equal the validated member ID;
 6. member IDs and paths must be unique and canonically ordered;
@@ -89,7 +90,7 @@ A bundle does not infer completeness. A higher-level gate remains responsible fo
 
 ## Security
 
-Member paths are project-relative and symlink-resolved. Bundle metadata does not accept arbitrary URLs or credentials. Member evidence is revalidated on every bundle validation, so the bundle cannot silently preserve a stale or tampered member.
+Member paths are project-relative and are not trusted through path resolution. Local JSON/evidence reads use the shared no-follow filesystem primitive on POSIX, rejecting symlinked file or parent-directory components. Bundle metadata does not accept arbitrary URLs or credentials. Member evidence is revalidated on every bundle validation, so the bundle cannot silently preserve a stale or tampered member.
 
 ## Current integration
 
