@@ -111,7 +111,7 @@ A successful preflight proves that the selected local runtime is reachable and t
 
 ## OpenHands Agent Server preflight
 
-When the local OpenHands Agent Server is available, the same preflight can verify the execution boundary without assuming a default port.
+When the local OpenHands Agent Server is available, the same preflight can verify the execution boundary without assuming a default port. The URL is a local trust-boundary input and must be loopback-only (localhost, 127.0.0.1, or ::1) with no embedded credentials, query, or fragment.
 
 Provide the exact server URL explicitly:
 
