@@ -283,6 +283,54 @@ class SecurityReviewTests(unittest.TestCase):
                 )
             )
 
+    def test_accepts_validated_github_attribute_url_with_unrelated_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "github_adapter.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import github_api_headers, validate_github_api_base_url\n"
+                "class Adapter:\n"
+                "    def __init__(self):\n"
+                "        self._api_base_url = validate_github_api_base_url('https://api.github.com')\n"
+                "    def request(self, path):\n"
+                "        return Request(f'{self._api_base_url}{path}', headers=github_api_headers())\n"
+                "    def redirect(self, url):\n"
+                "        return Request(url, headers={'Accept': 'text/plain'})\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("ready", result.status)
+            self.assertFalse(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
+    def test_rejects_validated_github_attribute_url_without_header(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir(parents=True)
+            (tools / "github_adapter.py").write_text(
+                "from urllib.request import Request\n"
+                "from github_http_security import validate_github_api_base_url\n"
+                "class Adapter:\n"
+                "    def __init__(self):\n"
+                "        self._api_base_url = validate_github_api_base_url('https://api.github.com')\n"
+                "    def request(self, path):\n"
+                "        return Request(f'{self._api_base_url}{path}')\n"
+                "    def redirect(self, url):\n"
+                "        return Request(url, headers={'Accept': 'text/plain'})\n",
+                encoding="utf-8",
+            )
+
+            result = assess_repository(root)
+            self.assertEqual("blocked", result.status)
+            self.assertTrue(
+                any(f.rule_id == "github.api-version" for f in result.findings)
+            )
+
     def test_accepts_parameterized_github_request_via_shared_header_mapping(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
