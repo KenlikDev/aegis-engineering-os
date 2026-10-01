@@ -17,7 +17,9 @@ from evidence_contract import (
     SECRET_VALUE_PATTERNS,
     EvidenceContractError,
     EvidenceRecord,
+    parse_json_object,
     read_and_validate_evidence,
+    read_bytes_no_follow,
 )
 
 
@@ -133,12 +135,14 @@ def _parse_requirement(value: object, index: int) -> EvidenceSelector:
 
 def load_requirements(path: str | Path) -> EvidenceSetRequirements:
     """Read and validate an explicit evidence-set requirements document."""
-    requirements_path = Path(path).expanduser().resolve()
+    requirements_path = Path(path).expanduser()
     try:
-        payload = json.loads(
-            requirements_path.read_text(encoding="utf-8"),
-            object_pairs_hook=_reject_duplicate_keys,
-            parse_constant=_reject_constants,
+        payload = parse_json_object(
+            read_bytes_no_follow(
+                requirements_path,
+                error_type=EvidenceSetRequirementsError,
+            ),
+            label="Evidence-set requirements JSON",
         )
     except EvidenceSetRequirementsError:
         raise
