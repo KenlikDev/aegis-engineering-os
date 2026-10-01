@@ -4,7 +4,7 @@
 
 Aegis separates promotion preparation from protected-branch ownership.
 
-The normal autonomous path ends at ai/integration. Promotion into develop or main is prepared as an explicit artifact and remains subject to the target branch policy.
+The normal autonomous path ends at ai/integration. Develop promotion is an explicit owner-gated pull request from the verified ai/integration branch. Main release promotion may use a separate snapshot artifact when the release process requires it.
 
 ## Readiness gate
 
@@ -26,36 +26,31 @@ When requested with `--evidence-output`, the result is also adapted into the can
 
 The observation timestamp is captured immediately before the provider assessment and normalized to UTC by the evidence contract.
 
-## Snapshot preparation
+## Develop promotion
 
-tools/promotion_snapshot.py is the write boundary.
+tools/develop_promotion.py is the write boundary for develop promotion.
 
 The operation is intentionally conservative:
 
-1. run the readiness gate;
-2. capture the exact source and protected target commit snapshots returned by that readiness observation;
-3. verify that the source contains a positive promotable delta beyond the target, including at least one changed file, and that the compare response has a consistent relationship status and commit counts; an ancestry `diverged` result is allowed after squash-based human promotion;
-4. create one immutable snapshot commit with:
-   - first parent = exact protected target SHA;
-   - second parent = exact validated ai/integration SHA;
-   - tree = exact tree of that validated source commit;
-5. reread both source and protected target branches and require their SHAs to remain equal to the validated readiness snapshot;
-6. create the short-lived branch ai/<work-item>-<target>-promotion directly at the snapshot commit SHA;
-7. verify the branch commit, parents, and tree;
-8. create or reuse one open pull request into the selected target;
-9. verify the pull request head SHA equals the exact promotion commit SHA, in addition to its branch/base identity;
-10. return structured metadata without credentials.
+1. require an explicit owner-verified source SHA as an operator-provided precondition;
+2. run the read-only readiness gate with expected_source_sha set to that exact SHA;
+3. capture the exact current source and protected target SHAs;
+4. require the source to remain exactly equal to the owner-verified SHA before any pull-request write;
+5. search for at most one existing open PR from ai/integration to develop;
+6. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
+7. record the verified SHA in the PR body;
+8. reread the pull request and return structured metadata without credentials.
 
-The branch is never intentionally published first at the protected target SHA. A source or target change during preparation therefore fails closed before the promotion branch is published. Once a new promotion branch is published, later pull-request or verification failures never trigger automatic branch deletion because the GitHub delete-reference API has no expected-SHA compare-and-delete condition. A valid newly published snapshot branch is retained for safe idempotent retry; a missing or changed branch is treated as an explicit recovery boundary and Aegis never overwrites or deletes it automatically. A snapshot commit is bound to the exact source revision for which promotion readiness verified Aegis Validation.
+No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint.
 
-
-The resulting commit represents the verified integration state as a target-based promotion artifact. Aegis does not resolve protected-target merge conflicts; the exact target/source diff remains part of the human promotion review.
+tools/promotion_snapshot.py remains the write boundary only for the legacy main release-promotion snapshot flow. It rejects develop targets.
 
 ## Idempotency
 
-The promotion branch name is deterministic:
+Develop promotion has no synthetic branch. Its idempotent identity is the exact pair ai/integration -> develop plus the owner-verified source SHA.
 
-ai/<work-item>-develop-promotion
+Main snapshot promotion retains its deterministic branch:
+
 ai/<work-item>-main-promotion
 
 When the branch already exists, its commit must exactly match the expected target parent, integration parent, and integration tree. A mismatch is a hard failure rather than an attempt to repair or overwrite the branch.
@@ -108,8 +103,9 @@ The overall delivery path is:
 
 work item -> task branch -> OpenHands -> verification -> quality gates
 -> review -> task PR -> ai/integration
--> promotion readiness -> promotion snapshot PR
--> owner-controlled promotion -> develop/main
+-> owner verification -> direct develop PR
+-> owner-controlled promotion -> develop
+-> release checkpoint -> main
 
 The final protected-branch merge remains outside the autonomous delivery boundary.
 
@@ -117,9 +113,9 @@ The final protected-branch merge remains outside the autonomous delivery boundar
 
 A promotion pull request is owner-controlled. tools/promotion_sync.py is the post-merge synchronization boundary.
 
-The operation requires the work item to be in integration, verifies the deterministic promotion branch and protected target, verifies that both the promotion PR head repository and base repository equal the configured repository, requires an actual closed-and-merged PR with a merge commit SHA, and compares the target branch against that merge commit with an exact `identical` result. It then re-reads the protected target and requires its SHA to equal the merge commit. Only after both traceability and integration -> done lifecycle mutations report read-after-write verification does it return `status=verified`.
+The operation requires the work item to be in integration, verifies the develop PR head is ai/integration or the main PR head is the deterministic release-promotion branch, verifies that both the promotion PR head repository and base repository equal the configured repository, requires an actual closed-and-merged PR with a merge commit SHA, and compares the target branch against that merge commit with an exact `identical` result. It then re-reads the protected target and requires its SHA to equal the merge commit. Only after both traceability and integration -> done lifecycle mutations report read-after-write verification does it return `status=verified`.
 
-Open or unmerged promotion PRs are non-mutating. The synchronizer never approves, merges, force-pushes, or changes protected branches.
+For develop, the synchronizer also requires the PR body verification marker and PR head SHA to equal the owner-verified source SHA. If that direct checkpoint is stale, synchronization fails closed. Open or unmerged promotion PRs are non-mutating. The synchronizer never approves, merges, force-pushes, or changes protected branches.
 
 The synchronized result can also be serialized as canonical `promotion-sync` evidence. A verified record binds the human-controlled target branch, exact promotion merge revision, protected target identity, pull-request identity, traceability verification, and integration -> done lifecycle verification. A `not-merged` result remains canonical `unknown`. This evidence is observational and does not authorize or perform promotion.
 

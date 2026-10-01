@@ -306,6 +306,110 @@ class PromotionSyncTests(unittest.TestCase):
                         api_base_url=invalid_url,
                     )
 
+    def test_successful_direct_develop_merge_requires_owner_verified_head(self):
+        provider = FakePromotionProvider(
+            head="ai/integration",
+            base="develop",
+        )
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head="ai/integration",
+            head_sha=HEAD_SHA,
+            base="develop",
+            base_sha=TARGET_SHA,
+            state="closed",
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
+            body=f"- Verified source SHA: {HEAD_SHA}\n",
+            verified_source_sha=HEAD_SHA,
+        )
+        provider.target = BranchSnapshot(
+            branch="develop",
+            sha=TARGET_SHA,
+            protected=True,
+        )
+
+        result = sync_promotion_merge(
+            provider,
+            FakeWorkItemProvider(),
+            "1",
+            PROMOTION_PR,
+            target_branch="develop",
+        )
+
+        self.assertEqual("verified", result["status"])
+        self.assertEqual(
+            [("develop", MERGE_SHA)],
+            provider.contains_calls,
+        )
+
+    def test_direct_develop_merge_rejects_missing_owner_verification(self):
+        provider = FakePromotionProvider(
+            head="ai/integration",
+            base="develop",
+        )
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head="ai/integration",
+            head_sha=HEAD_SHA,
+            base="develop",
+            base_sha=TARGET_SHA,
+            state="closed",
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
+            body="owner reviewed this\n",
+            verified_source_sha=None,
+        )
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "missing the owner-verification source SHA",
+        ):
+            sync_promotion_merge(
+                provider,
+                FakeWorkItemProvider(),
+                "1",
+                PROMOTION_PR,
+                target_branch="develop",
+            )
+
+    def test_direct_develop_merge_rejects_verification_head_drift(self):
+        provider = FakePromotionProvider(
+            head="ai/integration",
+            base="develop",
+        )
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head="ai/integration",
+            head_sha=OTHER_SHA,
+            base="develop",
+            base_sha=TARGET_SHA,
+            state="closed",
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
+            body=f"- Verified source SHA: {HEAD_SHA}\n",
+            verified_source_sha=HEAD_SHA,
+        )
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "head SHA does not match",
+        ):
+            sync_promotion_merge(
+                provider,
+                FakeWorkItemProvider(),
+                "1",
+                PROMOTION_PR,
+                target_branch="develop",
+            )
+
     def test_successful_merge_advances_integration_to_done(self):
         provider = FakePromotionProvider()
         work_items = FakeWorkItemProvider()
@@ -453,7 +557,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(head="ai/1-develop-promotion")
         work_items = FakeWorkItemProvider()
 
-        with self.assertRaisesRegex(PromotionSyncError, "deterministic promotion branch"):
+        with self.assertRaisesRegex(PromotionSyncError, "expected delivery source"):
             sync_promotion_merge(
                 provider,
                 work_items,
