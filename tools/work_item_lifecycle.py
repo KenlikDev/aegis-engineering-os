@@ -13,6 +13,7 @@ import json
 import os
 import re
 import uuid
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Callable, Mapping, Protocol
@@ -29,6 +30,10 @@ from github_http_security import (
 
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_LOCK_LEASE_SECONDS = 300.0
+MAX_LOCK_LEASE_SECONDS = 900.0
+LIFECYCLE_LOCK_REF_PREFIX = "refs/aegis/locks/work-item/"
+LIFECYCLE_LOCK_HEADER = "Aegis lifecycle lock v1"
 STATUS_LABEL_PREFIX = "aegis:status:"
 RESUME_LABEL_PREFIX = "aegis:resume:"
 STATUS_LABEL_RE = re.compile(r"^aegis:status:[a-z_]+$")
@@ -303,6 +308,13 @@ def _default_transport(
         ) from exc
 
 
+@dataclass(frozen=True, slots=True)
+class _LifecycleLock:
+    work_item_id: str
+    owner: str
+    ref_sha: str
+
+
 class GitHubIssuesProvider:
     """Persist Aegis lifecycle state through GitHub Issues."""
 
@@ -313,11 +325,20 @@ class GitHubIssuesProvider:
         *,
         transport: JsonTransport | None = None,
         api_base_url: str = "https://api.github.com",
+        lock_lease_seconds: float = DEFAULT_LOCK_LEASE_SECONDS,
     ) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
             raise WorkItemLifecycleError("GitHub repository must be owner/name.")
         if not token.strip():
             raise WorkItemLifecycleError("GitHub API token must not be empty.")
+        if not isinstance(lock_lease_seconds, (int, float)) or isinstance(
+            lock_lease_seconds, bool
+        ):
+            raise WorkItemLifecycleError("Lifecycle lock lease must be numeric.")
+        if not 0 < float(lock_lease_seconds) <= MAX_LOCK_LEASE_SECONDS:
+            raise WorkItemLifecycleError(
+                f"Lifecycle lock lease must be between 0 and {MAX_LOCK_LEASE_SECONDS} seconds."
+            )
         try:
             normalized_api_base_url = validate_github_api_base_url(api_base_url)
         except ValueError as exc:
@@ -326,6 +347,7 @@ class GitHubIssuesProvider:
         self._token = token
         self._transport = transport or _default_transport
         self._api_base_url = normalized_api_base_url
+        self._lock_lease_seconds = float(lock_lease_seconds)
 
     def _request(
         self,
