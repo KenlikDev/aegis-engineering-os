@@ -166,259 +166,6 @@ class WorkItemProvider(Protocol):
     """Minimal provider-neutral work-item contract."""
 
 
-    def _lifecycle_lock_ref_name(self, work_item_id: str) -> str:
-        if not work_item_id.isdigit():
-            raise WorkItemLifecycleError("GitHub work-item ID must be a numeric issue number.")
-        return f"{LIFECYCLE_LOCK_REF_PREFIX}{int(work_item_id)}"
-
-    def _lifecycle_lock_ref_path(self, work_item_id: str) -> str:
-        ref_name = self._lifecycle_lock_ref_name(work_item_id)
-        return f"/repos/{self.repository}/git/ref/{quote(ref_name.removeprefix('refs/'), safe='/')}"
-
-    def _get_ref_sha(self, path: str) -> str:
-        status, data = self._request("GET", path)
-        if status != 200 or not isinstance(data, Mapping):
-            raise WorkItemLifecycleError(f"Unable to read Git ref; HTTP {status}.")
-        obj = data.get("object")
-        if not isinstance(obj, Mapping) or not isinstance(obj.get("sha"), str):
-            raise WorkItemLifecycleError("Git ref response did not contain a commit SHA.")
-        return obj["sha"]
-
-    def _get_commit_tree_sha(self, commit_sha: str) -> str:
-        if not re.fullmatch(r"[0-9a-fA-F]{40}", commit_sha):
-            raise WorkItemLifecycleError("Git commit SHA is malformed.")
-        status, data = self._request(
-            "GET",
-            f"/repos/{self.repository}/git/commits/{commit_sha}",
-        )
-        if status != 200 or not isinstance(data, Mapping):
-            raise WorkItemLifecycleError(
-                f"Unable to read Git commit {commit_sha}; HTTP {status}."
-            )
-        tree = data.get("tree")
-        if not isinstance(tree, Mapping) or not isinstance(tree.get("sha"), str):
-            raise WorkItemLifecycleError("Git commit response did not contain a tree SHA.")
-        return tree["sha"]
-
-    @staticmethod
-    def _render_lifecycle_lock_message(
-        work_item_id: str,
-        *,
-        mode: str,
-        owner: str,
-        expires_at: datetime | None,
-    ) -> str:
-        if mode not in {"held", "free"}:
-            raise WorkItemLifecycleError("Lifecycle lock mode is invalid.")
-        if not UUID_RE.fullmatch(owner):
-            raise WorkItemLifecycleError("Lifecycle lock owner must be a UUID.")
-        expires_text = (
-            expires_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-            if expires_at is not None
-            else "-"
-        )
-        return "\n".join(
-            (
-                LIFECYCLE_LOCK_HEADER,
-                f"work-item: {int(work_item_id)}",
-                f"mode: {mode}",
-                f"owner: {owner}",
-                f"expires-at: {expires_text}",
-            )
-        )
-
-    @staticmethod
-    def _parse_lifecycle_lock_message(
-        work_item_id: str,
-        message: str,
-    ) -> tuple[str, str, datetime | None]:
-        fields: dict[str, str] = {}
-        lines = message.splitlines()
-        if not lines or lines[0] != LIFECYCLE_LOCK_HEADER:
-            raise WorkItemLifecycleError("Lifecycle lock ref contains an unknown commit format.")
-        for line in lines[1:]:
-            key, separator, value = line.partition(": ")
-            if separator:
-                fields[key] = value
-        if fields.get("work-item") != str(int(work_item_id)):
-            raise WorkItemLifecycleError("Lifecycle lock ref belongs to another work item.")
-        mode = fields.get("mode")
-        owner = fields.get("owner")
-        expires_text = fields.get("expires-at")
-        if mode not in {"held", "free"} or not isinstance(owner, str):
-            raise WorkItemLifecycleError("Lifecycle lock ref contains invalid lock metadata.")
-        if not UUID_RE.fullmatch(owner):
-            raise WorkItemLifecycleError("Lifecycle lock owner must be a UUID.")
-        if mode == "free":
-            if expires_text != "-":
-                raise WorkItemLifecycleError("Free lifecycle lock must not contain an expiry.")
-            return mode, owner, None
-        if not expires_text or expires_text == "-":
-            raise WorkItemLifecycleError("Held lifecycle lock must contain an expiry.")
-        try:
-            expires_at = datetime.fromisoformat(expires_text.replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise WorkItemLifecycleError("Lifecycle lock expiry is malformed.") from exc
-        if expires_at.tzinfo is None:
-            raise WorkItemLifecycleError("Lifecycle lock expiry must include a timezone.")
-        return mode, owner, expires_at.astimezone(timezone.utc)
-
-    def _create_lifecycle_lock_commit(
-        self,
-        parent_sha: str,
-        *,
-        work_item_id: str,
-        mode: str,
-        owner: str,
-        expires_at: datetime | None,
-    ) -> str:
-        tree_sha = self._get_commit_tree_sha(parent_sha)
-        status, data = self._request(
-            "POST",
-            f"/repos/{self.repository}/git/commits",
-            {
-                "message": self._render_lifecycle_lock_message(
-                    work_item_id,
-                    mode=mode,
-                    owner=owner,
-                    expires_at=expires_at,
-                ),
-                "tree": tree_sha,
-                "parents": [parent_sha],
-            },
-        )
-        if status != 201 or not isinstance(data, Mapping):
-            raise WorkItemLifecycleError(
-                f"Unable to create lifecycle lock commit; HTTP {status}."
-            )
-        sha = data.get("sha")
-        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", sha):
-            raise WorkItemLifecycleError("Lifecycle lock commit did not return a valid SHA.")
-        return sha
-
-    def _read_lifecycle_lock(
-        self,
-        work_item_id: str,
-    ) -> tuple[str, str, str, datetime | None] | None:
-        status, data = self._request("GET", self._lifecycle_lock_ref_path(work_item_id))
-        if status == 404:
-            return None
-        if status != 200 or not isinstance(data, Mapping):
-            raise WorkItemLifecycleError(
-                f"Unable to inspect lifecycle lock for #{work_item_id}; HTTP {status}."
-            )
-        obj = data.get("object")
-        if not isinstance(obj, Mapping) or not isinstance(obj.get("sha"), str):
-            raise WorkItemLifecycleError("Lifecycle lock ref did not contain an object SHA.")
-        ref_sha = obj["sha"]
-        status, commit = self._request(
-            "GET",
-            f"/repos/{self.repository}/git/commits/{ref_sha}",
-        )
-        if status != 200 or not isinstance(commit, Mapping):
-            raise WorkItemLifecycleError(
-                f"Unable to read lifecycle lock commit {ref_sha}; HTTP {status}."
-            )
-        message = commit.get("message")
-        if not isinstance(message, str):
-            raise WorkItemLifecycleError("Lifecycle lock commit did not contain a message.")
-        mode, owner, expires_at = self._parse_lifecycle_lock_message(work_item_id, message)
-        return ref_sha, mode, owner, expires_at
-
-    def _acquire_lifecycle_lock(self, work_item_id: str) -> _LifecycleLock:
-        ref_name = self._lifecycle_lock_ref_name(work_item_id)
-        ref_path = self._lifecycle_lock_ref_path(work_item_id)
-        owner = str(uuid.uuid4())
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=self._lock_lease_seconds)
-
-        for _ in range(4):
-            current = self._read_lifecycle_lock(work_item_id)
-            if current is None:
-                integration_sha = self._get_ref_sha(
-                    f"/repos/{self.repository}/git/ref/heads/ai/integration"
-                )
-                lock_sha = self._create_lifecycle_lock_commit(
-                    integration_sha,
-                    work_item_id=work_item_id,
-                    mode="held",
-                    owner=owner,
-                    expires_at=expires_at,
-                )
-                status, _ = self._request(
-                    "POST",
-                    f"/repos/{self.repository}/git/refs",
-                    {"ref": ref_name, "sha": lock_sha},
-                )
-                if status == 201:
-                    return _LifecycleLock(work_item_id, owner, lock_sha)
-                if status != 409:
-                    raise WorkItemLifecycleError(
-                        f"Unable to create lifecycle lock ref; HTTP {status}."
-                    )
-                continue
-
-            current_sha, mode, current_owner, current_expiry = current
-            if mode == "held":
-                if current_expiry is None:
-                    raise WorkItemLifecycleError("Held lifecycle lock has no expiry.")
-                if current_expiry > datetime.now(timezone.utc):
-                    raise WorkItemLifecycleError(
-                        f"Lifecycle lock for #{work_item_id} is held by {current_owner} "
-                        f"until {current_expiry.isoformat()}."
-                    )
-
-            new_sha = self._create_lifecycle_lock_commit(
-                current_sha,
-                work_item_id=work_item_id,
-                mode="held",
-                owner=owner,
-                expires_at=expires_at,
-            )
-            status, _ = self._request(
-                "PATCH",
-                ref_path,
-                {"sha": new_sha, "force": False},
-            )
-            if status == 200:
-                return _LifecycleLock(work_item_id, owner, new_sha)
-            if status != 409:
-                raise WorkItemLifecycleError(
-                    f"Unable to acquire lifecycle lock for #{work_item_id}; HTTP {status}."
-                )
-
-        raise WorkItemLifecycleError(
-            f"Lifecycle lock for #{work_item_id} changed concurrently; refusing to overwrite."
-        )
-
-    def _release_lifecycle_lock(self, lock: _LifecycleLock) -> None:
-        current = self._read_lifecycle_lock(lock.work_item_id)
-        if current is None or current[0] != lock.ref_sha:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} was lost before release."
-            )
-        _, mode, owner, _ = current
-        if mode != "held" or owner != lock.owner:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} is owned by another writer."
-            )
-        free_sha = self._create_lifecycle_lock_commit(
-            lock.ref_sha,
-            work_item_id=lock.work_item_id,
-            mode="free",
-            owner=lock.owner,
-            expires_at=None,
-        )
-        status, _ = self._request(
-            "PATCH",
-            self._lifecycle_lock_ref_path(lock.work_item_id),
-            {"sha": free_sha, "force": False},
-        )
-        if status != 200:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} changed before release; "
-                "refusing to overwrite another writer's lock."
-            )
-
     def get(self, work_item_id: str) -> WorkItem:
         ...
 
@@ -970,6 +717,259 @@ class InMemoryWorkItemProvider:
     def __init__(self, items: Mapping[str, WorkItem]) -> None:
         self.items = dict(items)
         self.comments: dict[str, list[str]] = {}
+
+    def _lifecycle_lock_ref_name(self, work_item_id: str) -> str:
+        if not work_item_id.isdigit():
+            raise WorkItemLifecycleError("GitHub work-item ID must be a numeric issue number.")
+        return f"{LIFECYCLE_LOCK_REF_PREFIX}{int(work_item_id)}"
+
+    def _lifecycle_lock_ref_path(self, work_item_id: str) -> str:
+        ref_name = self._lifecycle_lock_ref_name(work_item_id)
+        return f"/repos/{self.repository}/git/ref/{quote(ref_name.removeprefix('refs/'), safe='/')}"
+
+    def _get_ref_sha(self, path: str) -> str:
+        status, data = self._request("GET", path)
+        if status != 200 or not isinstance(data, Mapping):
+            raise WorkItemLifecycleError(f"Unable to read Git ref; HTTP {status}.")
+        obj = data.get("object")
+        if not isinstance(obj, Mapping) or not isinstance(obj.get("sha"), str):
+            raise WorkItemLifecycleError("Git ref response did not contain a commit SHA.")
+        return obj["sha"]
+
+    def _get_commit_tree_sha(self, commit_sha: str) -> str:
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", commit_sha):
+            raise WorkItemLifecycleError("Git commit SHA is malformed.")
+        status, data = self._request(
+            "GET",
+            f"/repos/{self.repository}/git/commits/{commit_sha}",
+        )
+        if status != 200 or not isinstance(data, Mapping):
+            raise WorkItemLifecycleError(
+                f"Unable to read Git commit {commit_sha}; HTTP {status}."
+            )
+        tree = data.get("tree")
+        if not isinstance(tree, Mapping) or not isinstance(tree.get("sha"), str):
+            raise WorkItemLifecycleError("Git commit response did not contain a tree SHA.")
+        return tree["sha"]
+
+    @staticmethod
+    def _render_lifecycle_lock_message(
+        work_item_id: str,
+        *,
+        mode: str,
+        owner: str,
+        expires_at: datetime | None,
+    ) -> str:
+        if mode not in {"held", "free"}:
+            raise WorkItemLifecycleError("Lifecycle lock mode is invalid.")
+        if not UUID_RE.fullmatch(owner):
+            raise WorkItemLifecycleError("Lifecycle lock owner must be a UUID.")
+        expires_text = (
+            expires_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            if expires_at is not None
+            else "-"
+        )
+        return "\n".join(
+            (
+                LIFECYCLE_LOCK_HEADER,
+                f"work-item: {int(work_item_id)}",
+                f"mode: {mode}",
+                f"owner: {owner}",
+                f"expires-at: {expires_text}",
+            )
+        )
+
+    @staticmethod
+    def _parse_lifecycle_lock_message(
+        work_item_id: str,
+        message: str,
+    ) -> tuple[str, str, datetime | None]:
+        fields: dict[str, str] = {}
+        lines = message.splitlines()
+        if not lines or lines[0] != LIFECYCLE_LOCK_HEADER:
+            raise WorkItemLifecycleError("Lifecycle lock ref contains an unknown commit format.")
+        for line in lines[1:]:
+            key, separator, value = line.partition(": ")
+            if separator:
+                fields[key] = value
+        if fields.get("work-item") != str(int(work_item_id)):
+            raise WorkItemLifecycleError("Lifecycle lock ref belongs to another work item.")
+        mode = fields.get("mode")
+        owner = fields.get("owner")
+        expires_text = fields.get("expires-at")
+        if mode not in {"held", "free"} or not isinstance(owner, str):
+            raise WorkItemLifecycleError("Lifecycle lock ref contains invalid lock metadata.")
+        if not UUID_RE.fullmatch(owner):
+            raise WorkItemLifecycleError("Lifecycle lock owner must be a UUID.")
+        if mode == "free":
+            if expires_text != "-":
+                raise WorkItemLifecycleError("Free lifecycle lock must not contain an expiry.")
+            return mode, owner, None
+        if not expires_text or expires_text == "-":
+            raise WorkItemLifecycleError("Held lifecycle lock must contain an expiry.")
+        try:
+            expires_at = datetime.fromisoformat(expires_text.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise WorkItemLifecycleError("Lifecycle lock expiry is malformed.") from exc
+        if expires_at.tzinfo is None:
+            raise WorkItemLifecycleError("Lifecycle lock expiry must include a timezone.")
+        return mode, owner, expires_at.astimezone(timezone.utc)
+
+    def _create_lifecycle_lock_commit(
+        self,
+        parent_sha: str,
+        *,
+        work_item_id: str,
+        mode: str,
+        owner: str,
+        expires_at: datetime | None,
+    ) -> str:
+        tree_sha = self._get_commit_tree_sha(parent_sha)
+        status, data = self._request(
+            "POST",
+            f"/repos/{self.repository}/git/commits",
+            {
+                "message": self._render_lifecycle_lock_message(
+                    work_item_id,
+                    mode=mode,
+                    owner=owner,
+                    expires_at=expires_at,
+                ),
+                "tree": tree_sha,
+                "parents": [parent_sha],
+            },
+        )
+        if status != 201 or not isinstance(data, Mapping):
+            raise WorkItemLifecycleError(
+                f"Unable to create lifecycle lock commit; HTTP {status}."
+            )
+        sha = data.get("sha")
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", sha):
+            raise WorkItemLifecycleError("Lifecycle lock commit did not return a valid SHA.")
+        return sha
+
+    def _read_lifecycle_lock(
+        self,
+        work_item_id: str,
+    ) -> tuple[str, str, str, datetime | None] | None:
+        status, data = self._request("GET", self._lifecycle_lock_ref_path(work_item_id))
+        if status == 404:
+            return None
+        if status != 200 or not isinstance(data, Mapping):
+            raise WorkItemLifecycleError(
+                f"Unable to inspect lifecycle lock for #{work_item_id}; HTTP {status}."
+            )
+        obj = data.get("object")
+        if not isinstance(obj, Mapping) or not isinstance(obj.get("sha"), str):
+            raise WorkItemLifecycleError("Lifecycle lock ref did not contain an object SHA.")
+        ref_sha = obj["sha"]
+        status, commit = self._request(
+            "GET",
+            f"/repos/{self.repository}/git/commits/{ref_sha}",
+        )
+        if status != 200 or not isinstance(commit, Mapping):
+            raise WorkItemLifecycleError(
+                f"Unable to read lifecycle lock commit {ref_sha}; HTTP {status}."
+            )
+        message = commit.get("message")
+        if not isinstance(message, str):
+            raise WorkItemLifecycleError("Lifecycle lock commit did not contain a message.")
+        mode, owner, expires_at = self._parse_lifecycle_lock_message(work_item_id, message)
+        return ref_sha, mode, owner, expires_at
+
+    def _acquire_lifecycle_lock(self, work_item_id: str) -> _LifecycleLock:
+        ref_name = self._lifecycle_lock_ref_name(work_item_id)
+        ref_path = self._lifecycle_lock_ref_path(work_item_id)
+        owner = str(uuid.uuid4())
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=self._lock_lease_seconds)
+
+        for _ in range(4):
+            current = self._read_lifecycle_lock(work_item_id)
+            if current is None:
+                integration_sha = self._get_ref_sha(
+                    f"/repos/{self.repository}/git/ref/heads/ai/integration"
+                )
+                lock_sha = self._create_lifecycle_lock_commit(
+                    integration_sha,
+                    work_item_id=work_item_id,
+                    mode="held",
+                    owner=owner,
+                    expires_at=expires_at,
+                )
+                status, _ = self._request(
+                    "POST",
+                    f"/repos/{self.repository}/git/refs",
+                    {"ref": ref_name, "sha": lock_sha},
+                )
+                if status == 201:
+                    return _LifecycleLock(work_item_id, owner, lock_sha)
+                if status != 409:
+                    raise WorkItemLifecycleError(
+                        f"Unable to create lifecycle lock ref; HTTP {status}."
+                    )
+                continue
+
+            current_sha, mode, current_owner, current_expiry = current
+            if mode == "held":
+                if current_expiry is None:
+                    raise WorkItemLifecycleError("Held lifecycle lock has no expiry.")
+                if current_expiry > datetime.now(timezone.utc):
+                    raise WorkItemLifecycleError(
+                        f"Lifecycle lock for #{work_item_id} is held by {current_owner} "
+                        f"until {current_expiry.isoformat()}."
+                    )
+
+            new_sha = self._create_lifecycle_lock_commit(
+                current_sha,
+                work_item_id=work_item_id,
+                mode="held",
+                owner=owner,
+                expires_at=expires_at,
+            )
+            status, _ = self._request(
+                "PATCH",
+                ref_path,
+                {"sha": new_sha, "force": False},
+            )
+            if status == 200:
+                return _LifecycleLock(work_item_id, owner, new_sha)
+            if status != 409:
+                raise WorkItemLifecycleError(
+                    f"Unable to acquire lifecycle lock for #{work_item_id}; HTTP {status}."
+                )
+
+        raise WorkItemLifecycleError(
+            f"Lifecycle lock for #{work_item_id} changed concurrently; refusing to overwrite."
+        )
+
+    def _release_lifecycle_lock(self, lock: _LifecycleLock) -> None:
+        current = self._read_lifecycle_lock(lock.work_item_id)
+        if current is None or current[0] != lock.ref_sha:
+            raise WorkItemLifecycleError(
+                f"Lifecycle lock for #{lock.work_item_id} was lost before release."
+            )
+        _, mode, owner, _ = current
+        if mode != "held" or owner != lock.owner:
+            raise WorkItemLifecycleError(
+                f"Lifecycle lock for #{lock.work_item_id} is owned by another writer."
+            )
+        free_sha = self._create_lifecycle_lock_commit(
+            lock.ref_sha,
+            work_item_id=lock.work_item_id,
+            mode="free",
+            owner=lock.owner,
+            expires_at=None,
+        )
+        status, _ = self._request(
+            "PATCH",
+            self._lifecycle_lock_ref_path(lock.work_item_id),
+            {"sha": free_sha, "force": False},
+        )
+        if status != 200:
+            raise WorkItemLifecycleError(
+                f"Lifecycle lock for #{lock.work_item_id} changed before release; "
+                "refusing to overwrite another writer's lock."
+            )
 
     def get(self, work_item_id: str) -> WorkItem:
         try:
