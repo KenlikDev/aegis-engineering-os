@@ -3,6 +3,9 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- prevent quality-gate commands from inheriting common credential-like environment variables;
+- enforce loopback-only OpenHands Agent Server URLs in runtime preflight;
+- add mandatory instruction-refresh checkpoints for long-running AI sessions;
 - harden security review to fail closed on dynamic subprocess shell settings and unrelated HTTP request sinks;
 - harden canonical integration-merge evidence to require the complete verified producer contract and preserve missing validation as explicit uncertainty;
 - bind prepared promotion pull requests to the exact promotion snapshot head SHA;
