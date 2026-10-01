@@ -27,7 +27,7 @@ Project-specific verification is declared in `.aegis/quality-gates.json`. Aegis 
 
 Each gate has a stable id, an argv command array, a project-relative working directory, a timeout, and a required flag. At least one gate must be required. Commands are executed directly without a shell, in manifest order.
 
-The runner records exit status, timeout state, duration, and bounded redacted stdout/stderr. Secret-like environment variables may be inherited from the process environment, but their values are never written to evidence. Manifest-defined secret-like environment variable names are rejected.
+The runner records exit status, timeout state, duration, and bounded redacted stdout/stderr. Common credential-like environment variables are removed from the inherited gate environment before execution; manifest-defined credential-like environment variable names are also rejected. The runner does not claim that this covers secrets stored under arbitrary innocuous variable names.
 
 The runner can synchronize an explicit work item:
 
