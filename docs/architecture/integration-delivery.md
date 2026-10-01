@@ -23,8 +23,8 @@ review
 -> squash merge with the exact validated SHA
 -> verify merged PR and merge commit
 -> require successful Aegis Validation for the exact merge commit SHA
--> compare `ai/integration` against the merge commit and require `identical`
--> re-read `ai/integration` and require its SHA to equal the merge commit
+-> verify the merge commit is contained in the current `ai/integration` history
+-> re-read `ai/integration` and record its current SHA separately
 -> advance work item review -> integration
 
 ## Race safety
@@ -76,7 +76,7 @@ No exact-head validation SHA for an open PR:
 - do not merge;
 - leave the work item in review.
 
-Post-merge comparison is not `identical`:
+Post-merge ancestry cannot be verified:
 - do not advance the work item lifecycle;
 - do not report integration as verified.
 
@@ -90,6 +90,7 @@ PR is draft, not clean, or targets the wrong branch:
 
 Successful verified merge:
 - require post-merge Aegis Validation for the exact merge commit SHA;
+- verify the merge commit is contained in the current `ai/integration` history;
 - verify traceability mutation evidence;
 - verify lifecycle transition mutation evidence;
 - attach traceability;
