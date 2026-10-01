@@ -7,6 +7,18 @@ This file is generated for a project using Aegis Engineering OS.
 - Communicate with the project owner in Russian.
 - Keep code, comments, commits, pull requests, ADRs, and canonical technical documentation in English.
 
+## Instruction refresh checkpoints
+
+These instructions are operational controls, not one-time onboarding text. Re-read the authoritative Aegis instructions at these checkpoints:
+
+- at session start and before the first repository mutation;
+- after every three substantial engineering phases or after context compaction/interruption;
+- whenever the task, branch, provider, work-item kind, or decision authority changes;
+- immediately before pull-request creation or merge;
+- immediately before protected-branch promotion or task completion.
+
+At minimum, refresh this file, the active Aegis orchestrator/constitution instructions, and the skills governing the current operation. If instructions changed, stop using the previous interpretation and re-evaluate the affected state before proceeding.
+
 ## Aegis
 
 Record the active Aegis version, source commit, installed skills, and their checksums in .aegis/aegis-version.json.
