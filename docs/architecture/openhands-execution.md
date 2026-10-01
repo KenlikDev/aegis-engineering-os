@@ -35,8 +35,6 @@ Every OpenHands JSON response is bounded to 1 MiB and parsed through the shared 
 
 Event history retrieval is additionally bounded to 100 pages and 10,000 accumulated events. A history that exceeds either boundary is rejected rather than being returned as incomplete execution evidence.
 
-Event history retrieval is additionally bounded to 100 pages and 10,000 accumulated events. A history that exceeds either boundary is rejected rather than being returned as incomplete execution evidence.
-
 Every OpenHands JSON response is bounded to 1 MiB before JSON parsing. A larger body is rejected as a transport/resource error rather than being loaded into memory as an unbounded Python object.
 
 ## State handling
