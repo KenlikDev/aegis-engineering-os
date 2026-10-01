@@ -28,13 +28,14 @@ Complete the autonomous task delivery boundary by merging a verified task pull r
 7. Read the pull request again.
 8. Require the pull request to be closed and actually merged.
 9. Require a merge commit SHA.
-10. Verify the merge commit is contained in ai/integration.
-11. Attach safe merge evidence to the work item.
-12. Advance review -> integration with optimistic lifecycle state.
+10. Require successful Aegis Validation for the exact merge commit SHA.
+11. Verify the merge commit is contained in the current ai/integration history.
+12. Attach safe merge evidence to the work item.
+13. Advance review -> integration only after the post-merge validation and ancestry checks pass.
 
 ## Idempotency
 
-An already merged pull request is not merged again. The synchronizer verifies its merge commit and completes the lifecycle transition.
+An already merged pull request is not merged again. The synchronizer still requires successful validation for its exact merge commit and verifies that commit remains in ai/integration history before completing the lifecycle transition.
 
 ## Safety rules
 
