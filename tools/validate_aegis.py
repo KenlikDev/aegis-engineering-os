@@ -29,6 +29,32 @@ def load_metadata(path: Path) -> dict:
         fail(f"Unable to read {path}: {exc}")
 
 
+def validate_pull_request_template(path: Path) -> None:
+    """Validate the repository PR template as part of the structural policy."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        fail(f"{path}: unable to read pull-request template: {exc}")
+
+    required_markers = (
+        "## Work item",
+        "Issue: #",
+        "## Validation",
+        "## Verification evidence",
+        "exact validated commit SHA",
+        "## Risks",
+        "professional English",
+    )
+    missing = [marker for marker in required_markers if marker not in text]
+    if missing:
+        fail(
+            f"{path}: missing required pull-request template markers: "
+            + ", ".join(missing)
+        )
+    if re.search(r"\b(?:in Russian|по-русски|на русском)\b", text, re.IGNORECASE):
+        fail(f"{path}: pull-request template must not require Russian PR content.")
+
+
 def validate_skill(path: Path, seen_names: dict[str, str]) -> None:
     text = path.read_text(encoding="utf-8")
 
@@ -71,6 +97,10 @@ def main() -> int:
         fail("aegis-manifest.json is missing.")
     if not registry_file.is_file():
         fail("skills/registry.json is missing.")
+    pull_request_template = ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
+    if not pull_request_template.is_file():
+        fail(".github/PULL_REQUEST_TEMPLATE.md is missing.")
+    validate_pull_request_template(pull_request_template)
 
     version = version_file.read_text(encoding="utf-8").strip()
     if not VERSION_PATTERN.fullmatch(version):
