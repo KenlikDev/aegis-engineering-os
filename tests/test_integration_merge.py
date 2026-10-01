@@ -84,6 +84,7 @@ class FakeIntegrationProvider:
         )
         self.exact_merge = exact_merge
         self.post_merge_sha = post_merge_sha
+        self.contains_merge = post_merge_sha == MERGE_SHA
         self.merge_calls = []
 
     def get_pull_request(self, number):
@@ -105,6 +106,10 @@ class FakeIntegrationProvider:
     def target_matches_commit(self, target_branch, commit_sha):
         self.merge_calls.append(("exact", target_branch, commit_sha))
         return self.exact_merge
+
+    def target_contains_commit(self, target_branch, commit_sha):
+        self.merge_calls.append(("contains", target_branch, commit_sha))
+        return self.contains_merge
 
     def merge_pull_request(self, number, expected_head_sha):
         self.merge_calls.append(("merge", number, expected_head_sha))
@@ -543,13 +548,29 @@ class IntegrationMergeTests(unittest.TestCase):
         self.assertEqual(LifecycleState.REVIEW, items.get("75").state)
         self.assertEqual([], provider.merge_calls)
 
-    def test_rejects_integration_branch_advanced_after_exact_compare(self):
+    def test_allows_integration_branch_advance_after_merge_commit_validation(self):
         provider = FakeIntegrationProvider(post_merge_sha=ADVANCED_SHA)
+        provider.contains_merge = True
+        items = work_items()
+
+        result = self.sync(
+            provider,
+            items,
+            expected_head_sha=HEAD_SHA,
+        )
+
+        self.assertEqual("verified", result["status"])
+        self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
+        self.assertEqual(ADVANCED_SHA, result["integration"]["sha"])
+
+    def test_rejects_integration_branch_without_merge_commit_ancestry(self):
+        provider = FakeIntegrationProvider(post_merge_sha=ADVANCED_SHA)
+        provider.contains_merge = False
         items = work_items()
 
         with self.assertRaisesRegex(
             IntegrationMergeError,
-            "advanced after exact merge verification",
+            "does not contain integration merge commit",
         ):
             self.sync(
                 provider,
