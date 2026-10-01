@@ -43,6 +43,9 @@ PROMOTION_BRANCH_RE = re.compile(
 VERIFIED_SOURCE_RE = re.compile(
     r"(?m)^- Verified source SHA: (?P<sha>[0-9a-f]{40})$"
 )
+VERIFIED_WORK_ITEM_RE = re.compile(
+    r"(?m)^- Work item: #(?P<id>[1-9][0-9]*)$"
+)
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HTTPS_URL_RE = re.compile(r"^https://[^\s]+$")
 
@@ -68,6 +71,7 @@ class PromotionPullRequest:
     base_repository: str | None = None
     body: str = ""
     verified_source_sha: str | None = None
+    verified_work_item_id: str | None = None
 
 
 class PromotionSyncProvider(Protocol):
@@ -225,6 +229,12 @@ class GitHubPromotionSyncProvider:
             if verified_source_match is not None
             else None
         )
+        verified_work_item_match = VERIFIED_WORK_ITEM_RE.search(body)
+        verified_work_item_id = (
+            verified_work_item_match.group("id")
+            if verified_work_item_match is not None
+            else None
+        )
 
         return PromotionPullRequest(
             number=number,
@@ -244,6 +254,7 @@ class GitHubPromotionSyncProvider:
             base_repository=base_repository,
             body=body,
             verified_source_sha=verified_source_sha,
+            verified_work_item_id=verified_work_item_id,
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
@@ -352,6 +363,10 @@ def sync_promotion_merge(
         if pull_request.verified_source_sha != pull_request.head_sha:
             raise PromotionSyncError(
                 "Develop promotion pull request head SHA does not match its owner-verification source SHA."
+            )
+        if pull_request.verified_work_item_id != work_item_id:
+            raise PromotionSyncError(
+                "Develop promotion pull request does not identify the synchronized work item."
             )
     if (
         pull_request.head_repository != provider.repository
