@@ -7,7 +7,11 @@ import re
 import sys
 from pathlib import Path
 
-from evidence_contract import EvidenceContractError, load_json_object
+from evidence_contract import (
+    EvidenceContractError,
+    load_json_object,
+    read_bytes_no_follow,
+)
 from validate_ai_config import load_registry, validate_profile_config
 
 
@@ -21,6 +25,25 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def read_text_no_follow(path: Path, label: str) -> str:
+    """Read repository text without following symlinked path components."""
+    try:
+        return read_bytes_no_follow(
+            path,
+            error_type=EvidenceContractError,
+        ).decode("utf-8")
+    except (EvidenceContractError, OSError, UnicodeDecodeError) as exc:
+        fail(f"{label}: unable to read securely: {exc}")
+
+
+def require_regular_file(path: Path, label: str) -> None:
+    """Reject missing or symlinked repository files before they are consumed."""
+    if path.is_symlink():
+        fail(f"{label} must not be a symbolic link: {path}")
+    if not path.is_file():
+        fail(f"{label} is missing: {path}")
+
+
 def load_metadata(path: Path) -> dict:
     """Load repository metadata through the shared strict JSON contract."""
     try:
@@ -31,10 +54,7 @@ def load_metadata(path: Path) -> dict:
 
 def validate_pull_request_template(path: Path) -> None:
     """Validate the repository PR template as part of the structural policy."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        fail(f"{path}: unable to read pull-request template: {exc}")
+    text = read_text_no_follow(path, f"{path}: pull-request template")
 
     required_markers = (
         "## Work item",
@@ -56,7 +76,7 @@ def validate_pull_request_template(path: Path) -> None:
 
 
 def validate_skill(path: Path, seen_names: dict[str, str]) -> None:
-    text = path.read_text(encoding="utf-8")
+    text = read_text_no_follow(path, f"Skill {path}")
 
     if not text.startswith("---\n"):
         fail(f"{path}: missing Agent Skills front matter.")
@@ -91,18 +111,17 @@ def main() -> int:
     manifest_file = ROOT / "aegis-manifest.json"
     registry_file = ROOT / "skills" / "registry.json"
 
-    if not version_file.is_file():
-        fail("VERSION file is missing.")
-    if not manifest_file.is_file():
-        fail("aegis-manifest.json is missing.")
-    if not registry_file.is_file():
-        fail("skills/registry.json is missing.")
+    require_regular_file(version_file, "VERSION file")
+    require_regular_file(manifest_file, "Aegis manifest")
+    require_regular_file(registry_file, "Aegis skill registry")
     pull_request_template = ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
-    if not pull_request_template.is_file():
-        fail(".github/PULL_REQUEST_TEMPLATE.md is missing.")
+    require_regular_file(
+        pull_request_template,
+        "Pull-request template",
+    )
     validate_pull_request_template(pull_request_template)
 
-    version = version_file.read_text(encoding="utf-8").strip()
+    version = read_text_no_follow(version_file, "VERSION file").strip()
     if not VERSION_PATTERN.fullmatch(version):
         fail(f"Unsupported experimental version format: {version!r}")
 
@@ -241,12 +260,19 @@ def main() -> int:
         "skills/registry.json",
     ]
 
-    missing = [path for path in required if not (ROOT / path).is_file()]
-    if missing:
-        fail("Missing required files: " + ", ".join(missing))
+    for relative_path in required:
+        require_regular_file(
+            ROOT / relative_path,
+            f"Required repository file {relative_path}",
+        )
+
+    skills_root = ROOT / "skills"
+    for entry in skills_root.rglob("*"):
+        if entry.is_symlink():
+            fail(f"Skills tree must not contain symbolic links: {entry}")
 
     discovered: dict[str, str] = {}
-    for skill in sorted((ROOT / "skills").rglob("SKILL.md")):
+    for skill in sorted(skills_root.rglob("SKILL.md")):
         validate_skill(skill, discovered)
 
     registry_names: set[str] = set()
