@@ -251,6 +251,50 @@ class QualityGateTests(unittest.TestCase):
                 [result.status for result in evidence.gates],
             )
 
+    def test_gate_environment_excludes_inherited_credential_like_variables(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            gate = load_quality_gates(
+                self._write_manifest(
+                    root,
+                    [
+                        {
+                            "id": "environment",
+                            "command": ["echo", "ok"],
+                            "required": True,
+                            "environment": {"SAFE_GATE_FLAG": "enabled"},
+                        }
+                    ],
+                )
+            )[0]
+
+            captured: dict[str, str] = {}
+
+            def runner(command, **kwargs):  # noqa: ANN001, ANN003
+                captured.update(kwargs["env"])
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+            with patch.dict(
+                "quality_gates.os.environ",
+                {
+                    "GITHUB_TOKEN": "ghs_secret",
+                    "NPM_TOKEN": "npm_secret",
+                    "AWS_SECRET_ACCESS_KEY": "aws_secret",
+                    "NPM_CONFIG__AUTH": "npm-auth-secret",
+                    "SAFE_PARENT_FLAG": "present",
+                },
+                clear=True,
+            ):
+                result = run_gate(root, gate, run_command=runner)
+
+            self.assertEqual("passed", result.status)
+            self.assertNotIn("GITHUB_TOKEN", captured)
+            self.assertNotIn("NPM_TOKEN", captured)
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", captured)
+            self.assertNotIn("NPM_CONFIG__AUTH", captured)
+            self.assertEqual("present", captured["SAFE_PARENT_FLAG"])
+            self.assertEqual("enabled", captured["SAFE_GATE_FLAG"])
+
     def test_output_and_environment_values_are_redacted(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
