@@ -127,6 +127,9 @@ class FakeMergeProvider:
     def target_matches_commit(self, branch, sha):
         return sha == MERGE and branch == "ai/integration"
 
+    def target_contains_commit(self, branch, sha):
+        return sha == MERGE and branch == "ai/integration"
+
     def merge_pull_request(self, number, expected_head_sha):
         self.merge_calls.append((number, expected_head_sha))
         self.pull_request = IntegrationPullRequest(
