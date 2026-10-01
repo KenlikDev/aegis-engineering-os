@@ -3,6 +3,8 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- require successful Aegis Validation for the exact integration merge commit before advancing work items to integration;
+- preserve separate task-head and post-merge validation provenance in integration evidence;
 - prevent quality-gate commands from inheriting common credential-like environment variables;
 - enforce loopback-only OpenHands Agent Server URLs in runtime preflight;
 - add mandatory instruction-refresh checkpoints for long-running AI sessions;
