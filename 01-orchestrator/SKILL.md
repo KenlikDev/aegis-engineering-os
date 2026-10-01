@@ -65,7 +65,7 @@ Before acting on any state-dependent claim, classify it as user intent, user cla
 
 Invoke state-verification when the task depends on current external or repository state.
 
-Load only the skills required by the task:
+Refresh authoritative instructions before mutation and at each instruction-refresh checkpoint defined by the repository. At minimum, re-read AGENTS.md, the constitution, this orchestrator skill, and every currently active project/workflow instruction. Do not continue from a stale context after compaction, interruption, task/provider/branch changes, or before a merge/promotion/completion mutation.
 
 Load only the skills required by the task:
 - role skills;

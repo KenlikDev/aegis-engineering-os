@@ -86,6 +86,18 @@ Ask the user when a decision has material product, business, security, privacy, 
 - For long-running work, a clean recovery checkpoint may be pushed when it reduces the risk of losing work.
 - Never force-push develop or main.
 
+## Instruction refresh checkpoints
+
+Instruction files are operational controls, not one-time onboarding text. Re-read the authoritative instructions at these checkpoints:
+
+- at session start and before the first repository mutation;
+- after every three substantial engineering phases or whenever context has been compacted or interrupted;
+- whenever the task, branch, provider, work-item kind, or decision authority changes;
+- immediately before creating or merging a pull request;
+- immediately before any protected-branch promotion or task completion.
+
+At minimum, refresh AGENTS.md, 00-constitution/core-principles.md, 01-orchestrator/SKILL.md, and the active project/workflow instructions. Re-run the relevant state and policy checks when refreshed instructions can change the decision. If an instruction file changed during the session, treat the new content as authoritative and re-evaluate the plan before continuing.
+
 ## Knowledge safety
 
 New or modified global knowledge follows this lifecycle:

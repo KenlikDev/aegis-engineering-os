@@ -41,7 +41,7 @@ Only a verified merged PR advances \`review -> integration\`.
 
 ## Full repository audit protocol
 
-For a fresh-review audit, assume existing code may be wrong even when CI is green. Inspect the complete repository tree and inventory executable files, configuration, skills, tests, workflows, templates, and architecture documents.
+For a fresh-review audit, assume existing code may be wrong even when CI is green. Re-read the authoritative instruction set at the final review checkpoint before evaluating merge readiness. Inspect the complete repository tree and inventory executable files, configuration, skills, tests, workflows, templates, and architecture documents.
 
 For every material workflow boundary, trace input validation through mutation, read-after-write verification, returned status, canonical evidence, and downstream consumers. Search for places where `verified`, `ready`, `passed`, `completed`, `active`, or `authorized` are assigned without a directly corresponding proof condition. Verify that `unknown`, `pending`, `blocked`, and `failed` remain distinguishable.
 

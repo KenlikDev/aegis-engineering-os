@@ -111,6 +111,20 @@ def _validate_task_branch(branch: str) -> str:
     return branch
 
 
+def _validate_task_branch_for_work_item(branch: str, work_item_id: str) -> str:
+    if not re.fullmatch(r"[1-9][0-9]*", work_item_id):
+        raise DeliveryError("Work-item id must be a positive integer.")
+    branch = _validate_task_branch(branch)
+    expected_pattern = re.compile(
+        rf"^ai/(feature|fix|refactor|chore)/{re.escape(work_item_id)}-[A-Za-z0-9._-]+$"
+    )
+    if not expected_pattern.fullmatch(branch):
+        raise DeliveryError(
+            "Pull-request head must be the Aegis task branch for this work item."
+        )
+    return branch
+
+
 def _validate_base_branch(branch: str) -> str:
     if not branch or not BRANCH_RE.fullmatch(branch):
         raise DeliveryError("Pull-request base branch is invalid.")
@@ -398,6 +412,7 @@ def create_review_pull_request(
 ) -> dict[str, Any]:
     """Create or reuse a PR only for a work item already in review."""
     _validate_request(request)
+    _validate_task_branch_for_work_item(request.head, work_item_id)
     item = work_item_provider.get(work_item_id)
     if item.state != LifecycleState.REVIEW:
         raise DeliveryError(
@@ -462,7 +477,7 @@ def sync_merged_pull_request(
 ) -> dict[str, Any]:
     """Advance review to integration only after a verified merge into the target."""
     _validate_base_branch(integration_branch)
-    _validate_task_branch(expected_head)
+    _validate_task_branch_for_work_item(expected_head, work_item_id)
     item = work_item_provider.get(work_item_id)
     if item.state != LifecycleState.REVIEW:
         raise DeliveryError(

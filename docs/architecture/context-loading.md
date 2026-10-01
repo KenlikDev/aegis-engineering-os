@@ -22,6 +22,17 @@ The readiness gate is evaluated after workflow composition and before managed ex
 
 Load only the roles, technology skills, workflows, and quality/security guidance relevant to the current task.
 
+## Instruction refresh
+
+Authoritative instructions are refreshed at explicit checkpoints rather than assumed to remain valid for the entire session:
+
+1. session start and before the first repository mutation;
+2. after every three substantial engineering phases or after context compaction/interruption;
+3. when task scope, branch, provider, work-item kind, or decision authority changes;
+4. immediately before pull-request creation/merge, protected promotion, and completion.
+
+The minimum refresh set is AGENTS.md, 00-constitution/core-principles.md, 01-orchestrator/SKILL.md, active project instructions, and the skills governing the current operation. A refresh that changes a constraint invalidates the previous plan until the affected state is re-evaluated.
+
 ## Deep references
 
 Load detailed references only when the active skill requires them.

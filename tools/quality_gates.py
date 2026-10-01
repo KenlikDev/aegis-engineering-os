@@ -33,7 +33,8 @@ MAX_OUTPUT_CHARS = 32768
 GATE_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 ENV_KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 SENSITIVE_ENV_KEY_RE = re.compile(
-    r"(?:TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|ACCESS_KEY|CREDENTIAL)",
+    r"(?:TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|ACCESS_KEY|CREDENTIAL|"
+    r"AUTHORIZATION|(?:^|_)AUTH(?:_|$)|COOKIE)",
     re.IGNORECASE,
 )
 SENSITIVE_OUTPUT_RE = re.compile(
@@ -252,7 +253,12 @@ def _secret_values_from_environment(environment: Mapping[str, str]) -> tuple[str
 
 
 def _gate_environment(gate: QualityGate) -> tuple[dict[str, str], tuple[str, ...]]:
-    environment = os.environ.copy()
+    """Build a gate environment without inheriting common credential-like variables."""
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not SENSITIVE_ENV_KEY_RE.search(key)
+    }
     environment.update(gate.environment)
     return environment, _secret_values_from_environment(environment)
 
