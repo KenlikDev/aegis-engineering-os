@@ -265,6 +265,45 @@ class VersionVerificationTests(unittest.TestCase):
             ),
         )
 
+    def test_version_source_symlink_is_rejected(self) -> None:
+        import os
+        if os.name != "posix":
+            self.skipTest("secure no-follow reads are only available on POSIX.")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root.parent / f"{root.name}-outside.txt"
+            outside.write_text("tool 1.2.3\n", encoding="utf-8")
+            source = root / "source.txt"
+            try:
+                source.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"symbolic links unavailable: {exc}")
+
+            claims = root / "claims.json"
+            claims.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "claims": [
+                            {
+                                "component": "tool",
+                                "version": "1.2.3",
+                                "scope": "toolchain",
+                                "source": "source.txt",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                VersionVerificationError,
+                "securely open atomic copy source",
+            ):
+                record_version_evidence(root, claims, root / "evidence.json")
+            outside.unlink(missing_ok=True)
+
     def test_record_refuses_to_overwrite_input_or_source(self):
         root, claims = self._project()
         with self.assertRaisesRegex(VersionVerificationError, "differ"):
