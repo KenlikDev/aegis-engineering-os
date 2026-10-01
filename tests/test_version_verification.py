@@ -79,19 +79,15 @@ class VersionVerificationTests(unittest.TestCase):
         import version_verification as module
 
         with patch.object(
-            Path,
-            "read_bytes",
+            module,
+            "read_bytes_no_follow",
             return_value=snapshot,
-        ) as read_bytes, patch.object(
-            Path,
-            "read_text",
-            side_effect=AssertionError("source must be read once as bytes"),
-        ):
+        ) as read_bytes_no_follow:
             digest, content = module._sha256_and_text(source)
 
         self.assertEqual(hashlib.sha256(snapshot).hexdigest(), digest)
         self.assertEqual(snapshot.decode("utf-8"), content)
-        read_bytes.assert_called_once_with()
+        read_bytes_no_follow.assert_called_once()
     def test_record_rejects_duplicate_json_keys(self):
         root, claims = self._project()
         claims.write_text(
