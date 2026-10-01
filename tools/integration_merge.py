@@ -595,6 +595,7 @@ def sync_integration_merge(
             "branch": integration.branch,
             "sha": integration.sha,
             "protected": integration.protected,
+            "contains_merge_commit": True,
         },
         "traceability_verified": trace.verified,
         "work_item": {
