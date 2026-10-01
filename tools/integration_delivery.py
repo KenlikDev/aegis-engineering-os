@@ -61,6 +61,8 @@ class IntegrationDeliveryRequest:
     body: str
     workflow: str = DEFAULT_WORKFLOW
     draft: bool = False
+    post_merge_validation_timeout_seconds: float = 600.0
+    post_merge_validation_poll_interval_seconds: float = 2.0
 
 
 def deliver_to_integration(
@@ -145,6 +147,10 @@ def deliver_to_integration(
                 work_item_provider,
                 request.work_item_id,
                 pull_request_number,
+                validation_provider=validation_provider,
+                validation_workflow=request.workflow,
+                post_merge_validation_timeout_seconds=request.post_merge_validation_timeout_seconds,
+                post_merge_validation_poll_interval_seconds=request.post_merge_validation_poll_interval_seconds,
             )
         except IntegrationMergeError as exc:
             raise IntegrationDeliveryError(
@@ -172,6 +178,8 @@ def deliver_to_integration(
                 request.work_item_id,
                 pull_request_number,
                 expected_head_sha=validation.head_sha,
+                validation_provider=validation_provider,
+                validation_workflow=request.workflow,
             )
         except IntegrationMergeError as exc:
             raise IntegrationDeliveryError(
@@ -194,6 +202,7 @@ def deliver_to_integration(
             if validation
             else None
         ),
+        "post_merge_validation": merge_result.get("post_merge_validation"),
         "integration": merge_result.get("integration"),
         "traceability_verified": merge_result.get("traceability_verified"),
         "work_item": merge_result.get("work_item"),
@@ -210,6 +219,18 @@ def main() -> int:
     parser.add_argument("title")
     parser.add_argument("--body", default="")
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
+    parser.add_argument(
+        "--post-merge-validation-timeout",
+        type=float,
+        default=600.0,
+        help="Maximum seconds to wait for exact merge-commit Aegis Validation.",
+    )
+    parser.add_argument(
+        "--post-merge-validation-poll-interval",
+        type=float,
+        default=2.0,
+        help="Seconds between exact merge-commit validation checks.",
+    )
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     parser.add_argument(
         "--canonical-evidence-output",
@@ -237,6 +258,8 @@ def main() -> int:
                 title=args.title,
                 body=args.body,
                 workflow=args.workflow,
+                post_merge_validation_timeout_seconds=args.post_merge_validation_timeout,
+                post_merge_validation_poll_interval_seconds=args.post_merge_validation_poll_interval,
             ),
         )
     except (
