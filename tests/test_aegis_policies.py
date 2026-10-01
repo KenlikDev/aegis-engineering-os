@@ -82,6 +82,12 @@ class AegisPolicyTests(unittest.TestCase):
                 )
             self.assertFalse((backup_root / "skills" / "aegis-orchestrator").exists())
 
+    def test_pull_request_template_matches_language_and_evidence_contract(self) -> None:
+        import validate_aegis
+
+        template = ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
+        validate_aegis.validate_pull_request_template(template)
+
     def test_bootstrap_registry_paths_stay_inside_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
