@@ -339,6 +339,7 @@ class SecurityReviewTests(unittest.TestCase):
             (tools / "github_adapter.py").write_text(
                 "from urllib.request import Request\n"
                 "from github_http_security import github_api_headers\n"
+                "BASE = 'https://api.github.com'\n"
                 "def send(url):\n"
                 "    headers = github_api_headers()\n"
                 "    return Request(url, headers=dict(headers))\n",
@@ -359,6 +360,7 @@ class SecurityReviewTests(unittest.TestCase):
             (tools / "github_adapter.py").write_text(
                 "from urllib.request import Request\n"
                 "from github_http_security import github_api_headers\n"
+                "BASE = 'https://api.github.com'\n"
                 "def send(url):\n"
                 "    headers = github_api_headers()\n"
                 "    headers = {}\n"
