@@ -433,7 +433,7 @@ class EvidenceAdapterTests(unittest.TestCase):
         self.assertEqual(TARGET_SHA, canonical.revision)
         self.assertIsNone(canonical.result["validation"])
         self.assertEqual(1, len(canonical.uncertainty))
-        self.assertIn("No new validation run", canonical.uncertainty[0])
+        self.assertIn("No pre-merge task-head validation", canonical.uncertainty[0])
 
     def test_integration_delivery_rejects_missing_post_merge_validation(self):
         result = {
@@ -1493,6 +1493,17 @@ class EvidenceAdapterTests(unittest.TestCase):
             "status": "verified",
             "work_item_id": "143",
             "validation_head_sha": SOURCE_SHA,
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 143,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "pull_request": {
                 "number": 143,
                 "url": "https://github.com/example/pull/143",
@@ -1544,6 +1555,17 @@ class EvidenceAdapterTests(unittest.TestCase):
             "status": "verified",
             "work_item_id": "143",
             "validation_head_sha": SOURCE_SHA,
+            "post_merge_validation": {
+                "id": 1501,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": TARGET_SHA,
+                "validated_sha": TARGET_SHA,
+                "evidence_type": "merged-pull-request",
+                "pull_request_number": 143,
+                "url": "https://github.com/kenlikdev/aegis-engineering-os/actions/runs/1501",
+            },
             "pull_request": {
                 "number": 143,
                 "url": "https://github.com/example/pull/143",
