@@ -349,7 +349,7 @@ class IntegrationMergeTests(unittest.TestCase):
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
         self.assertEqual(
-            [("merge", PR_NUMBER, HEAD_SHA), ("exact", "ai/integration", MERGE_SHA)],
+            [("merge", PR_NUMBER, HEAD_SHA), ("contains", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
         self.assertIn(MERGE_SHA, items.comments["75"][0])
@@ -370,7 +370,7 @@ class IntegrationMergeTests(unittest.TestCase):
         self.assertEqual("verified", result["status"])
         self.assertEqual(LifecycleState.INTEGRATION, items.get("75").state)
         self.assertEqual(
-            [("exact", "ai/integration", MERGE_SHA)],
+            [("contains", "ai/integration", MERGE_SHA)],
             provider.merge_calls,
         )
 
@@ -588,12 +588,13 @@ class IntegrationMergeTests(unittest.TestCase):
             self.sync(provider, items)
 
     def test_rejects_merge_commit_not_in_target(self):
-        provider = FakeIntegrationProvider(exact_merge=False)
+        provider = FakeIntegrationProvider()
+        provider.contains_merge = False
         items = work_items()
 
         with self.assertRaisesRegex(
             IntegrationMergeError,
-            "not exactly equal to integration merge commit",
+            "does not contain integration merge commit",
         ):
             self.sync(
                 provider,
@@ -611,6 +612,21 @@ class IntegrationMergeTests(unittest.TestCase):
             self.sync(provider, items)
 
         self.assertEqual([], provider.merge_calls)
+
+    def test_github_provider_accepts_ancestor_compare_result(self):
+        transport = FakeGitHubTransport()
+        transport.comparison = {
+            "status": "behind",
+            "ahead_by": 0,
+            "behind_by": 4,
+        }
+        provider = GitHubIntegrationMergeProvider(
+            REPOSITORY,
+            "secret-token",
+            transport=transport,
+        )
+
+        self.assertTrue(provider.target_contains_commit("ai/integration", MERGE_SHA))
 
     def test_github_provider_rejects_non_identical_compare_result(self):
         transport = FakeGitHubTransport()
@@ -651,7 +667,7 @@ class IntegrationMergeTests(unittest.TestCase):
         )
 
         self.assertTrue(
-            provider.target_matches_commit("ai/integration", MERGE_SHA)
+            provider.target_contains_commit("ai/integration", MERGE_SHA)
         )
 
 
