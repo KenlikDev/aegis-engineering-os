@@ -29,7 +29,7 @@ Promotion branches are owner-controlled delivery mechanisms and are not autonomo
 
 ## Protection intent
 
-develop and main should require pull requests, successful required checks, and human approval according to repository policy.
+develop and main require pull requests and successful required checks under the current live rulesets. The current rulesets require 0 approving reviews, so the human-only promotion rule is enforced by Aegis operating policy rather than a distinct GitHub approval gate. The owner may strengthen the GitHub rulesets when an independent human-review boundary is required.
 
 ai/integration should require successful automated quality gates before changes are accepted. Human approval can remain optional if the owner intentionally chooses that autonomy level.
 
