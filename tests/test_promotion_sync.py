@@ -323,8 +323,9 @@ class PromotionSyncTests(unittest.TestCase):
             merge_commit_sha=MERGE_SHA,
             head_repository=REPOSITORY,
             base_repository=REPOSITORY,
-            body=f"- Verified source SHA: {HEAD_SHA}\n",
+            body=f"- Work item: #1\n- Verified source SHA: {HEAD_SHA}\n",
             verified_source_sha=HEAD_SHA,
+            verified_work_item_id="1",
         )
         provider.target = BranchSnapshot(
             branch="develop",
@@ -365,6 +366,7 @@ class PromotionSyncTests(unittest.TestCase):
             base_repository=REPOSITORY,
             body="owner reviewed this\n",
             verified_source_sha=None,
+            verified_work_item_id=None,
         )
         with self.assertRaisesRegex(
             PromotionSyncError,
