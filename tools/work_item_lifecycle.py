@@ -418,250 +418,6 @@ class GitHubIssuesProvider:
             raise WorkItemLifecycleError("Aegis resume label contains an invalid lifecycle state.")
         return LifecycleState(value)
 
-    def get(self, work_item_id: str) -> WorkItem:
-        status, data = self._request("GET", self._issue_path(work_item_id))
-        if status != 200 or not isinstance(data, Mapping):
-            raise WorkItemLifecycleError(
-                f"Unable to read GitHub issue #{work_item_id}; HTTP {status}."
-            )
-        raw_labels = data.get("labels", [])
-        if not isinstance(raw_labels, list):
-            raise WorkItemLifecycleError("GitHub issue labels response is malformed.")
-        labels = tuple(
-            sorted(
-                label.get("name")
-                for label in raw_labels
-                if isinstance(label, Mapping) and isinstance(label.get("name"), str)
-            )
-        )
-        state_labels_present = any(
-            STATUS_LABEL_RE.fullmatch(label) for label in labels
-        )
-        if not state_labels_present:
-            if data.get("state") == "closed":
-                raise WorkItemLifecycleError(
-                    "GitHub issue is closed without an Aegis status label; "
-                    "refusing to infer lifecycle completion."
-                )
-            state = LifecycleState.INTAKE
-        else:
-            state = self._extract_state(list(labels))
-        resume_state = self._extract_resume_state(list(labels), state)
-        if state == LifecycleState.DONE and data.get("state") != "closed":
-            raise WorkItemLifecycleError("Aegis done state requires a closed GitHub issue.")
-        if state != LifecycleState.DONE and data.get("state") != "open":
-            raise WorkItemLifecycleError(
-                "Aegis non-terminal state requires an open GitHub issue."
-            )
-        html_url = data.get("html_url")
-        return WorkItem(
-            id=str(work_item_id),
-            title=str(data.get("title", "")),
-            state=state,
-            provider="github-issues",
-            provider_url=html_url if isinstance(html_url, str) else None,
-            labels=labels,
-            resume_state=resume_state,
-        )
-
-    def _ensure_status_label(self, state: LifecycleState) -> None:
-        label_name = f"{STATUS_LABEL_PREFIX}{state.value}"
-        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
-        status, data = self._request("GET", path)
-        if status == 200:
-            return
-        if status != 404:
-            raise WorkItemLifecycleError(
-                f"Unable to inspect Aegis status label {label_name!r}; HTTP {status}."
-            )
-        create_path = f"/repos/{self.repository}/labels"
-        status, data = self._request(
-            "POST",
-            create_path,
-            {
-                "name": label_name,
-                "description": f"Aegis lifecycle state: {state.value}.",
-                "color": "6f42c1",
-            },
-        )
-        if status not in {200, 201}:
-            raise WorkItemLifecycleError(
-                f"Unable to create Aegis status label {label_name!r}; HTTP {status}."
-            )
-        self._verify_label_exists(label_name)
-
-    def _ensure_resume_label(self, state: LifecycleState) -> None:
-        label_name = f"{RESUME_LABEL_PREFIX}{state.value}"
-        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
-        status, _ = self._request("GET", path)
-        if status == 200:
-            return
-        if status != 404:
-            raise WorkItemLifecycleError(
-                f"Unable to inspect Aegis resume label {label_name!r}; HTTP {status}."
-            )
-        status, _ = self._request(
-            "POST",
-            f"/repos/{self.repository}/labels",
-            {
-                "name": label_name,
-                "description": f"Aegis blocked-work resume target: {state.value}.",
-                "color": "8250df",
-            },
-        )
-        if status not in {200, 201}:
-            raise WorkItemLifecycleError(
-                f"Unable to create Aegis resume label {label_name!r}; HTTP {status}."
-            )
-        self._verify_label_exists(label_name)
-
-    def _verify_label_exists(self, label_name: str) -> None:
-        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
-        status, _ = self._request("GET", path)
-        if status != 200:
-            raise WorkItemLifecycleError(
-                f"GitHub status label {label_name!r} was not readable after mutation."
-            )
-
-    def transition(
-        self,
-        work_item_id: str,
-        target: LifecycleState,
-        *,
-        expected_state: LifecycleState | None = None,
-    ) -> MutationEvidence:
-        current = self.get(work_item_id)
-        if expected_state is not None and current.state != expected_state:
-            raise WorkItemLifecycleError(
-                f"Work item #{work_item_id} state changed concurrently: "
-                f"expected {expected_state.value}, got {current.state.value}."
-            )
-        validate_transition(
-            current.state,
-            target,
-            resume_state=current.resume_state,
-        )
-        self._ensure_status_label(target)
-
-        lock = self._acquire_lifecycle_lock(work_item_id)
-        try:
-            current = self.get(work_item_id)
-            if expected_state is not None and current.state != expected_state:
-                raise WorkItemLifecycleError(
-                    f"Work item #{work_item_id} state changed concurrently: "
-                    f"expected {expected_state.value}, got {current.state.value}."
-                )
-            validate_transition(
-                current.state,
-                target,
-                resume_state=current.resume_state,
-            )
-            if target == LifecycleState.BLOCKED:
-                if current.state not in ACTIVE_STATES:
-                    raise WorkItemLifecycleError(
-                        "Only active work items can enter blocked state."
-                    )
-                self._ensure_resume_label(current.state)
-
-            labels = [
-                label
-                for label in current.labels
-                if not STATUS_LABEL_RE.fullmatch(label)
-                and not RESUME_LABEL_RE.fullmatch(label)
-            ]
-            labels.append(f"{STATUS_LABEL_PREFIX}{target.value}")
-            if target == LifecycleState.BLOCKED:
-                labels.append(f"{RESUME_LABEL_PREFIX}{current.state.value}")
-            payload: dict[str, Any] = {
-                "labels": sorted(labels),
-                "state": "closed" if target == LifecycleState.DONE else "open",
-            }
-            if target == LifecycleState.DONE:
-                payload["state_reason"] = "completed"
-            elif current.state == LifecycleState.DONE:
-                payload["state_reason"] = "reopened"
-
-            status, _ = self._request("PATCH", self._issue_path(work_item_id), payload)
-            if status != 200:
-                raise WorkItemLifecycleError(
-                    f"Unable to transition GitHub issue #{work_item_id}; HTTP {status}."
-                )
-
-            verified = self.get(work_item_id)
-            if verified.state != target:
-                raise WorkItemLifecycleError(
-                    f"GitHub issue #{work_item_id} did not verify as {target.value} after mutation."
-                )
-            evidence = MutationEvidence(
-                provider="github-issues",
-                operation="transition",
-                work_item_id=work_item_id,
-                state_before=current.state.value,
-                state_after=verified.state.value,
-                verified=True,
-                reference=verified.provider_url,
-            )
-        except Exception:
-            self._release_lifecycle_lock(lock)
-            raise
-        self._release_lifecycle_lock(lock)
-        return evidence
-
-    def comment(self, work_item_id: str, body: str) -> MutationEvidence:
-        if not body.strip():
-            raise WorkItemLifecycleError("Work-item comment must not be empty.")
-        if len(body) > 65000:
-            raise WorkItemLifecycleError("Work-item comment is too large.")
-        status, data = self._request(
-            "POST",
-            f"{self._issue_path(work_item_id)}/comments",
-            {"body": body},
-        )
-        if status not in {200, 201} or not isinstance(data, Mapping):
-            raise WorkItemLifecycleError(
-                f"Unable to add GitHub issue comment to #{work_item_id}; HTTP {status}."
-            )
-        comment_id = data.get("id")
-        if not isinstance(comment_id, int):
-            raise WorkItemLifecycleError("GitHub issue comment did not return an ID.")
-
-        verify_status, verify_data = self._request(
-            "GET",
-            f"/repos/{self.repository}/issues/comments/{comment_id}",
-        )
-        if (
-            verify_status != 200
-            or not isinstance(verify_data, Mapping)
-            or verify_data.get("body") != body
-        ):
-            raise WorkItemLifecycleError(
-                f"GitHub issue comment #{comment_id} failed read-after-write verification."
-            )
-
-        return MutationEvidence(
-            provider="github-issues",
-            operation="comment",
-            work_item_id=work_item_id,
-            verified=True,
-            reference=str(data.get("html_url")) if data.get("html_url") else None,
-        )
-
-    def attach_traceability(
-        self,
-        work_item_id: str,
-        traceability: Traceability,
-    ) -> MutationEvidence:
-        body = render_traceability_comment(traceability)
-        return self.comment(work_item_id, body)
-
-
-class InMemoryWorkItemProvider:
-    """Small deterministic provider used for policy and lifecycle tests."""
-
-    def __init__(self, items: Mapping[str, WorkItem]) -> None:
-        self.items = dict(items)
-        self.comments: dict[str, list[str]] = {}
-
     def _lifecycle_lock_ref_name(self, work_item_id: str) -> str:
         if not work_item_id.isdigit():
             raise WorkItemLifecycleError("GitHub work-item ID must be a numeric issue number.")
@@ -914,6 +670,250 @@ class InMemoryWorkItemProvider:
                 f"Lifecycle lock for #{lock.work_item_id} changed before release; "
                 "refusing to overwrite another writer's lock."
             )
+
+    def get(self, work_item_id: str) -> WorkItem:
+        status, data = self._request("GET", self._issue_path(work_item_id))
+        if status != 200 or not isinstance(data, Mapping):
+            raise WorkItemLifecycleError(
+                f"Unable to read GitHub issue #{work_item_id}; HTTP {status}."
+            )
+        raw_labels = data.get("labels", [])
+        if not isinstance(raw_labels, list):
+            raise WorkItemLifecycleError("GitHub issue labels response is malformed.")
+        labels = tuple(
+            sorted(
+                label.get("name")
+                for label in raw_labels
+                if isinstance(label, Mapping) and isinstance(label.get("name"), str)
+            )
+        )
+        state_labels_present = any(
+            STATUS_LABEL_RE.fullmatch(label) for label in labels
+        )
+        if not state_labels_present:
+            if data.get("state") == "closed":
+                raise WorkItemLifecycleError(
+                    "GitHub issue is closed without an Aegis status label; "
+                    "refusing to infer lifecycle completion."
+                )
+            state = LifecycleState.INTAKE
+        else:
+            state = self._extract_state(list(labels))
+        resume_state = self._extract_resume_state(list(labels), state)
+        if state == LifecycleState.DONE and data.get("state") != "closed":
+            raise WorkItemLifecycleError("Aegis done state requires a closed GitHub issue.")
+        if state != LifecycleState.DONE and data.get("state") != "open":
+            raise WorkItemLifecycleError(
+                "Aegis non-terminal state requires an open GitHub issue."
+            )
+        html_url = data.get("html_url")
+        return WorkItem(
+            id=str(work_item_id),
+            title=str(data.get("title", "")),
+            state=state,
+            provider="github-issues",
+            provider_url=html_url if isinstance(html_url, str) else None,
+            labels=labels,
+            resume_state=resume_state,
+        )
+
+    def _ensure_status_label(self, state: LifecycleState) -> None:
+        label_name = f"{STATUS_LABEL_PREFIX}{state.value}"
+        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
+        status, data = self._request("GET", path)
+        if status == 200:
+            return
+        if status != 404:
+            raise WorkItemLifecycleError(
+                f"Unable to inspect Aegis status label {label_name!r}; HTTP {status}."
+            )
+        create_path = f"/repos/{self.repository}/labels"
+        status, data = self._request(
+            "POST",
+            create_path,
+            {
+                "name": label_name,
+                "description": f"Aegis lifecycle state: {state.value}.",
+                "color": "6f42c1",
+            },
+        )
+        if status not in {200, 201}:
+            raise WorkItemLifecycleError(
+                f"Unable to create Aegis status label {label_name!r}; HTTP {status}."
+            )
+        self._verify_label_exists(label_name)
+
+    def _ensure_resume_label(self, state: LifecycleState) -> None:
+        label_name = f"{RESUME_LABEL_PREFIX}{state.value}"
+        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
+        status, _ = self._request("GET", path)
+        if status == 200:
+            return
+        if status != 404:
+            raise WorkItemLifecycleError(
+                f"Unable to inspect Aegis resume label {label_name!r}; HTTP {status}."
+            )
+        status, _ = self._request(
+            "POST",
+            f"/repos/{self.repository}/labels",
+            {
+                "name": label_name,
+                "description": f"Aegis blocked-work resume target: {state.value}.",
+                "color": "8250df",
+            },
+        )
+        if status not in {200, 201}:
+            raise WorkItemLifecycleError(
+                f"Unable to create Aegis resume label {label_name!r}; HTTP {status}."
+            )
+        self._verify_label_exists(label_name)
+
+    def _verify_label_exists(self, label_name: str) -> None:
+        path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
+        status, _ = self._request("GET", path)
+        if status != 200:
+            raise WorkItemLifecycleError(
+                f"GitHub status label {label_name!r} was not readable after mutation."
+            )
+
+    def transition(
+        self,
+        work_item_id: str,
+        target: LifecycleState,
+        *,
+        expected_state: LifecycleState | None = None,
+    ) -> MutationEvidence:
+        current = self.get(work_item_id)
+        if expected_state is not None and current.state != expected_state:
+            raise WorkItemLifecycleError(
+                f"Work item #{work_item_id} state changed concurrently: "
+                f"expected {expected_state.value}, got {current.state.value}."
+            )
+        validate_transition(
+            current.state,
+            target,
+            resume_state=current.resume_state,
+        )
+        self._ensure_status_label(target)
+
+        lock = self._acquire_lifecycle_lock(work_item_id)
+        try:
+            current = self.get(work_item_id)
+            if expected_state is not None and current.state != expected_state:
+                raise WorkItemLifecycleError(
+                    f"Work item #{work_item_id} state changed concurrently: "
+                    f"expected {expected_state.value}, got {current.state.value}."
+                )
+            validate_transition(
+                current.state,
+                target,
+                resume_state=current.resume_state,
+            )
+            if target == LifecycleState.BLOCKED:
+                if current.state not in ACTIVE_STATES:
+                    raise WorkItemLifecycleError(
+                        "Only active work items can enter blocked state."
+                    )
+                self._ensure_resume_label(current.state)
+
+            labels = [
+                label
+                for label in current.labels
+                if not STATUS_LABEL_RE.fullmatch(label)
+                and not RESUME_LABEL_RE.fullmatch(label)
+            ]
+            labels.append(f"{STATUS_LABEL_PREFIX}{target.value}")
+            if target == LifecycleState.BLOCKED:
+                labels.append(f"{RESUME_LABEL_PREFIX}{current.state.value}")
+            payload: dict[str, Any] = {
+                "labels": sorted(labels),
+                "state": "closed" if target == LifecycleState.DONE else "open",
+            }
+            if target == LifecycleState.DONE:
+                payload["state_reason"] = "completed"
+            elif current.state == LifecycleState.DONE:
+                payload["state_reason"] = "reopened"
+
+            status, _ = self._request("PATCH", self._issue_path(work_item_id), payload)
+            if status != 200:
+                raise WorkItemLifecycleError(
+                    f"Unable to transition GitHub issue #{work_item_id}; HTTP {status}."
+                )
+
+            verified = self.get(work_item_id)
+            if verified.state != target:
+                raise WorkItemLifecycleError(
+                    f"GitHub issue #{work_item_id} did not verify as {target.value} after mutation."
+                )
+            evidence = MutationEvidence(
+                provider="github-issues",
+                operation="transition",
+                work_item_id=work_item_id,
+                state_before=current.state.value,
+                state_after=verified.state.value,
+                verified=True,
+                reference=verified.provider_url,
+            )
+        except Exception:
+            self._release_lifecycle_lock(lock)
+            raise
+        self._release_lifecycle_lock(lock)
+        return evidence
+
+    def comment(self, work_item_id: str, body: str) -> MutationEvidence:
+        if not body.strip():
+            raise WorkItemLifecycleError("Work-item comment must not be empty.")
+        if len(body) > 65000:
+            raise WorkItemLifecycleError("Work-item comment is too large.")
+        status, data = self._request(
+            "POST",
+            f"{self._issue_path(work_item_id)}/comments",
+            {"body": body},
+        )
+        if status not in {200, 201} or not isinstance(data, Mapping):
+            raise WorkItemLifecycleError(
+                f"Unable to add GitHub issue comment to #{work_item_id}; HTTP {status}."
+            )
+        comment_id = data.get("id")
+        if not isinstance(comment_id, int):
+            raise WorkItemLifecycleError("GitHub issue comment did not return an ID.")
+
+        verify_status, verify_data = self._request(
+            "GET",
+            f"/repos/{self.repository}/issues/comments/{comment_id}",
+        )
+        if (
+            verify_status != 200
+            or not isinstance(verify_data, Mapping)
+            or verify_data.get("body") != body
+        ):
+            raise WorkItemLifecycleError(
+                f"GitHub issue comment #{comment_id} failed read-after-write verification."
+            )
+
+        return MutationEvidence(
+            provider="github-issues",
+            operation="comment",
+            work_item_id=work_item_id,
+            verified=True,
+            reference=str(data.get("html_url")) if data.get("html_url") else None,
+        )
+
+    def attach_traceability(
+        self,
+        work_item_id: str,
+        traceability: Traceability,
+    ) -> MutationEvidence:
+        body = render_traceability_comment(traceability)
+        return self.comment(work_item_id, body)
+
+
+class InMemoryWorkItemProvider:
+    """Small deterministic provider used for policy and lifecycle tests."""
+
+    def __init__(self, items: Mapping[str, WorkItem]) -> None:
+        self.items = dict(items)
+        self.comments: dict[str, list[str]] = {}
 
     def get(self, work_item_id: str) -> WorkItem:
         try:
