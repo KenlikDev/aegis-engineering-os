@@ -211,6 +211,7 @@ def integration_delivery_evidence(
 
     pull_request = result.get("pull_request")
     validation = result.get("validation")
+    post_merge_validation = result.get("post_merge_validation")
     integration = result.get("integration")
     work_item = result.get("work_item")
 
@@ -225,6 +226,10 @@ def integration_delivery_evidence(
             )
     if validation is not None and not isinstance(validation, Mapping):
         raise EvidenceContractError("Integration delivery validation result is malformed.")
+    if canonical_status == "verified" and not isinstance(post_merge_validation, Mapping):
+        raise EvidenceContractError(
+            "Integration delivery post-merge validation is required for verified status."
+        )
 
     revision: str | None = None
     if canonical_status == "verified":
@@ -233,6 +238,8 @@ def integration_delivery_evidence(
         assert isinstance(work_item, Mapping)
 
         validation_head = validation.get("head_sha") if isinstance(validation, Mapping) else None
+        post_merge_head = post_merge_validation.get("head_sha")
+        post_merge_validated = post_merge_validation.get("validated_sha")
         pr_head = pull_request.get("head_sha")
         merge_sha = pull_request.get("merge_commit_sha")
         integration_sha = integration.get("sha")
@@ -265,7 +272,27 @@ def integration_delivery_evidence(
                 )
         else:
             uncertainty.append(
-                "No new validation run was performed during already-merged integration synchronization."
+                "No pre-merge task-head validation was performed during already-merged integration synchronization."
+            )
+
+        if not isinstance(post_merge_head, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", post_merge_head
+        ) or not isinstance(post_merge_validated, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", post_merge_validated
+        ):
+            raise EvidenceContractError(
+                "Integration delivery post-merge validation revisions must be valid 40-character hexadecimal SHAs."
+            )
+        if post_merge_head != merge_sha or post_merge_validated != merge_sha:
+            raise EvidenceContractError(
+                "Integration delivery post-merge validation must target the exact merge commit."
+            )
+        if (
+            post_merge_validation.get("status") != "completed"
+            or post_merge_validation.get("conclusion") != "success"
+        ):
+            raise EvidenceContractError(
+                "Integration delivery post-merge validation must be a completed successful run."
             )
 
         if pull_request.get("merged") is not True:
@@ -320,6 +347,17 @@ def integration_delivery_evidence(
         if isinstance(validation, Mapping)
         else None
     )
+    post_merge_validation_payload = {
+        "id": post_merge_validation.get("id"),
+        "workflow": post_merge_validation.get("workflow"),
+        "status": post_merge_validation.get("status"),
+        "conclusion": post_merge_validation.get("conclusion"),
+        "head_sha": post_merge_validation.get("head_sha"),
+        "validated_sha": post_merge_validation.get("validated_sha"),
+        "evidence_type": post_merge_validation.get("evidence_type"),
+        "pull_request_number": post_merge_validation.get("pull_request_number"),
+        "url": post_merge_validation.get("url"),
+    } if isinstance(post_merge_validation, Mapping) else None
     integration_payload = {
         "branch": integration.get("branch"),
         "sha": integration.get("sha"),
@@ -343,6 +381,7 @@ def integration_delivery_evidence(
                 "work_item_id": work_item_id,
                 "pull_request": pull_request_payload,
                 "validation": validation_payload,
+                "post_merge_validation": post_merge_validation_payload,
                 "integration": integration_payload,
                 "work_item": work_item_payload,
                 "traceability_verified": result.get("traceability_verified"),
@@ -743,6 +782,27 @@ def integration_merge_evidence(
         )
 
     validation_head_sha = result.get("validation_head_sha")
+    post_merge_validation = result.get("post_merge_validation")
+    if not isinstance(post_merge_validation, Mapping):
+        raise EvidenceContractError(
+            "Verified integration merge post-merge validation is required."
+        )
+    post_merge_head_sha = post_merge_validation.get("head_sha")
+    post_merge_validated_sha = post_merge_validation.get("validated_sha")
+    if (
+        not isinstance(post_merge_head_sha, str)
+        or not re.fullmatch(r"[0-9a-f]{40}", post_merge_head_sha)
+        or not isinstance(post_merge_validated_sha, str)
+        or not re.fullmatch(r"[0-9a-f]{40}", post_merge_validated_sha)
+        or post_merge_head_sha != merge_commit_sha
+        or post_merge_validated_sha != merge_commit_sha
+        or post_merge_validation.get("status") != "completed"
+        or post_merge_validation.get("conclusion") != "success"
+    ):
+        raise EvidenceContractError(
+            "Integration merge post-merge validation must be a completed successful run for the exact merge commit."
+        )
+
     uncertainty: list[str] = []
     if validation_head_sha is None:
         uncertainty.append(
