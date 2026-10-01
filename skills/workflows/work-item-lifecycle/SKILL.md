@@ -97,6 +97,12 @@ Close the work item through its provider when supported. Preserve traceability t
 
 Never assume a specific work-management provider is available. Use the provider skill selected by capability discovery.
 
+## Concurrency boundary
+
+GitHub Issues transitions use a per-work-item Git ref lock in `refs/aegis/locks/work-item/<id>`. The first writer acquires an absent ref with the Git references API; an existing free or expired lock is advanced with `force=false`, so concurrent writers that observed the same lock commit cannot both advance the ref. Lock metadata carries a bounded lease, and release is also a fast-forward-only ref update; a writer that loses the ref race fails closed rather than overwriting another lifecycle transition.
+
+This guarantee applies to cooperating Aegis lifecycle writers using `GitHubIssuesProvider`. Direct manual edits to GitHub issue labels or state do not acquire the lock and remain outside the provider's serialization boundary. The lifecycle provider therefore requires a GitHub token with Contents write permission in addition to the permissions needed to mutate issues. The repository validation workflow remains read-only and does not receive Contents write access.
+
 ## Runtime composition
 
 When used with managed OpenHands execution:
