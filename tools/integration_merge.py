@@ -402,7 +402,7 @@ def sync_integration_merge(
     expected_head_sha: str | None = None,
     validation_provider: ValidationProvider | None = None,
     validation_workflow: str = DEFAULT_WORKFLOW,
-    post_merge_validation_timeout_seconds: float = 120.0,
+    post_merge_validation_timeout_seconds: float = 600.0,
     post_merge_validation_poll_interval_seconds: float = 2.0,
     monotonic: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
@@ -606,6 +606,18 @@ def main() -> int:
     parser.add_argument("pull_request_number", type=int)
     parser.add_argument("--expected-head-sha", default=None)
     parser.add_argument("--validation-workflow", default=DEFAULT_WORKFLOW)
+    parser.add_argument(
+        "--post-merge-validation-timeout",
+        type=float,
+        default=600.0,
+        help="Maximum seconds to wait for exact merge-commit Aegis Validation.",
+    )
+    parser.add_argument(
+        "--post-merge-validation-poll-interval",
+        type=float,
+        default=2.0,
+        help="Seconds between exact merge-commit validation checks.",
+    )
     parser.add_argument(
         "--canonical-evidence-output",
         type=Path,
