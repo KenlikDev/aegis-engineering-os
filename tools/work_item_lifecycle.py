@@ -429,8 +429,82 @@ class WorkItemProvider(Protocol):
         *,
         expected_state: LifecycleState | None = None,
     ) -> MutationEvidence:
-        ...
+        current = self.get(work_item_id)
+        if expected_state is not None and current.state != expected_state:
+            raise WorkItemLifecycleError(
+                f"Work item #{work_item_id} state changed concurrently: "
+                f"expected {expected_state.value}, got {current.state.value}."
+            )
+        validate_transition(
+            current.state,
+            target,
+            resume_state=current.resume_state,
+        )
+        self._ensure_status_label(target)
 
+        lock = self._acquire_lifecycle_lock(work_item_id)
+        try:
+            current = self.get(work_item_id)
+            if expected_state is not None and current.state != expected_state:
+                raise WorkItemLifecycleError(
+                    f"Work item #{work_item_id} state changed concurrently: "
+                    f"expected {expected_state.value}, got {current.state.value}."
+                )
+            validate_transition(
+                current.state,
+                target,
+                resume_state=current.resume_state,
+            )
+            if target == LifecycleState.BLOCKED:
+                if current.state not in ACTIVE_STATES:
+                    raise WorkItemLifecycleError(
+                        "Only active work items can enter blocked state."
+                    )
+                self._ensure_resume_label(current.state)
+
+            labels = [
+                label
+                for label in current.labels
+                if not STATUS_LABEL_RE.fullmatch(label)
+                and not RESUME_LABEL_RE.fullmatch(label)
+            ]
+            labels.append(f"{STATUS_LABEL_PREFIX}{target.value}")
+            if target == LifecycleState.BLOCKED:
+                labels.append(f"{RESUME_LABEL_PREFIX}{current.state.value}")
+            payload: dict[str, Any] = {
+                "labels": sorted(labels),
+                "state": "closed" if target == LifecycleState.DONE else "open",
+            }
+            if target == LifecycleState.DONE:
+                payload["state_reason"] = "completed"
+            elif current.state == LifecycleState.DONE:
+                payload["state_reason"] = "reopened"
+
+            status, _ = self._request("PATCH", self._issue_path(work_item_id), payload)
+            if status != 200:
+                raise WorkItemLifecycleError(
+                    f"Unable to transition GitHub issue #{work_item_id}; HTTP {status}."
+                )
+
+            verified = self.get(work_item_id)
+            if verified.state != target:
+                raise WorkItemLifecycleError(
+                    f"GitHub issue #{work_item_id} did not verify as {target.value} after mutation."
+                )
+            evidence = MutationEvidence(
+                provider="github-issues",
+                operation="transition",
+                work_item_id=work_item_id,
+                state_before=current.state.value,
+                state_after=verified.state.value,
+                verified=True,
+                reference=verified.provider_url,
+            )
+        except Exception:
+            self._release_lifecycle_lock(lock)
+            raise
+        self._release_lifecycle_lock(lock)
+        return evidence
     def comment(
         self,
         work_item_id: str,
