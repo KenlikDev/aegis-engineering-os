@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -75,6 +76,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
 
     def test_rejects_duplicate_markers(self):
         body = (
+            f"- Work item: #{ISSUE_ID}\n"
             f"- Verified source SHA: {HEAD_SHA}\n"
             f"- Verified source SHA: {HEAD_SHA}\n"
         )
@@ -138,7 +140,12 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             old_argv = sys.argv
             try:
                 sys.argv = ["validate_develop_promotion.py", str(path)]
-                self.assertEqual(0, main())
+                with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}):
+                    with mock.patch(
+                        "validate_develop_promotion._lookup_work_item",
+                        return_value=self._lookup(ISSUE_ID),
+                    ):
+                        self.assertEqual(0, main())
             finally:
                 sys.argv = old_argv
 
