@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from evidence_adapters import (  # noqa: E402
     architecture_planning_evidence,
     ci_diagnosis_evidence,
+    develop_promotion_evidence,
     implementation_readiness_evidence,
     integration_delivery_evidence,
     integration_merge_evidence,
@@ -65,9 +66,139 @@ from version_verification import VersionClaim, VersionEvidence  # noqa: E402
 REPOSITORY = "KenlikDev/aegis-engineering-os"
 SOURCE_SHA = "1111111111111111111111111111111111111111"
 TARGET_SHA = "2222222222222222222222222222222222222222"
+OTHER_SHA = "3333333333333333333333333333333333333333"
 
 
 class EvidenceAdapterTests(unittest.TestCase):
+    def test_develop_promotion_verified_result_round_trips(self):
+        result = {
+            "status": "prepared",
+            "repository": REPOSITORY,
+            "work_item_id": "324",
+            "source_branch": "ai/integration",
+            "source_sha": SOURCE_SHA,
+            "owner_verified_source_sha": SOURCE_SHA,
+            "target_branch": "develop",
+            "target_sha": TARGET_SHA,
+            "pull_request_reused": False,
+            "pull_request": {
+                "number": 325,
+                "url": "https://github.com/kenlik.dev/aegis-engineering-os/pull/325",
+                "state": "open",
+                "merged": False,
+                "head": "ai/integration",
+                "head_sha": SOURCE_SHA,
+                "head_repository": REPOSITORY,
+                "base": "develop",
+                "base_repository": REPOSITORY,
+                "draft": True,
+            },
+            "validation": {
+                "id": 1700,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": SOURCE_SHA,
+                "validated_sha": SOURCE_SHA,
+                "url": "https://github.com/kenlik.dev/aegis-engineering-os/actions/runs/1700",
+            },
+        }
+        evidence = develop_promotion_evidence(
+            result,
+            repository=REPOSITORY,
+            observed_at="2026-10-02T19:50:00Z",
+        )
+        self.assertEqual("verified", evidence.status)
+        self.assertEqual("develop-promotion", evidence.kind)
+        self.assertEqual(SOURCE_SHA, evidence.revision)
+        self.assertEqual("promotion:324->develop", evidence.subject)
+        self.assertEqual(REPOSITORY, evidence.result["pull_request"]["base_repository"])
+
+        with __import__("tempfile").TemporaryDirectory() as temp:
+            path = __import__("pathlib").Path(temp) / "develop-promotion.json"
+            write_evidence(evidence, path)
+            self.assertEqual(evidence, read_and_validate_evidence(path))
+
+    def test_develop_promotion_evidence_rejects_source_drift(self):
+        result = {
+            "status": "prepared",
+            "work_item_id": "324",
+            "source_branch": "ai/integration",
+            "source_sha": OTHER_SHA,
+            "owner_verified_source_sha": SOURCE_SHA,
+            "target_branch": "develop",
+            "target_sha": TARGET_SHA,
+            "pull_request": {
+                "number": 325,
+                "url": "https://github.com/kenlik.dev/aegis-engineering-os/pull/325",
+                "state": "open",
+                "merged": False,
+                "head": "ai/integration",
+                "head_sha": OTHER_SHA,
+                "head_repository": REPOSITORY,
+                "base": "develop",
+                "base_repository": REPOSITORY,
+            },
+            "validation": {
+                "id": 1700,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": OTHER_SHA,
+                "validated_sha": OTHER_SHA,
+                "url": "https://github.com/kenlik.dev/aegis-engineering-os/actions/runs/1700",
+            },
+        }
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "does not match",
+        ):
+            develop_promotion_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-10-02T19:50:00Z",
+            )
+
+    def test_develop_promotion_evidence_rejects_fork_origin(self):
+        result = {
+            "status": "prepared",
+            "work_item_id": "324",
+            "source_branch": "ai/integration",
+            "source_sha": SOURCE_SHA,
+            "owner_verified_source_sha": SOURCE_SHA,
+            "target_branch": "develop",
+            "target_sha": TARGET_SHA,
+            "pull_request": {
+                "number": 325,
+                "url": "https://github.com/kenlik.dev/aegis-engineering-os/pull/325",
+                "state": "open",
+                "merged": False,
+                "head": "ai/integration",
+                "head_sha": SOURCE_SHA,
+                "head_repository": "KenlikDev/attacker-fork",
+                "base": "develop",
+                "base_repository": REPOSITORY,
+            },
+            "validation": {
+                "id": 1700,
+                "workflow": ".github/workflows/validate.yml",
+                "status": "completed",
+                "conclusion": "success",
+                "head_sha": SOURCE_SHA,
+                "validated_sha": SOURCE_SHA,
+                "url": "https://github.com/kenlik.dev/aegis-engineering-os/actions/runs/1700",
+            },
+        }
+        with self.assertRaisesRegex(
+            EvidenceContractError,
+            "pull-request identity",
+        ):
+            develop_promotion_evidence(
+                result,
+                repository=REPOSITORY,
+                observed_at="2026-10-02T19:50:00Z",
+            )
+
     def test_promotion_sync_verified_result_preserves_target_revision(self):
         result = {
             "status": "verified",
