@@ -11,6 +11,7 @@ from develop_promotion import (  # noqa: E402
     GitHubDevelopPromotionProvider,
     prepare_develop_promotion,
 )
+from promotion_readiness import PromotionReadiness
 from work_item_lifecycle import LifecycleState, WorkItem
 
 REPOSITORY = "KenlikDev/aegis-engineering-os"
@@ -123,6 +124,26 @@ class FakeWorkItemProvider:
         return self.item
 
 
+class RecheckingProvider(GitHubDevelopPromotionProvider):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.readiness_calls = 0
+
+    def assess_readiness(self, **kwargs):
+        self.readiness_calls += 1
+        result = super().assess_readiness(**kwargs)
+        if self.readiness_calls == 2:
+            return PromotionReadiness(
+                repository=result.repository,
+                source=result.source,
+                target=result.target,
+                compare=result.compare,
+                validation=result.validation,
+                blockers=("ai/integration changed after owner verification.",),
+            )
+        return result
+
+
 class DevelopPromotionTests(unittest.TestCase):
     def _request(self, sha=SOURCE_SHA, target="develop"):
         return DevelopPromotionRequest(
@@ -162,6 +183,25 @@ class DevelopPromotionTests(unittest.TestCase):
             f"- Verified source SHA: {SOURCE_SHA}",
             transport.created_payload["body"],
         )
+
+    def test_recheck_rejects_stale_source_before_pr_write(self):
+        transport = FakeTransport()
+        provider = RecheckingProvider(
+            REPOSITORY,
+            "test-token",
+            transport=transport,
+        )
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "Promotion readiness is blocked before develop PR write",
+        ):
+            prepare_develop_promotion(
+                provider,
+                self._work_item_provider(),
+                self._request(),
+            )
+        self.assertEqual(2, provider.readiness_calls)
+        self.assertFalse(transport.created_pr)
 
     def test_rejects_stale_owner_verified_sha_before_pr_write(self):
         transport = FakeTransport(source_sha=OTHER_SHA)
