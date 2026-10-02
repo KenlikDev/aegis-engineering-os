@@ -36,10 +36,21 @@ def validate_event(event: Mapping[str, Any]) -> None:
         return
 
     head_sha = head.get("sha") if isinstance(head, Mapping) else None
+    head_repo = head.get("repo") if isinstance(head, Mapping) else None
+    base_repo = base.get("repo") if isinstance(base, Mapping) else None
     body = pull_request.get("body") or ""
     if not isinstance(head_sha, str) or not SHA_RE.fullmatch(head_sha):
         raise DevelopPromotionValidationError(
             "Direct develop promotion PR has a malformed head SHA."
+        )
+    if not (
+        isinstance(head_repo, Mapping)
+        and isinstance(base_repo, Mapping)
+        and head_repo.get("full_name") == event.get("repository", {}).get("full_name")
+        and base_repo.get("full_name") == event.get("repository", {}).get("full_name")
+    ):
+        raise DevelopPromotionValidationError(
+            "Direct develop promotion PR must originate from the configured repository."
         )
     if not isinstance(body, str):
         raise DevelopPromotionValidationError(
