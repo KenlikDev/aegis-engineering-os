@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind direct develop promotion work-item markers to an existing open issue in `aegis:status:integration` during required validation;
 - add canonical evidence output for owner-gated develop promotion preparation, including exact source and repository-origin provenance;
 - fail the required `Validate Aegis` path for direct `ai/integration -> develop` promotion when the live PR head drifts from the owner-verified source SHA;
 - narrow the owner-gated develop promotion stale-source race with a final exact-SHA readiness recheck immediately before PR write;

@@ -13,7 +13,7 @@ Advance an integrated work item to done only after a promotion pull request has 
 
 1. The work item is in integration.
 2. The promotion pull request number is explicit.
-3. For develop, the pull-request head is ai/integration and its owner-verification marker names the same source SHA as the PR head. For main, the pull-request head matches ai/<work-item>-main-promotion.
+3. The pull-request head matches ai/<work-item>-<target>-promotion.
 4. The pull-request base matches the selected protected target.
 5. The pull request is closed and actually merged.
 6. A merge commit SHA is present.
@@ -23,7 +23,7 @@ Advance an integrated work item to done only after a promotion pull request has 
 
 ## Human checkpoint boundary
 
-Promotion pull requests are prepared only for declared engineering-stage checkpoints on `develop` or release checkpoints on `main`. The develop checkpoint is bounded to one stage and uses ai/integration directly; the owner-verified source SHA is part of the PR evidence. Main release checkpoints may continue to use the snapshot artifact.
+Promotion pull requests are prepared only for declared engineering-stage checkpoints on `develop` or release checkpoints on `main`. The promotion artifact is bounded to one stage and includes exact source/target identities and validation evidence.
 
 Aegis may create and verify the artifact, but never approves or merges protected branches. After a human-controlled merge, this workflow verifies the exact merge and synchronizes lifecycle state; it does not repair the protected branch.
 
@@ -34,7 +34,6 @@ See `docs/governance/promotion-checkpoints.md` for the promotion cadence.
 - Never approve or merge a pull request.
 - Never force-push or modify a protected branch.
 - Do not treat an open or merely mergeable pull request as merged.
-- For direct develop promotion, the required `Validate Aegis` gate must pass the owner-verified source/head equality check.
 - Do not advance the lifecycle when the target branch compare is not exact `identical` or the post-compare target SHA differs.
 - Require traceability and lifecycle transition mutation evidence to report read-after-write verification before returning `Verified`.
 - Optionally emit canonical `promotion-sync` evidence with `--canonical-evidence-output`; this evidence is observational and never authorization.

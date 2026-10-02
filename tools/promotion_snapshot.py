@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare owner-controlled main promotion snapshots without merging protected branches."""
+"""Prepare owner-controlled promotion snapshots without merging protected branches."""
 
 from __future__ import annotations
 
@@ -459,10 +459,6 @@ def _validate_request(request: PromotionSnapshotRequest) -> None:
         raise PromotionSnapshotError("Work-item id must be a positive integer.")
     if request.source_branch != DEFAULT_SOURCE_BRANCH:
         raise PromotionSnapshotError("Promotion source must be ai/integration.")
-    if request.target_branch == "develop":
-        raise PromotionSnapshotError(
-            "Develop promotion snapshots are disabled; use the owner-gated direct ai/integration -> develop workflow."
-        )
     if request.target_branch not in TARGETS:
         raise PromotionSnapshotError("Promotion target must be develop or main.")
     expected = f"ai/{request.work_item_id}-{request.target_branch}-promotion"

@@ -28,12 +28,12 @@ A stage is complete for promotion when:
 4. canonical provenance and lifecycle evidence is internally consistent;
 5. the exact current `ai/integration` SHA has a successful Aegis Validation run;
 6. promotion readiness confirms the exact protected target state, a positive promotable file delta, and a semantically consistent GitHub compare relationship;
-7. the owner explicitly verifies the exact current ai/integration SHA;
-8. the resulting develop pull request is created directly from ai/integration at the owner-verified SHA, with the verified SHA recorded in the PR body.
+7. a deterministic promotion snapshot is created from the exact source and target SHAs;
+8. the resulting promotion pull request contains a bounded description of the stage and its exact source/target identities.
 
 Aegis does not merge, approve, or otherwise authorize the resulting `develop` pull request.
 
-The human reviewer makes the protected-branch decision from the direct ai/integration pull request, the exact diff, the validation evidence, and the documented scope. The PR must not be created until the owner has performed the required ai/integration verification. Because protected branches use squash merges, Git ancestry may legitimately be `diverged` even when the target already contains earlier promoted trees; Aegis records that as a review condition rather than treating it as proof of failure.
+The human reviewer makes the protected-branch decision from the bounded promotion artifact, the exact diff, the validation evidence, and the documented scope. Because protected branches use squash merges, Git ancestry may legitimately be `diverged` even when the target already contains earlier promoted trees; Aegis records that as a review condition rather than treating it as proof of failure.
 
 ### Develop merge completion
 
@@ -69,8 +69,8 @@ Every human promotion checkpoint should expose:
 
 - the exact source `ai/integration` SHA;
 - the exact protected target SHA observed before preparation;
-- the exact ai/integration SHA verified by the owner;
-- the develop pull request identity and its exact head SHA;
+- the promotion snapshot branch and SHA;
+- the promotion pull request identity;
 - validation run identities and conclusions;
 - relevant canonical evidence references;
 - the included work-item scope;
@@ -80,9 +80,9 @@ The package is evidence for human review. It is not an authorization token and d
 
 ## Recovery
 
-If ai/integration or the target branch changes after the owner verification and before the develop merge, the checkpoint is stale. Aegis must not treat the existing PR as an unchanged verified checkpoint; a fresh owner verification is required before promotion continues.
+If the target branch changes while promotion is being prepared, Aegis fails closed and prepares a new checkpoint from fresh state.
 
-The deprecated develop snapshot path is blocked. For main release promotion, if a published promotion snapshot later encounters a preparation or provider error, Aegis does not perform an unsafe compare-then-delete cleanup. A valid snapshot is retained for idempotent retry; a missing or changed snapshot is treated as a recovery boundary.
+If a published promotion snapshot later encounters a preparation or provider error, Aegis does not perform an unsafe compare-then-delete cleanup. A valid snapshot is retained for idempotent retry; a missing or changed snapshot is treated as a recovery boundary.
 
 ## Non-goals
 

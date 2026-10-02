@@ -119,27 +119,15 @@ The verifier checks fresh source/target SHAs, compare divergence, protection sta
 
 The verifier is read-only and does not create, merge, or promote anything.
 
-## Develop promotion
+## Promotion snapshot preparation
 
-After the owner has verified the exact current `ai/integration` state, prepare the develop promotion from that branch directly:
-
-    python3 tools/develop_promotion.py OWNER/REPO 66 \
-      --owner-verified-source-sha <EXACT_AI_INTEGRATION_SHA> \
-      --ready
-
-The tool rechecks that the current `ai/integration` SHA still equals the owner-verified SHA, verifies promotion readiness and target protection, and then creates or reuses a direct `ai/integration -> develop` pull request. The associated work item must already be in the `integration` lifecycle state. It does not create a temporary develop-promotion branch.
-
-Do not run the develop promotion preparation before the owner checkpoint. If `ai/integration` advances after verification, the stale checkpoint is rejected and a fresh owner verification is required.
-
-## Main promotion snapshot preparation
-
-Main release promotion may continue to use the owner-controlled snapshot mechanism:
+When promotion readiness passes, prepare an owner-controlled promotion artifact:
 
     python3 tools/promotion_snapshot.py OWNER/REPO 66 main
 
-The command creates or reuses `ai/66-main-promotion`, prepares a verified two-parent snapshot commit, and creates or reuses a draft pull request into `main`. Use `--ready` only when the release promotion pull request should be created as ready for review.
+The command creates or reuses ai/66-main-promotion, prepares a verified two-parent snapshot commit, and creates or reuses a draft pull request into main. Use --ready only when the promotion pull request should be created as ready for review.
 
-The snapshot tool rejects `develop` targets. It never resolves conflicts and never approves or merges protected branches.
+The snapshot tool refuses develop while the selected target is behind or diverged. It never resolves conflicts and never approves or merges protected branches.
 
 The optional evidence artifact preserves the exact observed source SHA and validation provenance in the canonical evidence envelope.
 

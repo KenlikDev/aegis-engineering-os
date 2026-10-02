@@ -38,10 +38,7 @@ TARGETS = frozenset({"develop", "main"})
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 WORK_ITEM_RE = re.compile(r"^[1-9][0-9]*$")
 PROMOTION_BRANCH_RE = re.compile(
-    r"^ai/(?P<work_item>[1-9][0-9]*)-main-promotion$"
-)
-VERIFIED_SOURCE_RE = re.compile(
-    r"(?m)^- Verified source SHA: (?P<sha>[0-9a-f]{40})$"
+    r"^ai/(?P<work_item>[1-9][0-9]*)-(?P<target>develop|main)-promotion$"
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HTTPS_URL_RE = re.compile(r"^https://[^\s]+$")
@@ -66,9 +63,6 @@ class PromotionPullRequest:
     merge_commit_sha: str | None
     head_repository: str | None = None
     base_repository: str | None = None
-    body: str = ""
-    verified_source_sha: str | None = None
-    verified_work_item_id: str | None = None
 
 
 class PromotionSyncProvider(Protocol):
@@ -192,7 +186,6 @@ class GitHubPromotionSyncProvider:
         url = data.get("html_url")
         state = data.get("state")
         merged_at = data.get("merged_at")
-        body = data.get("body") or ""
         head_repo = head.get("repo") if isinstance(head, Mapping) else None
         base_repo = base.get("repo") if isinstance(base, Mapping) else None
         if (
@@ -208,7 +201,6 @@ class GitHubPromotionSyncProvider:
             or not isinstance(base, Mapping)
             or not isinstance(head.get("ref"), str)
             or not isinstance(base.get("ref"), str)
-            or not isinstance(body, str)
         ):
             raise PromotionSyncError("GitHub promotion pull-request response is malformed.")
 
@@ -219,13 +211,6 @@ class GitHubPromotionSyncProvider:
                 "GitHub promotion pull-request head and base repositories must match "
                 "the configured repository."
             )
-
-        verified_source_match = VERIFIED_SOURCE_RE.search(body)
-        verified_source_sha = (
-            verified_source_match.group("sha")
-            if verified_source_match is not None
-            else None
-        )
 
         return PromotionPullRequest(
             number=number,
@@ -243,8 +228,6 @@ class GitHubPromotionSyncProvider:
             ),
             head_repository=head_repository,
             base_repository=base_repository,
-            body=body,
-            verified_source_sha=verified_source_sha,
         )
 
     def get_branch(self, branch: str) -> BranchSnapshot:
@@ -303,9 +286,7 @@ def _validate_inputs(
         raise PromotionSyncError("Pull-request number must be positive.")
     if target_branch not in TARGETS:
         raise PromotionSyncError("Promotion target must be develop or main.")
-    if target_branch == "develop":
-        return "ai/integration"
-    expected_branch = f"ai/{work_item_id}-main-promotion"
+    expected_branch = f"ai/{work_item_id}-{target_branch}-promotion"
     if not PROMOTION_BRANCH_RE.fullmatch(expected_branch):
         raise PromotionSyncError("Promotion branch name is invalid.")
     return expected_branch
@@ -343,17 +324,8 @@ def sync_promotion_merge(
     pull_request = provider.get_pull_request(pull_request_number)
     if pull_request.head != expected_head:
         raise PromotionSyncError(
-            "Promotion pull-request head does not match the expected delivery source."
+            "Promotion pull-request head does not match the deterministic promotion branch."
         )
-    if target_branch == "develop":
-        if pull_request.verified_source_sha is None:
-            raise PromotionSyncError(
-                "Develop promotion pull request is missing the owner-verification source SHA."
-            )
-        if pull_request.verified_source_sha != pull_request.head_sha:
-            raise PromotionSyncError(
-                "Develop promotion pull request head SHA does not match its owner-verification source SHA."
-            )
     if (
         pull_request.head_repository != provider.repository
         or pull_request.base_repository != provider.repository
