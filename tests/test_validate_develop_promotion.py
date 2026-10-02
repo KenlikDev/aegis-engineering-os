@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,12 +69,15 @@ class DevelopPromotionValidationTests(unittest.TestCase):
         ):
             validate_event(event(head_sha=OTHER_SHA), issue_lookup=self._lookup)
 
-    def test_rejects_missing_marker(self):
+    def test_rejects_missing_work_item_marker(self):
         with self.assertRaisesRegex(
             DevelopPromotionValidationError,
-            "exactly one owner-verified",
+            "exactly one authoritative work-item",
         ):
-            validate_event(event(body="owner verification omitted\n"))
+            validate_event(
+                event(body=f"- Verified source SHA: {HEAD_SHA}\n"),
+                issue_lookup=self._lookup,
+            )
 
     def test_rejects_duplicate_markers(self):
         body = (
@@ -111,7 +113,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
                 event(),
                 issue_lookup=lambda issue_id: SimpleNamespace(
                     id="999",
-                    state=__import__("work_item_lifecycle").LifecycleState.INTEGRATION,
+                    state=LifecycleState.INTEGRATION,
                 ),
             )
 
@@ -153,7 +155,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
                 with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}):
                     with mock.patch(
                         "validate_develop_promotion._lookup_work_item",
-                        return_value=self._lookup(ISSUE_ID),
+                        return_value=self._lookup,
                     ):
                         self.assertEqual(0, main())
             finally:
