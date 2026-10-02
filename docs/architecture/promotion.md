@@ -33,12 +33,13 @@ tools/develop_promotion.py is the write boundary for develop promotion.
 The operation is intentionally conservative:
 
 1. require an explicit owner-verified source SHA as an operator-provided precondition;
-2. run the read-only readiness gate with expected_source_sha set to that exact SHA;
-3. capture the exact current source and protected target SHAs;
-4. require the source to remain exactly equal to the owner-verified SHA before any pull-request write;
-5. search for at most one existing open PR from ai/integration to develop;
-6. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
-7. record the verified SHA in the PR body;
+2. require the authoritative work item to be in the `integration` lifecycle state;
+3. run the read-only readiness gate with expected_source_sha set to that exact SHA;
+4. capture the exact current source and protected target SHAs;
+5. require the source to remain exactly equal to the owner-verified SHA before any pull-request write;
+6. search for at most one existing open PR from ai/integration to develop;
+7. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
+8. record the verified SHA in the PR body;
 8. reread the pull request and return structured metadata without credentials.
 
 No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint.
