@@ -123,11 +123,11 @@ The verifier is read-only and does not create, merge, or promote anything.
 
 After the owner has verified the exact current `ai/integration` state, prepare the develop promotion from that branch directly:
 
-    python3 tools/develop_promotion.py OWNER/REPO 324 \
+    python3 tools/develop_promotion.py OWNER/REPO 66 \
       --owner-verified-source-sha <EXACT_AI_INTEGRATION_SHA> \
       --ready
 
-The tool rechecks that the current `ai/integration` SHA still equals the owner-verified SHA, verifies promotion readiness and target protection, and then creates or reuses a direct `ai/integration -> develop` pull request. It does not create a temporary develop-promotion branch.
+The tool rechecks that the current `ai/integration` SHA still equals the owner-verified SHA, verifies promotion readiness and target protection, and then creates or reuses a direct `ai/integration -> develop` pull request. The associated work item must already be in the `integration` lifecycle state. It does not create a temporary develop-promotion branch.
 
 Do not run the develop promotion preparation before the owner checkpoint. If `ai/integration` advances after verification, the stale checkpoint is rejected and a fresh owner verification is required.
 

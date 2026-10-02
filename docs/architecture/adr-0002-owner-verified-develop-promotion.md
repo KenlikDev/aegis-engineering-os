@@ -16,7 +16,7 @@ Develop promotion uses a direct pull request:
 
 `ai/integration -> develop`
 
-The preparation boundary is `tools/develop_promotion.py`. It requires an explicit owner-verified source SHA, rechecks that the current protected `ai/integration` branch is still exactly that SHA, confirms promotion readiness and target protection, then creates or reuses the direct PR. The verified SHA is recorded in the PR body.
+The preparation boundary is `tools/develop_promotion.py`. It requires an explicit owner-verified source SHA and an authoritative work item already in lifecycle state `integration`, rechecks that the current protected `ai/integration` branch is still exactly that SHA, confirms promotion readiness and target protection, then creates or reuses the direct PR. The verified SHA is recorded in the PR body.
 
 The former develop snapshot path in `tools/promotion_snapshot.py` is blocked. The snapshot mechanism remains available only for the existing main release-promotion flow.
 
