@@ -99,6 +99,10 @@ Main promotion is prepared only for a release candidate or another explicitly de
 
 The detailed cadence is defined in `docs/governance/promotion-checkpoints.md`.
 
+## Required-check enforcement
+
+For a direct `ai/integration -> develop` pull request, `.github/workflows/validate.yml` executes `tools/validate_develop_promotion.py` before the ordinary validation suite. The gate is read-only and compares the exact pull-request head SHA with the single `Verified source SHA` marker recorded by the owner-gated promotion tool. Other pull-request flows are outside this specialized check. Because the protected `develop` ruleset requires `Validate Aegis`, a drifted direct promotion PR fails its required validation rather than remaining ordinarily merge-eligible.
+
 ## Lifecycle
 
 The overall delivery path is:
