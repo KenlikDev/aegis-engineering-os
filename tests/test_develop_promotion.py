@@ -304,7 +304,7 @@ class DevelopPromotionTests(unittest.TestCase):
             with (
                 patch.object(module, "GitHubDevelopPromotionProvider", return_value=provider),
                 patch.object(module, "GitHubIssuesProvider", return_value=self._work_item_provider()),
-                patch.object(module.sys, "argv", argv),
+                patch.object(sys, "argv", argv),
             ):
                 self.assertEqual(0, module.main())
 
