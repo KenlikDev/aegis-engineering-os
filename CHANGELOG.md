@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- narrow the owner-gated develop promotion stale-source race with a final exact-SHA readiness recheck immediately before PR write;
 - require the owner-gated develop promotion to reference an authoritative work item already in `integration` state;
 - require owner verification of the exact `ai/integration` SHA before any `develop` promotion PR; develop promotion now uses `ai/integration` directly, and the temporary develop-promotion snapshot path is blocked;
 - serialize GitHub lifecycle transitions per work item with conditional fast-forward Git-ref locks and bounded stale-lock recovery;
