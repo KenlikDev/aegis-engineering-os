@@ -69,18 +69,14 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             "exactly one authoritative work-item",
         ):
             validate_event(
-                event(body=f"- Verified source SHA: {HEAD_SHA}
-")
+                event(body=f"- Verified source SHA: {HEAD_SHA}\n")
             )
 
     def test_rejects_duplicate_work_item_markers(self):
         body = (
-            "- Work item: #332
-"
-            "- Work item: #332
-"
-            f"- Verified source SHA: {HEAD_SHA}
-"
+            "- Work item: #332\n"
+            "- Work item: #332\n"
+            f"- Verified source SHA: {HEAD_SHA}\n"
         )
         with self.assertRaisesRegex(
             DevelopPromotionValidationError,
@@ -90,10 +86,8 @@ class DevelopPromotionValidationTests(unittest.TestCase):
 
     def test_rejects_malformed_work_item_marker(self):
         body = (
-            "- Work item: #0
-"
-            f"- Verified source SHA: {HEAD_SHA}
-"
+            "- Work item: #0\n"
+            f"- Verified source SHA: {HEAD_SHA}\n"
         )
         with self.assertRaisesRegex(
             DevelopPromotionValidationError,
