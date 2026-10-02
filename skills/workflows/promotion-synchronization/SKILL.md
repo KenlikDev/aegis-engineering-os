@@ -34,6 +34,7 @@ See `docs/governance/promotion-checkpoints.md` for the promotion cadence.
 - Never approve or merge a pull request.
 - Never force-push or modify a protected branch.
 - Do not treat an open or merely mergeable pull request as merged.
+- For direct develop promotion, the required `Validate Aegis` gate must pass the owner-verified source/head equality check.
 - Do not advance the lifecycle when the target branch compare is not exact `identical` or the post-compare target SHA differs.
 - Require traceability and lifecycle transition mutation evidence to report read-after-write verification before returning `Verified`.
 - Optionally emit canonical `promotion-sync` evidence with `--canonical-evidence-output`; this evidence is observational and never authorization.
