@@ -43,7 +43,7 @@ The operation is intentionally conservative:
 9. record the verified SHA in the PR body;
 10. reread the pull request and return structured metadata without credentials.
 
-No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint.
+No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint. While a develop PR remains open, the required `Validate Aegis` workflow also fails closed whenever the direct PR head SHA differs from its recorded owner-verified source SHA, so branch advancement invalidates the protected-branch check path.
 
 tools/promotion_snapshot.py remains the write boundary for the main release-promotion snapshot flow. It rejects develop targets.
 
