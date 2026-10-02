@@ -44,7 +44,7 @@ The operation is intentionally conservative:
 
 No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint.
 
-tools/promotion_snapshot.py remains the write boundary only for the legacy main release-promotion snapshot flow. It rejects develop targets.
+tools/promotion_snapshot.py remains the write boundary for the main release-promotion snapshot flow. It rejects develop targets.
 
 ## Idempotency
 
