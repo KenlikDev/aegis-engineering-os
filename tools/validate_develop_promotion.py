@@ -136,11 +136,14 @@ def validate_event(
 
     work_item_id = work_item_matches[0].group("id")
     lookup = issue_lookup
-    if lookup is not None:
-        _validate_work_item_identity(
-            work_item_id=work_item_id,
-            lookup=lookup,
+    if lookup is None:
+        raise DevelopPromotionValidationError(
+            "Develop promotion work-item lookup is required."
         )
+    _validate_work_item_identity(
+        work_item_id=work_item_id,
+        lookup=lookup,
+    )
 
     matches = list(VERIFIED_SOURCE_RE.finditer(body))
     if len(matches) != 1:
