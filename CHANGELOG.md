@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- require the owner-gated develop promotion to reference an authoritative work item already in `integration` state;
 - require owner verification of the exact `ai/integration` SHA before any `develop` promotion PR; develop promotion now uses `ai/integration` directly, and the temporary develop-promotion snapshot path is blocked;
 - serialize GitHub lifecycle transitions per work item with conditional fast-forward Git-ref locks and bounded stale-lock recovery;
 - require successful Aegis Validation for the exact integration merge commit before advancing work items to integration;
