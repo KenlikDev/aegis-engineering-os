@@ -27,6 +27,12 @@ from promotion_readiness import (
     PromotionReadiness,
     PromotionReadinessError,
 )
+from work_item_lifecycle import (
+    GitHubIssuesProvider,
+    LifecycleState,
+    WorkItemLifecycleError,
+    WorkItemProvider,
+)
 
 TARGET_BRANCH = "develop"
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -401,10 +407,23 @@ def _verify_pull_request(
 
 def prepare_develop_promotion(
     provider: DevelopPromotionProvider,
+    work_item_provider: WorkItemProvider,
     request: DevelopPromotionRequest,
 ) -> DevelopPromotionResult:
-    """Create or reuse a direct develop PR for an explicitly supplied verified SHA."""
+    """Create or reuse a direct develop PR only for an integrated work item."""
     _validate_request(request)
+    try:
+        item = work_item_provider.get(request.work_item_id)
+    except WorkItemLifecycleError as exc:
+        raise DevelopPromotionError(
+            "Unable to verify the work item's lifecycle state."
+        ) from exc
+    if item.state != LifecycleState.INTEGRATION:
+        raise DevelopPromotionError(
+            "Develop promotion requires the work item to be in integration state; "
+            f"got {item.state.value}."
+        )
+
     readiness = provider.assess_readiness(
         source_branch=request.source_branch,
         target_branch=request.target_branch,
@@ -493,8 +512,14 @@ def main() -> int:
     try:
         token = os.environ.get(args.token_env, "")
         provider = GitHubDevelopPromotionProvider(args.repository, token)
+        work_item_provider = GitHubIssuesProvider(
+            args.repository,
+            token,
+            api_base_url=provider._api_base_url,
+        )
         result = prepare_develop_promotion(
             provider,
+            work_item_provider,
             DevelopPromotionRequest(
                 repository=args.repository,
                 work_item_id=args.work_item_id,
@@ -505,7 +530,12 @@ def main() -> int:
                 draft=not args.ready,
             ),
         )
-    except (DevelopPromotionError, PromotionReadinessError, ValueError) as exc:
+    except (
+        DevelopPromotionError,
+        PromotionReadinessError,
+        WorkItemLifecycleError,
+        ValueError,
+    ) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
 
