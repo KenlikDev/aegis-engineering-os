@@ -102,8 +102,16 @@ class FakeTransport:
             "state": "open",
             "merged_at": None,
             "body": body,
-            "head": {"ref": "ai/integration", "sha": head_sha},
-            "base": {"ref": "develop"},
+            "head": {
+                "ref": "ai/integration",
+                "sha": head_sha,
+                "repo": {"full_name": REPOSITORY},
+            },
+            "base": {
+                "ref": "develop",
+                "sha": TARGET_SHA,
+                "repo": {"full_name": REPOSITORY},
+            },
             "draft": True,
         }
 
@@ -249,6 +257,61 @@ class DevelopPromotionTests(unittest.TestCase):
         )
         self.assertTrue(result.pull_request_reused)
         self.assertFalse(transport.created_pr)
+
+    def test_rejects_fork_origin(self):
+        transport = FakeTransport()
+        original_payload = transport.pull_request_payload
+
+        def fork_payload(**kwargs):
+            payload = original_payload(**kwargs)
+            payload["head"]["repo"]["full_name"] = "KenlikDev/forked-aegis"
+            return payload
+
+        transport.pull_request_payload = fork_payload
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "verification failed",
+        ):
+            prepare_develop_promotion(
+                self._provider(transport),
+                self._work_item_provider(),
+                self._request(),
+            )
+        self.assertTrue(transport.created_pr)
+
+    def test_cli_can_write_canonical_evidence(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        import develop_promotion as module
+        from evidence_contract import read_and_validate_evidence
+
+        transport = FakeTransport()
+        provider = self._provider(transport)
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "develop-promotion.json"
+            argv = [
+                "develop_promotion.py",
+                REPOSITORY,
+                "324",
+                "--owner-verified-source-sha",
+                SOURCE_SHA,
+                "--evidence-output",
+                str(output),
+            ]
+            with (
+                patch.object(module, "GitHubDevelopPromotionProvider", return_value=provider),
+                patch.object(module, "GitHubIssuesProvider", return_value=self._work_item_provider()),
+                patch.object(module.sys, "argv", argv),
+            ):
+                self.assertEqual(0, module.main())
+
+            evidence = read_and_validate_evidence(output)
+            self.assertEqual("develop-promotion", evidence.kind)
+            self.assertEqual(SOURCE_SHA, evidence.revision)
+            self.assertEqual(REPOSITORY, evidence.result["pull_request"]["head_repository"])
 
     def test_rejects_non_develop_target(self):
         transport = FakeTransport()

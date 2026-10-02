@@ -30,6 +30,8 @@ The observation timestamp is captured immediately before the provider assessment
 
 tools/develop_promotion.py is the write boundary for develop promotion.
 
+Successful develop preparation can optionally be serialized as canonical `develop-promotion` evidence with `--evidence-output`. The evidence binds the work item, owner-verified source SHA, protected target SHA, direct pull-request identity (including repository origin), and exact-source Aegis Validation result. The artifact is observational and does not authorize or merge the protected branch.
+
 The operation is intentionally conservative:
 
 1. require an explicit owner-verified source SHA as an operator-provided precondition;

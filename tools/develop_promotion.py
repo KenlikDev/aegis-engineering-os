@@ -8,6 +8,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -70,6 +71,8 @@ class DevelopPromotionPullRequest:
     base: str
     draft: bool
     body: str
+    head_repository: str
+    base_repository: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,7 +237,15 @@ class GitHubDevelopPromotionProvider:
         body = data.get("body") or ""
         head_ref = head.get("ref") if isinstance(head, Mapping) else None
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
+        head_repo = head.get("repo") if isinstance(head, Mapping) else None
+        head_repository = (
+            head_repo.get("full_name") if isinstance(head_repo, Mapping) else None
+        )
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
+        base_repo = base.get("repo") if isinstance(base, Mapping) else None
+        base_repository = (
+            base_repo.get("full_name") if isinstance(base_repo, Mapping) else None
+        )
         if not (
             isinstance(number, int)
             and number > 0
@@ -249,6 +260,8 @@ class GitHubDevelopPromotionProvider:
             and isinstance(base_ref, str)
             and isinstance(draft, bool)
             and isinstance(body, str)
+            and isinstance(head_repository, str)
+            and isinstance(base_repository, str)
         ):
             return None
         return DevelopPromotionPullRequest(
@@ -261,6 +274,8 @@ class GitHubDevelopPromotionProvider:
             base=base_ref,
             draft=draft,
             body=body,
+            head_repository=head_repository,
+            base_repository=base_repository,
         )
 
     def list_open_pull_requests(
@@ -396,6 +411,8 @@ def _verify_pull_request(
         or pull_request.head != request.source_branch
         or pull_request.base != request.target_branch
         or pull_request.head_sha != request.owner_verified_source_sha
+        or pull_request.head_repository != request.repository
+        or pull_request.base_repository != request.repository
         or match is None
         or match.group("sha") != request.owner_verified_source_sha
     ):
@@ -498,7 +515,10 @@ def _to_dict(result: DevelopPromotionResult) -> dict[str, Any]:
             "merged": result.pull_request.merged,
             "head": result.pull_request.head,
             "head_sha": result.pull_request.head_sha,
+            "head_repository": result.pull_request.head_repository,
             "base": result.pull_request.base,
+            "base_sha": result.pull_request.head_sha,
+            "base_repository": result.pull_request.base_repository,
             "draft": result.pull_request.draft,
         },
     }
@@ -516,6 +536,11 @@ def main() -> int:
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     parser.add_argument(
+        "--evidence-output",
+        type=os.path.abspath,
+        help="Optional canonical develop-promotion evidence output path.",
+    )
+    parser.add_argument(
         "--ready",
         action="store_true",
         help="Create the develop pull request as ready for review.",
@@ -529,6 +554,7 @@ def main() -> int:
             args.repository,
             token,
         )
+        observed_at = datetime.now(timezone.utc)
         result = prepare_develop_promotion(
             provider,
             work_item_provider,
@@ -550,6 +576,19 @@ def main() -> int:
     ) as exc:
         print(f"ERROR: {exc}", file=os.sys.stderr)
         return 1
+
+    if args.evidence_output:
+        from evidence_adapters import develop_promotion_evidence
+        from evidence_contract import write_evidence
+
+        write_evidence(
+            develop_promotion_evidence(
+                _to_dict(result),
+                repository=args.repository,
+                observed_at=observed_at,
+            ),
+            args.evidence_output,
+        )
 
     print(json.dumps(_to_dict(result), indent=2, sort_keys=True))
     return 0
