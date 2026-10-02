@@ -25,9 +25,17 @@ def event(
     body=None,
 ):
     return {
+        "repository": {"full_name": "KenlikDev/aegis-engineering-os"},
         "pull_request": {
-            "head": {"ref": head_ref, "sha": head_sha},
-            "base": {"ref": base_ref},
+            "head": {
+                "ref": head_ref,
+                "sha": head_sha,
+                "repo": {"full_name": "KenlikDev/aegis-engineering-os"},
+            },
+            "base": {
+                "ref": base_ref,
+                "repo": {"full_name": "KenlikDev/aegis-engineering-os"},
+            },
             "body": (
                 f"- Verified source SHA: {HEAD_SHA}\n"
                 if body is None
@@ -69,6 +77,15 @@ class DevelopPromotionValidationTests(unittest.TestCase):
     def test_ignores_other_pull_request_flows(self):
         validate_event(event(base_ref="ai/integration"))
         validate_event(event(head_ref="ai/chore/123-example"))
+
+    def test_rejects_fork_origin(self):
+        payload = event()
+        payload["pull_request"]["head"]["repo"]["full_name"] = "attacker/example-fork"
+        with self.assertRaisesRegex(
+            DevelopPromotionValidationError,
+            "must originate from the configured repository",
+        ):
+            validate_event(payload)
 
     def test_rejects_malformed_head_sha(self):
         with self.assertRaisesRegex(
