@@ -38,9 +38,10 @@ The operation is intentionally conservative:
 4. capture the exact current source and protected target SHAs;
 5. require the source to remain exactly equal to the owner-verified SHA before any pull-request write;
 6. search for at most one existing open PR from ai/integration to develop;
-7. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
-8. record the verified SHA in the PR body;
-9. reread the pull request and return structured metadata without credentials.
+7. re-run the exact-SHA readiness check immediately before any PR write;
+8. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
+9. record the verified SHA in the PR body;
+10. reread the pull request and return structured metadata without credentials.
 
 No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint.
 
