@@ -11,6 +11,7 @@ from develop_promotion import (  # noqa: E402
     GitHubDevelopPromotionProvider,
     prepare_develop_promotion,
 )
+from work_item_lifecycle import LifecycleState, WorkItem
 
 REPOSITORY = "KenlikDev/aegis-engineering-os"
 SOURCE_SHA = "1111111111111111111111111111111111111111"
@@ -106,6 +107,22 @@ class FakeTransport:
         }
 
 
+class FakeWorkItemProvider:
+    def __init__(self, state=LifecycleState.INTEGRATION):
+        self.item = WorkItem(
+            id="324",
+            title="Develop promotion task",
+            state=state,
+            provider="fake",
+            provider_url="https://example.test/issues/324",
+        )
+
+    def get(self, work_item_id):
+        if work_item_id != "324":
+            raise AssertionError(f"Unexpected work item: {work_item_id}")
+        return self.item
+
+
 class DevelopPromotionTests(unittest.TestCase):
     def _request(self, sha=SOURCE_SHA, target="develop"):
         return DevelopPromotionRequest(
@@ -114,6 +131,9 @@ class DevelopPromotionTests(unittest.TestCase):
             owner_verified_source_sha=sha,
             target_branch=target,
         )
+
+    def _work_item_provider(self, state=LifecycleState.INTEGRATION):
+        return FakeWorkItemProvider(state)
 
     def _provider(self, transport):
         return GitHubDevelopPromotionProvider(
@@ -124,7 +144,11 @@ class DevelopPromotionTests(unittest.TestCase):
 
     def test_creates_direct_develop_pr_from_owner_verified_sha(self):
         transport = FakeTransport()
-        result = prepare_develop_promotion(self._provider(transport), self._request())
+        result = prepare_develop_promotion(
+            self._provider(transport),
+            self._work_item_provider(),
+            self._request(),
+        )
 
         self.assertEqual(SOURCE_SHA, result.source_sha)
         self.assertEqual(TARGET_SHA, result.target_sha)
@@ -145,13 +169,21 @@ class DevelopPromotionTests(unittest.TestCase):
             DevelopPromotionError,
             "Promotion readiness is blocked",
         ):
-            prepare_develop_promotion(self._provider(transport), self._request())
+            prepare_develop_promotion(
+            self._provider(transport),
+            self._work_item_provider(),
+            self._request(),
+        )
         self.assertFalse(transport.created_pr)
 
     def test_rejects_unprotected_target(self):
         transport = FakeTransport(protected=False)
         with self.assertRaisesRegex(DevelopPromotionError, "must remain protected"):
-            prepare_develop_promotion(self._provider(transport), self._request())
+            prepare_develop_promotion(
+            self._provider(transport),
+            self._work_item_provider(),
+            self._request(),
+        )
         self.assertFalse(transport.created_pr)
 
     def test_reuses_matching_open_direct_pr(self):
@@ -170,7 +202,11 @@ class DevelopPromotionTests(unittest.TestCase):
                 "draft": True,
             }
         )
-        result = prepare_develop_promotion(self._provider(transport), self._request())
+        result = prepare_develop_promotion(
+            self._provider(transport),
+            self._work_item_provider(),
+            self._request(),
+        )
         self.assertTrue(result.pull_request_reused)
         self.assertFalse(transport.created_pr)
 
@@ -179,8 +215,22 @@ class DevelopPromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(DevelopPromotionError, "target must be develop"):
             prepare_develop_promotion(
                 self._provider(transport),
+                self._work_item_provider(),
                 self._request(target="main"),
             )
+
+    def test_rejects_non_integrated_work_item_before_pr_write(self):
+        transport = FakeTransport()
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "requires the work item to be in integration state",
+        ):
+            prepare_develop_promotion(
+                self._provider(transport),
+                self._work_item_provider(LifecycleState.REVIEW),
+                self._request(),
+            )
+        self.assertFalse(transport.created_pr)
 
     def test_rejects_malformed_verified_sha(self):
         transport = FakeTransport()
@@ -190,6 +240,7 @@ class DevelopPromotionTests(unittest.TestCase):
         ):
             prepare_develop_promotion(
                 self._provider(transport),
+                self._work_item_provider(),
                 self._request(sha="not-a-sha"),
             )
 
