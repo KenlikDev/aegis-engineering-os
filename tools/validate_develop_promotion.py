@@ -12,8 +12,12 @@ from pathlib import Path
 from typing import Any, Mapping
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+WORK_ITEM_RE = re.compile(r"^[1-9][0-9]*$")
 VERIFIED_SOURCE_RE = re.compile(
     r"(?m)^- Verified source SHA: (?P<sha>[0-9a-f]{40})$"
+)
+WORK_ITEM_MARKER_RE = re.compile(
+    r"(?m)^- Work item: #(?P<id>[1-9][0-9]*)$"
 )
 
 
@@ -69,6 +73,19 @@ def validate_event(event: Mapping[str, Any]) -> None:
         raise DevelopPromotionValidationError(
             "Direct develop promotion PR head SHA does not match its "
             "owner-verified source SHA."
+        )
+
+    work_item_matches = list(WORK_ITEM_MARKER_RE.finditer(body))
+    if len(work_item_matches) != 1:
+        raise DevelopPromotionValidationError(
+            "Direct develop promotion PR must contain exactly one "
+            "authoritative work-item marker."
+        )
+
+    work_item_id = work_item_matches[0].group("id")
+    if not WORK_ITEM_RE.fullmatch(work_item_id):
+        raise DevelopPromotionValidationError(
+            "Direct develop promotion PR work-item marker is malformed."
         )
 
 

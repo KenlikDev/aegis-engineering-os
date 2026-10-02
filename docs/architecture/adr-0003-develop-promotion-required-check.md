@@ -14,7 +14,7 @@ Because a pull request tracks the live head branch, later autonomous integration
 
 For a direct `ai/integration -> develop` pull request, the `Validate Aegis` workflow runs `tools/validate_develop_promotion.py`.
 
-The validator is intentionally read-only. It activates only for direct `ai/integration -> develop` pull requests and requires exactly one `Verified source SHA` marker in the PR body. That SHA must be a valid 40-character lowercase commit SHA and must equal the current pull-request head SHA.
+The validator is intentionally read-only. It activates only for direct `ai/integration -> develop` pull requests and requires exactly one authoritative `Work item: #<id>` marker plus exactly one `Verified source SHA` marker in the PR body. The work-item identifier must be a positive integer; the source SHA must be a valid 40-character lowercase commit SHA and must equal the current pull-request head SHA.
 
 The specialized gate runs before the general repository validation steps. A drifted direct promotion therefore fails the required `Validate Aegis` check.
 
@@ -29,4 +29,4 @@ Other pull-request flows and main release-promotion snapshots are unchanged.
 
 ## Verification
 
-Unit tests cover matching source/head equality, SHA drift, missing and duplicate markers, malformed heads, unrelated pull-request flows, and the CLI event-file boundary.
+Unit tests cover matching source/head equality, work-item marker presence and uniqueness, SHA drift, missing and duplicate markers, malformed heads, unrelated pull-request flows, and the CLI event-file boundary.
