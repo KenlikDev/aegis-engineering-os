@@ -37,6 +37,7 @@ def event(
                 "repo": {"full_name": "KenlikDev/aegis-engineering-os"},
             },
             "body": (
+                f"- Work item: #332\n"
                 f"- Verified source SHA: {HEAD_SHA}\n"
                 if body is None
                 else body
