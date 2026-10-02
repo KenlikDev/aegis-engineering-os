@@ -37,6 +37,7 @@ def event(
                 "repo": {"full_name": "KenlikDev/aegis-engineering-os"},
             },
             "body": (
+                f"- Work item: #332\n"
                 f"- Verified source SHA: {HEAD_SHA}\n"
                 if body is None
                 else body
@@ -62,6 +63,38 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             "exactly one owner-verified",
         ):
             validate_event(event(body="owner verification omitted\n"))
+
+    def test_rejects_missing_work_item_marker(self):
+        with self.assertRaisesRegex(
+            DevelopPromotionValidationError,
+            "exactly one authoritative work-item",
+        ):
+            validate_event(
+                event(body=f"- Verified source SHA: {HEAD_SHA}\n")
+            )
+
+    def test_rejects_duplicate_work_item_markers(self):
+        body = (
+            "- Work item: #332\n"
+            "- Work item: #332\n"
+            f"- Verified source SHA: {HEAD_SHA}\n"
+        )
+        with self.assertRaisesRegex(
+            DevelopPromotionValidationError,
+            "exactly one authoritative work-item",
+        ):
+            validate_event(event(body=body))
+
+    def test_rejects_malformed_work_item_marker(self):
+        body = (
+            "- Work item: #0\n"
+            f"- Verified source SHA: {HEAD_SHA}\n"
+        )
+        with self.assertRaisesRegex(
+            DevelopPromotionValidationError,
+            "exactly one authoritative work-item",
+        ):
+            validate_event(event(body=body))
 
     def test_rejects_duplicate_markers(self):
         body = (
