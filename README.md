@@ -123,7 +123,7 @@ The verifier is read-only and does not create, merge, or promote anything.
 
 After the owner has verified the exact current `ai/integration` state, prepare the develop promotion from that branch directly:
 
-    python3 tools/develop_promotion.py OWNER/REPO 324 \
+    python3 tools/develop_promotion.py OWNER/REPO 66 \
       --owner-verified-source-sha <EXACT_AI_INTEGRATION_SHA> \
       --ready
 
