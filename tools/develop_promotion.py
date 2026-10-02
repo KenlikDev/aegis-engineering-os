@@ -515,7 +515,6 @@ def main() -> int:
         work_item_provider = GitHubIssuesProvider(
             args.repository,
             token,
-            api_base_url=provider._api_base_url,
         )
         result = prepare_develop_promotion(
             provider,
