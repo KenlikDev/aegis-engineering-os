@@ -67,6 +67,14 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.merge_commit_sha }}"
 
+      - name: Enforce owner-verified develop promotion
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.action != 'closed' &&
+          github.event.pull_request.base.ref == 'develop' &&
+          github.event.pull_request.head.ref == 'ai/integration'
+        run: python tools/validate_develop_promotion.py "$GITHUB_EVENT_PATH"
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

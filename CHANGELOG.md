@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- fail the required `Validate Aegis` path for direct `ai/integration -> develop` promotion when the live PR head drifts from the owner-verified source SHA;
 - narrow the owner-gated develop promotion stale-source race with a final exact-SHA readiness recheck immediately before PR write;
 - require the owner-gated develop promotion to reference an authoritative work item already in `integration` state;
 - require owner verification of the exact `ai/integration` SHA before any `develop` promotion PR; develop promotion now uses `ai/integration` directly, and the temporary develop-promotion snapshot path is blocked;

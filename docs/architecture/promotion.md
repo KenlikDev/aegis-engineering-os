@@ -43,7 +43,7 @@ The operation is intentionally conservative:
 9. record the verified SHA in the PR body;
 10. reread the pull request and return structured metadata without credentials.
 
-No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint.
+No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint. While a develop PR remains open, the required `Validate Aegis` workflow also fails closed whenever the direct PR head SHA differs from its recorded owner-verified source SHA, so branch advancement invalidates the protected-branch check path.
 
 tools/promotion_snapshot.py remains the write boundary for the main release-promotion snapshot flow. It rejects develop targets.
 
@@ -98,6 +98,10 @@ The resulting `develop` pull request is a human decision boundary. Aegis creates
 Main promotion is prepared only for a release candidate or another explicitly declared release checkpoint after the required develop validation and release-readiness evidence is complete.
 
 The detailed cadence is defined in `docs/governance/promotion-checkpoints.md`.
+
+## Required-check enforcement
+
+For a direct `ai/integration -> develop` pull request, `.github/workflows/validate.yml` executes `tools/validate_develop_promotion.py` before the ordinary validation suite. The gate is read-only and compares the exact pull-request head SHA with the single `Verified source SHA` marker recorded by the owner-gated promotion tool. Other pull-request flows are outside this specialized check. Because the protected `develop` ruleset requires `Validate Aegis`, a drifted direct promotion PR fails its required validation rather than remaining ordinarily merge-eligible.
 
 ## Lifecycle
 
