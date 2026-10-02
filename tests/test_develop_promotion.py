@@ -184,6 +184,8 @@ class DevelopPromotionTests(unittest.TestCase):
         self.assertEqual("ai/integration", result.pull_request.head)
         self.assertEqual(SOURCE_SHA, result.pull_request.head_sha)
         self.assertEqual("develop", result.pull_request.base)
+        self.assertEqual(TARGET_SHA, result.pull_request.base_sha)
+        self.assertEqual(SOURCE_SHA, result.validation["validated_sha"])
         self.assertTrue(transport.created_pr)
         self.assertEqual("ai/integration", transport.created_payload["head"])
         self.assertEqual("develop", transport.created_payload["base"])
@@ -245,8 +247,16 @@ class DevelopPromotionTests(unittest.TestCase):
                     "## Aegis owner-gated develop promotion\n\n"
                     f"- Verified source SHA: {SOURCE_SHA}\n"
                 ),
-                "head": {"ref": "ai/integration", "sha": SOURCE_SHA},
-                "base": {"ref": "develop"},
+                "head": {
+                    "ref": "ai/integration",
+                    "sha": SOURCE_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": "develop",
+                    "sha": TARGET_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
                 "draft": True,
             }
         )

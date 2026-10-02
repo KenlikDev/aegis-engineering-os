@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from evidence_adapters import (  # noqa: E402
     architecture_planning_evidence,
     ci_diagnosis_evidence,
+    develop_promotion_evidence,
     implementation_readiness_evidence,
     integration_delivery_evidence,
     integration_merge_evidence,
@@ -65,6 +66,7 @@ from version_verification import VersionClaim, VersionEvidence  # noqa: E402
 REPOSITORY = "KenlikDev/aegis-engineering-os"
 SOURCE_SHA = "1111111111111111111111111111111111111111"
 TARGET_SHA = "2222222222222222222222222222222222222222"
+OTHER_SHA = "3333333333333333333333333333333333333333"
 
 
 class EvidenceAdapterTests(unittest.TestCase):

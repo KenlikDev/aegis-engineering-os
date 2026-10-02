@@ -69,6 +69,7 @@ class DevelopPromotionPullRequest:
     head: str
     head_sha: str
     base: str
+    base_sha: str
     draft: bool
     body: str
     head_repository: str
@@ -83,6 +84,7 @@ class DevelopPromotionResult:
     target_sha: str
     pull_request: DevelopPromotionPullRequest
     pull_request_reused: bool
+    validation: Mapping[str, Any] | None
 
 
 JsonTransport = Callable[
@@ -258,6 +260,8 @@ class GitHubDevelopPromotionProvider:
             and isinstance(head_sha, str)
             and SHA_RE.fullmatch(head_sha)
             and isinstance(base_ref, str)
+            and isinstance(base_sha, str)
+            and SHA_RE.fullmatch(base_sha)
             and isinstance(draft, bool)
             and isinstance(body, str)
             and isinstance(head_repository, str)
@@ -272,6 +276,7 @@ class GitHubDevelopPromotionProvider:
             head=head_ref,
             head_sha=head_sha,
             base=base_ref,
+            base_sha=base_sha,
             draft=draft,
             body=body,
             head_repository=head_repository,
@@ -497,6 +502,21 @@ def prepare_develop_promotion(
         target_sha=final_readiness.target.sha,
         pull_request=pull_request,
         pull_request_reused=reused,
+        validation=(
+            {
+                "id": final_readiness.validation.id,
+                "workflow": final_readiness.validation.workflow,
+                "status": final_readiness.validation.status,
+                "conclusion": final_readiness.validation.conclusion,
+                "head_sha": final_readiness.validation.head_sha,
+                "validated_sha": final_readiness.validation.validated_sha,
+                "evidence_type": final_readiness.validation.evidence_type,
+                "pull_request_number": final_readiness.validation.pull_request_number,
+                "url": final_readiness.validation.url,
+            }
+            if final_readiness.validation is not None
+            else None
+        ),
     )
 
 
@@ -505,8 +525,12 @@ def _to_dict(result: DevelopPromotionResult) -> dict[str, Any]:
         "status": "prepared",
         "repository": result.repository,
         "work_item_id": result.work_item_id,
+        "source_branch": DEFAULT_SOURCE_BRANCH,
         "source_sha": result.source_sha,
+        "owner_verified_source_sha": result.source_sha,
+        "target_branch": TARGET_BRANCH,
         "target_sha": result.target_sha,
+        "validation": result.validation,
         "pull_request_reused": result.pull_request_reused,
         "pull_request": {
             "number": result.pull_request.number,
@@ -517,7 +541,7 @@ def _to_dict(result: DevelopPromotionResult) -> dict[str, Any]:
             "head_sha": result.pull_request.head_sha,
             "head_repository": result.pull_request.head_repository,
             "base": result.pull_request.base,
-            "base_sha": result.pull_request.head_sha,
+            "base_sha": result.pull_request.base_sha,
             "base_repository": result.pull_request.base_repository,
             "draft": result.pull_request.draft,
         },
