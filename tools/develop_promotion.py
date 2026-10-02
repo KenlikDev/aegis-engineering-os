@@ -444,6 +444,19 @@ def prepare_develop_promotion(
             "Multiple open develop promotion pull requests exist for ai/integration -> develop."
         )
 
+    # Re-read readiness after the PR lookup to narrow the source-branch TOCTOU window.
+    final_readiness = provider.assess_readiness(
+        source_branch=request.source_branch,
+        target_branch=request.target_branch,
+        workflow=request.workflow,
+        expected_source_sha=request.owner_verified_source_sha,
+    )
+    if not final_readiness.ready:
+        raise DevelopPromotionError(
+            "Promotion readiness is blocked before develop PR write: "
+            + "; ".join(final_readiness.blockers)
+        )
+
     reused = bool(existing)
     if existing:
         pull_request = provider.get_pull_request(existing[0].number)
@@ -453,7 +466,7 @@ def prepare_develop_promotion(
                 "chore: promote owner-verified ai/integration to develop "
                 f"(#{request.work_item_id})"
             ),
-            body=_promotion_body(request, readiness),
+            body=_promotion_body(request, final_readiness),
             head=request.source_branch,
             base=request.target_branch,
             draft=request.draft,
@@ -463,8 +476,8 @@ def prepare_develop_promotion(
     return DevelopPromotionResult(
         repository=request.repository,
         work_item_id=request.work_item_id,
-        source_sha=readiness.source.sha,
-        target_sha=readiness.target.sha,
+        source_sha=final_readiness.source.sha,
+        target_sha=final_readiness.target.sha,
         pull_request=pull_request,
         pull_request_reused=reused,
     )
