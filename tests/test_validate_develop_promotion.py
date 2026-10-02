@@ -1,14 +1,16 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+from work_item_lifecycle import LifecycleState  # noqa: E402
 from validate_develop_promotion import (  # noqa: E402
     DevelopPromotionValidationError,
     main,
@@ -54,7 +56,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
         self.assertEqual(ISSUE_ID, issue_id)
         return SimpleNamespace(
             id=ISSUE_ID,
-            state=__import__("work_item_lifecycle").LifecycleState.INTEGRATION,
+            state=LifecycleState.INTEGRATION,
         )
 
     def test_accepts_matching_direct_develop_promotion(self):
@@ -76,6 +78,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
 
     def test_rejects_duplicate_markers(self):
         body = (
+            f"- Work item: #{ISSUE_ID}\n"
             f"- Verified source SHA: {HEAD_SHA}\n"
             f"- Verified source SHA: {HEAD_SHA}\n"
         )
@@ -94,7 +97,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
                 event(),
                 issue_lookup=lambda issue_id: SimpleNamespace(
                     id=issue_id,
-                    state=__import__("work_item_lifecycle").LifecycleState.REVIEW,
+                    state=LifecycleState.REVIEW,
                 ),
             )
 
