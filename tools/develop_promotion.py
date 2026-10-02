@@ -244,6 +244,7 @@ class GitHubDevelopPromotionProvider:
             head_repo.get("full_name") if isinstance(head_repo, Mapping) else None
         )
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
+        base_sha = base.get("sha") if isinstance(base, Mapping) else None
         base_repo = base.get("repo") if isinstance(base, Mapping) else None
         base_repository = (
             base_repo.get("full_name") if isinstance(base_repo, Mapping) else None
