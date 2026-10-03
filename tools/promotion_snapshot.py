@@ -29,7 +29,7 @@ from promotion_readiness import (
 )
 
 DEFAULT_API_BASE_URL = "https://api.github.com"
-TARGETS = frozenset({"develop", "main"})
+TARGETS = frozenset({"main"})
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 WORK_ITEM_RE = re.compile(r"^[1-9][0-9]*$")
 PROMOTION_BRANCH_RE = re.compile(
@@ -459,12 +459,10 @@ def _validate_request(request: PromotionSnapshotRequest) -> None:
         raise PromotionSnapshotError("Work-item id must be a positive integer.")
     if request.source_branch != DEFAULT_SOURCE_BRANCH:
         raise PromotionSnapshotError("Promotion source must be ai/integration.")
-    if request.target_branch == "develop":
-        raise PromotionSnapshotError(
-            "Develop promotion snapshots are disabled; use the owner-gated direct ai/integration -> develop workflow."
-        )
     if request.target_branch not in TARGETS:
-        raise PromotionSnapshotError("Promotion target must be develop or main.")
+        raise PromotionSnapshotError(
+            "Promotion snapshot target must be main; develop promotion uses the owner-gated direct ai/integration -> develop workflow."
+        )
     expected = f"ai/{request.work_item_id}-{request.target_branch}-promotion"
     if not PROMOTION_BRANCH_RE.fullmatch(expected):
         raise PromotionSnapshotError("Promotion branch name is invalid.")
