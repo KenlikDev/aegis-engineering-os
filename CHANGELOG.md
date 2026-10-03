@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;
 - add canonical evidence output for owner-gated develop promotion preparation, including exact source and repository-origin provenance;
 - fail the required `Validate Aegis` path for direct `ai/integration -> develop` promotion when the live PR head drifts from the owner-verified source SHA;
