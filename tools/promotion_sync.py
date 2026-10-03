@@ -72,7 +72,6 @@ class PromotionPullRequest:
     body: str = ""
     verified_source_sha: str | None = None
     verified_work_item_id: str | None = None
-    verified_work_item_id: str | None = None
 
 
 class PromotionSyncProvider(Protocol):
