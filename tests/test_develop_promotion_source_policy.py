@@ -53,10 +53,8 @@ class DevelopPromotionSourcePolicyTests(unittest.TestCase):
         promotion = (ROOT / "docs/architecture/promotion.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            'request.target_branch == "develop"',
-            snapshot,
-        )
+        self.assertIn('TARGETS = frozenset({"main"})', snapshot)
+        self.assertNotIn('TARGETS = frozenset({"develop", "main"})', snapshot)
         self.assertIn("main-promotion", promotion)
 
 
