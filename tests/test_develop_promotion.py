@@ -94,6 +94,7 @@ class FakeTransport:
         head_sha = head_sha or self.source_sha
         body = body or (
             "## Aegis owner-gated develop promotion\n\n"
+            "- Work item: #324\n"
             f"- Verified source SHA: {self.source_sha}\n"
         )
         return {
