@@ -166,6 +166,19 @@ If provider synchronization itself fails, Aegis does not guess the remote state 
 For GitHub Issues, the lifecycle adapter maps a closed unlabeled issue to `done`, while open unlabeled issues remain `intake`. Explicit Aegis status labels remain authoritative when present.
 
 
+## Managed GitHub execution boundary
+
+The repository provides a manual `workflow_dispatch` boundary in `.github/workflows/aegis-managed-execution.yml` for operators who need to invoke canonical lifecycle or integration-delivery mutations from the managed GitHub environment.
+
+The workflow accepts only two operations:
+
+- `transition`, which delegates directly to `tools/work_item_lifecycle.py transition` and requires an explicit expected current state;
+- `integrate`, which delegates directly to `tools/integration_delivery.py` and therefore retains its review-state, exact-validation, protected-`ai/integration`, traceability, and post-merge verification checks.
+
+The workflow does not accept arbitrary commands or evaluate user-provided shell. Repository and token selection are fixed to the workflow's own repository and `GITHUB_TOKEN`. The token permissions are limited to the GitHub APIs required by the two canonical operations.
+
+This workflow is an execution boundary, not a replacement for the canonical tools. Lifecycle transition rules, locking, read-after-write verification, integration merge authorization, and evidence contracts remain implemented in the Python tools.
+
 ## Promotion readiness boundary
 
 The runtime layer ends before protected-branch promotion. \`tools/promotion_readiness.py\` is a read-only release gate that consumes current GitHub state and does not mutate any branch or pull request.

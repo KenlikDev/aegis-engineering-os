@@ -80,6 +80,17 @@ For explicit work-item synchronization, provide `--work-item-repository OWNER/RE
 See `docs/architecture/overview.md` for the current system design.
 
 
+## Managed GitHub execution
+
+When the canonical lifecycle or integration tools need to run in the managed GitHub environment, use the manual **Aegis Managed Execution** workflow (`.github/workflows/aegis-managed-execution.yml`).
+
+It exposes only:
+
+- `transition` — invokes `tools/work_item_lifecycle.py` with an explicit `--expected-state`;
+- `integrate` — invokes `tools/integration_delivery.py`, preserving exact validation and protected `ai/integration` merge checks.
+
+The workflow is deliberately not a general command runner. It fixes the repository to `github.repository`, uses the workflow `GITHUB_TOKEN`, and scopes permissions to the GitHub APIs required by the canonical tools.
+
 ## Pull-request delivery
 
 After quality verification places a work item in \`review\`, use \`tools/delivery.py\` to create or reuse an explicit PR from the task branch into \`ai/integration\`:
