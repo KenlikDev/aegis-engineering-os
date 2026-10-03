@@ -69,6 +69,7 @@ permissions:
 jobs:
   execute:
     name: Execute canonical Aegis operation
+    if: ${{ github.ref == 'refs/heads/ai/integration' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -105,6 +106,7 @@ jobs:
       - name: Execute canonical integration delivery
         if: ${{ inputs.operation == 'integrate' }}
         run: |
+          test "$EXPECTED_STATE" = "review"
           test -n "$HEAD_BRANCH"
           test -n "$PR_TITLE"
           python tools/integration_delivery.py "$REPOSITORY" "$WORK_ITEM_ID" "$HEAD_BRANCH" "$PR_TITLE" \
