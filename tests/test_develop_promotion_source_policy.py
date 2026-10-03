@@ -41,7 +41,10 @@ class DevelopPromotionSourcePolicyTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("ai/integration -> develop", branching)
-        self.assertIn("direct ai/integration -> develop", promotion)
+        self.assertIn(
+            "Develop promotion is an explicit owner-gated pull request",
+            promotion,
+        )
 
     def test_main_snapshot_branch_remains_allowed(self):
         snapshot = (ROOT / "tools/promotion_snapshot.py").read_text(
@@ -50,8 +53,11 @@ class DevelopPromotionSourcePolicyTests(unittest.TestCase):
         promotion = (ROOT / "docs/architecture/promotion.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("main-promotion", snapshot)
-        self.assertIn("ai/<work-item>-main-promotion", promotion)
+        self.assertIn(
+            'request.target_branch == "develop"',
+            snapshot,
+        )
+        self.assertIn("main-promotion", promotion)
 
 
 if __name__ == "__main__":
