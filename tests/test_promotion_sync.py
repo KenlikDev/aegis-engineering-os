@@ -389,6 +389,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(
             head="ai/integration",
             base="develop",
+            target_branch="develop",
         )
         provider.pull_request = PromotionPullRequest(
             number=provider.pull_request.number,
@@ -422,6 +423,7 @@ class PromotionSyncTests(unittest.TestCase):
         provider = FakePromotionProvider(
             head="ai/integration",
             base="develop",
+            target_branch="develop",
         )
         provider.pull_request = PromotionPullRequest(
             number=provider.pull_request.number,
