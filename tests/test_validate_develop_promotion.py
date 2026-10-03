@@ -67,7 +67,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             DevelopPromotionValidationError,
             "head SHA does not match",
         ):
-            validate_event(event(head_sha=OTHER_SHA, issue_lookup=self._lookup))
+            validate_event(event(head_sha=OTHER_SHA), issue_lookup=self._lookup)
 
     def test_rejects_missing_marker(self):
         with self.assertRaisesRegex(
@@ -95,7 +95,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             DevelopPromotionValidationError,
             "exactly one authoritative work-item",
         ):
-            validate_event(event(body=body, issue_lookup=self._lookup))
+            validate_event(event(body=body), issue_lookup=self._lookup)
 
     def test_rejects_malformed_work_item_marker(self):
         body = (
@@ -153,8 +153,8 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             validate_event(event())
 
     def test_ignores_other_pull_request_flows(self):
-        validate_event(event(base_ref="ai/integration", issue_lookup=self._lookup))
-        validate_event(event(head_ref="ai/chore/123-example", issue_lookup=self._lookup))
+        validate_event(event(base_ref="ai/integration"), issue_lookup=self._lookup)
+        validate_event(event(head_ref="ai/chore/123-example"), issue_lookup=self._lookup)
 
     def test_rejects_fork_origin(self):
         payload = event()
@@ -170,7 +170,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             DevelopPromotionValidationError,
             "malformed head SHA",
         ):
-            validate_event(event(head_sha="not-a-sha", issue_lookup=self._lookup))
+            validate_event(event(head_sha="not-a-sha"), issue_lookup=self._lookup)
 
     def test_cli_reads_event_payload(self):
         payload = event()
