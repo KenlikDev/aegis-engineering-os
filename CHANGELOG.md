@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- recover shared Aegis lifecycle-label initialization after concurrent GitHub label creation, with mandatory read-after-write verification;
 - bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
 - recheck the owner-gated develop promotion work-item lifecycle immediately before PR reuse/creation to narrow the final TOCTOU window;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;

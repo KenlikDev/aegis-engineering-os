@@ -720,7 +720,7 @@ class GitHubIssuesProvider:
     def _ensure_status_label(self, state: LifecycleState) -> None:
         label_name = f"{STATUS_LABEL_PREFIX}{state.value}"
         path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
-        status, data = self._request("GET", path)
+        status, _ = self._request("GET", path)
         if status == 200:
             return
         if status != 404:
@@ -728,7 +728,7 @@ class GitHubIssuesProvider:
                 f"Unable to inspect Aegis status label {label_name!r}; HTTP {status}."
             )
         create_path = f"/repos/{self.repository}/labels"
-        status, data = self._request(
+        status, _ = self._request(
             "POST",
             create_path,
             {
@@ -737,11 +737,15 @@ class GitHubIssuesProvider:
                 "color": "6f42c1",
             },
         )
-        if status not in {200, 201}:
-            raise WorkItemLifecycleError(
-                f"Unable to create Aegis status label {label_name!r}; HTTP {status}."
-            )
-        self._verify_label_exists(label_name)
+        if status in {200, 201}:
+            self._verify_label_exists(label_name)
+            return
+        if status in {409, 422}:
+            self._verify_label_exists(label_name)
+            return
+        raise WorkItemLifecycleError(
+            f"Unable to create Aegis status label {label_name!r}; HTTP {status}."
+        )
 
     def _ensure_resume_label(self, state: LifecycleState) -> None:
         label_name = f"{RESUME_LABEL_PREFIX}{state.value}"
@@ -762,11 +766,15 @@ class GitHubIssuesProvider:
                 "color": "8250df",
             },
         )
-        if status not in {200, 201}:
-            raise WorkItemLifecycleError(
-                f"Unable to create Aegis resume label {label_name!r}; HTTP {status}."
-            )
-        self._verify_label_exists(label_name)
+        if status in {200, 201}:
+            self._verify_label_exists(label_name)
+            return
+        if status in {409, 422}:
+            self._verify_label_exists(label_name)
+            return
+        raise WorkItemLifecycleError(
+            f"Unable to create Aegis resume label {label_name!r}; HTTP {status}."
+        )
 
     def _verify_label_exists(self, label_name: str) -> None:
         path = f"/repos/{self.repository}/labels/{quote(label_name, safe='')}"
