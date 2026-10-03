@@ -27,6 +27,9 @@ class AegisManagedExecutionWorkflowTests(unittest.TestCase):
         self.assertIn("- transition", self.workflow)
         self.assertIn("- integrate", self.workflow)
 
+    def test_execution_is_restricted_to_integration_branch(self):
+        self.assertIn("github.ref == 'refs/heads/ai/integration'", self.workflow)
+
     def test_expected_state_is_required(self):
         self.assertIn("expected_state:", self.workflow)
         block = self.workflow.split("expected_state:", 1)[1].split("target_state:", 1)[0]
@@ -46,6 +49,7 @@ class AegisManagedExecutionWorkflowTests(unittest.TestCase):
             self.workflow,
         )
         self.assertIn("--canonical-evidence-output", self.workflow)
+        self.assertIn('test "$EXPECTED_STATE" = "review"', self.workflow)
 
     def test_permissions_are_scoped_to_required_apis(self):
         expected = [
