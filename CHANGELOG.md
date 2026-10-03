@@ -3,6 +3,8 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- add a manual Aegis Managed Execution workflow that delegates only to the canonical lifecycle and integration-delivery tools;
+- require explicit expected lifecycle state for managed workflow transitions and preserve exact validation/protected-branch checks for integration delivery;
 - bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
 - recheck the owner-gated develop promotion work-item lifecycle immediately before PR reuse/creation to narrow the final TOCTOU window;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;
