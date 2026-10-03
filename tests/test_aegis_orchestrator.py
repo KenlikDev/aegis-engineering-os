@@ -250,6 +250,9 @@ Test fixture.
             capture_output=True,
         )
 
+    def test_orchestrator_default_ollama_version_is_released(self) -> None:
+        self.assertEqual("0.34.2", aegis_orchestrator.DEFAULT_OLLAMA_VERSION)
+
     def _config(
         self,
         task: str = "Implement the requested change.",
@@ -272,13 +275,13 @@ Test fixture.
             profile_config=self.project / "profiles.json",
             evidence_path=evidence_path,
             expected_model="gemma4:31b",
-            expected_ollama_version="0.34.3",
+            expected_ollama_version="0.34.2",
             expected_openhands_version="1.49.5",
         )
 
     def _preflight(self, *args, **kwargs):  # noqa: ANN002, ANN003
         return {
-            "ollama_version": "0.34.3",
+            "ollama_version": "0.34.2",
             "model": "gemma4:31b",
             "openhands_agent_server": {
                 "version": "1.49.5",

@@ -39,7 +39,7 @@ Run:
 
 The preflight does not pull models, change Ollama state, modify the project, or invoke an OpenHands execution command.
 
-Ollama documents model names as model:tag values, the local-model listing at GET /api/tags, and runtime version reporting at GET /api/version. The exact model tag therefore remains part of the runtime evidence instead of being inferred from a mutable latest alias.
+Ollama documents model names as model:tag values, the local-model listing at GET /api/tags, and runtime version reporting at GET /api/version. The exact model tag therefore remains part of the runtime evidence instead of being inferred from a mutable latest alias. The managed orchestrator default expected Ollama version is explicitly pinned to the verified release `0.34.2`; projects may override it with their own recorded version evidence, and Aegis never upgrades the runtime implicitly.
 
 ## Local HTTP response bounds
 
