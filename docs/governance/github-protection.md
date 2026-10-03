@@ -86,7 +86,7 @@ Before relying on this document for a repository decision, Aegis can inspect the
 
     GITHUB_TOKEN="$TOKEN" python3 tools/github_protection_audit.py OWNER/REPO
 
-The default audit checks `main`, `develop`, and `ai/integration`. Use repeated `--branch` arguments for a narrower scope. The tool requires a token with sufficient GitHub Administration read access because repository rulesets are an administrative resource. It fails closed when a requested branch has zero or multiple active branch rulesets, or when the returned ruleset schema is malformed. It performs no GitHub mutations.
+The default audit checks `main`, `develop`, and `ai/integration`. Use repeated `--branch` arguments for a narrower scope. The tool uses the repository ruleset API and requires credentials appropriate to the controls being inspected. Complete bypass-actor verification requires the returned `bypass_actors` field; GitHub may omit that field for callers without sufficient ruleset access. The audit preserves an omitted field as `null` rather than treating it as an empty bypass list. It fails closed when a requested branch has zero or multiple active branch rulesets, or when the returned ruleset schema is malformed. It performs no GitHub mutations.
 
 To persist the observation as canonical provenance:
 

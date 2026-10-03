@@ -136,6 +136,12 @@ class ProtectionAuditTests(unittest.TestCase):
         self.assertEqual(2, len(items))
         self.assertEqual(3, len(transport.calls))
 
+    def test_preserves_unknown_bypass_actor_visibility(self):
+        item = ruleset()
+        item.pop("bypass_actors")
+        summary = summarize_ruleset(item)
+        self.assertIsNone(summary.bypass_actors)
+
     def test_evidence_is_canonical(self):
         result = audit_branches(
             FakeProvider([

@@ -52,7 +52,7 @@ class RulesetSummary:
     blocks_deletion: bool
     requires_linear_history: bool
     allowed_merge_methods: tuple[str, ...]
-    bypass_actors: tuple[Mapping[str, Any], ...]
+    bypass_actors: tuple[Mapping[str, Any], ...] | None
     html_url: str | None
 
 
@@ -214,8 +214,10 @@ def _rule_parameters(
 
 def _parse_bypass_actors(
     ruleset: Mapping[str, Any],
-) -> tuple[Mapping[str, Any], ...]:
-    raw = ruleset.get("bypass_actors", [])
+) -> tuple[Mapping[str, Any], ...] | None:
+    if "bypass_actors" not in ruleset:
+        return None
+    raw = ruleset["bypass_actors"]
     if not isinstance(raw, list):
         raise RulesetAuditError("Ruleset bypass_actors are malformed.")
     actors: list[Mapping[str, Any]] = []
@@ -378,7 +380,11 @@ def audit_branches(
                 "blocks_deletion": summary.blocks_deletion,
                 "requires_linear_history": summary.requires_linear_history,
             },
-            "bypass_actors": [dict(actor) for actor in summary.bypass_actors],
+            "bypass_actors": (
+                [dict(actor) for actor in summary.bypass_actors]
+                if summary.bypass_actors is not None
+                else None
+            ),
         }
 
     return {"repository": provider.repository, "branches": result}
