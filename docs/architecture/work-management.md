@@ -98,7 +98,7 @@ The lifecycle provider returns `MutationEvidence` as the provider-neutral result
 
 A mutation with `verified=True` becomes canonical `verified`. A mutation with `verified=False` remains canonical `unknown` with explicit uncertainty. The adapter does not retry, repair, or reinterpret the provider result.
 
-GitHub lifecycle transitions are serialized per work item with a Git ref lock under `refs/aegis/locks/work-item/<id>`. Lock acquisition uses ref creation when absent and `force=false` fast-forward updates for existing free or expired locks. A competing writer that advances the ref first causes the stale update to return a conflict, so the lifecycle transition fails closed rather than overwriting the newer writer. A bounded lease provides stale-lock recovery after process failure. Release is also conditional and never deletes an unconditionally reacquired lock. The guarantee covers cooperating `GitHubIssuesProvider` instances; manual GitHub issue edits remain outside this serialization boundary.
+GitHub lifecycle transitions are serialized per work item with a Git ref lock under `refs/aegis/locks/work-item/<id>`. Lock acquisition uses ref creation when absent and `force=false` fast-forward updates for existing free or expired locks. A competing writer that advances the ref first causes the stale update to return a conflict, so the lifecycle transition fails closed rather than overwriting the newer writer. A bounded lease provides stale-lock recovery after process failure. Lock release is best-effort housekeeping: it is conditional, never overwrites another writer, and a release race cannot invalidate mutation evidence that was already read back successfully. The guarantee covers cooperating `GitHubIssuesProvider` instances; manual GitHub issue edits remain outside this serialization boundary.
 
 Higher-level execution boundaries must enforce this invariant at their own return boundary. They must not synthesize `verified=True` from a successful transport or command result. Quality-gate synchronization and managed execution therefore fail closed when traceability, comment, or lifecycle mutation evidence is unverified.
 
@@ -120,3 +120,5 @@ A blocker result means the work item must not silently advance to `ready`. The t
 ## GitHub credential destination
 
 GitHub Issues lifecycle persistence sends bearer credentials only to the exact `https://api.github.com` API origin. Arbitrary HTTPS hosts are not accepted as API destinations.
+
+Lock-release cleanup is not part of lifecycle mutation verification. If cleanup loses a race or encounters a transient provider error, the transition result remains based on the already verified work-item state; failed mutations preserve their original error while cleanup remains non-destructive.
