@@ -106,7 +106,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             DevelopPromotionValidationError,
             "exactly one authoritative work-item",
         ):
-            validate_event(event(body=body, issue_lookup=self._lookup))
+            validate_event(event(body=body))
 
     def test_rejects_duplicate_markers(self):
         body = (
@@ -117,7 +117,7 @@ class DevelopPromotionValidationTests(unittest.TestCase):
             DevelopPromotionValidationError,
             "exactly one owner-verified",
         ):
-            validate_event(event(body=body, issue_lookup=self._lookup))
+            validate_event(event(body=body))
 
     def test_rejects_non_integrated_work_item(self):
         with self.assertRaisesRegex(
