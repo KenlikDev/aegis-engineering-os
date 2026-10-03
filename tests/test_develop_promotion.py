@@ -94,6 +94,7 @@ class FakeTransport:
         head_sha = head_sha or self.source_sha
         body = body or (
             "## Aegis owner-gated develop promotion\n\n"
+            "- Work item: #324\n"
             f"- Verified source SHA: {self.source_sha}\n"
         )
         return {
@@ -280,6 +281,7 @@ class DevelopPromotionTests(unittest.TestCase):
                 "merged_at": None,
                 "body": (
                     "## Aegis owner-gated develop promotion\n\n"
+                    "- Work item: #324\n"
                     f"- Verified source SHA: {SOURCE_SHA}\n"
                 ),
                 "head": {
@@ -302,6 +304,106 @@ class DevelopPromotionTests(unittest.TestCase):
         )
         self.assertTrue(result.pull_request_reused)
         self.assertFalse(transport.created_pr)
+
+    def test_rejects_missing_work_item_marker_on_reuse(self):
+        transport = FakeTransport(
+            existing_pr={
+                "number": 10,
+                "html_url": "https://github.com/KenlikDev/aegis-engineering-os/pull/10",
+                "state": "open",
+                "merged_at": None,
+                "body": f"- Verified source SHA: {SOURCE_SHA}\n",
+                "head": {
+                    "ref": "ai/integration",
+                    "sha": SOURCE_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": "develop",
+                    "sha": TARGET_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "draft": True,
+            }
+        )
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "exactly one authoritative work-item marker",
+        ):
+            prepare_develop_promotion(
+                self._provider(transport),
+                self._work_item_provider(),
+                self._request(),
+            )
+
+    def test_rejects_duplicate_verified_source_markers_on_reuse(self):
+        transport = FakeTransport(
+            existing_pr={
+                "number": 10,
+                "html_url": "https://github.com/KenlikDev/aegis-engineering-os/pull/10",
+                "state": "open",
+                "merged_at": None,
+                "body": (
+                    "- Work item: #324\n"
+                    f"- Verified source SHA: {SOURCE_SHA}\n"
+                    f"- Verified source SHA: {SOURCE_SHA}\n"
+                ),
+                "head": {
+                    "ref": "ai/integration",
+                    "sha": SOURCE_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": "develop",
+                    "sha": TARGET_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "draft": True,
+            }
+        )
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "exactly one owner-verified source SHA marker",
+        ):
+            prepare_develop_promotion(
+                self._provider(transport),
+                self._work_item_provider(),
+                self._request(),
+            )
+
+    def test_rejects_wrong_work_item_marker_on_reuse(self):
+        transport = FakeTransport(
+            existing_pr={
+                "number": 10,
+                "html_url": "https://github.com/KenlikDev/aegis-engineering-os/pull/10",
+                "state": "open",
+                "merged_at": None,
+                "body": (
+                    "- Work item: #999\n"
+                    f"- Verified source SHA: {SOURCE_SHA}\n"
+                ),
+                "head": {
+                    "ref": "ai/integration",
+                    "sha": SOURCE_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "base": {
+                    "ref": "develop",
+                    "sha": TARGET_SHA,
+                    "repo": {"full_name": REPOSITORY},
+                },
+                "draft": True,
+            }
+        )
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "provenance does not match",
+        ):
+            prepare_develop_promotion(
+                self._provider(transport),
+                self._work_item_provider(),
+                self._request(),
+            )
 
     def test_rejects_fork_origin(self):
         transport = FakeTransport()
