@@ -281,6 +281,7 @@ class DevelopPromotionTests(unittest.TestCase):
                 "merged_at": None,
                 "body": (
                     "## Aegis owner-gated develop promotion\n\n"
+                    "- Work item: #324\n"
                     f"- Verified source SHA: {SOURCE_SHA}\n"
                 ),
                 "head": {
