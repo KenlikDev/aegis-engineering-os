@@ -125,8 +125,11 @@ class ProtectionAuditTests(unittest.TestCase):
 
     def test_reads_all_ruleset_pages(self):
         transport = FakeTransport({
-            1: [ruleset()],
-            2: [ruleset(ruleset_id=2, name="main-protection", branch="main")],
+            1: [
+                ruleset(ruleset_id=index, name=f"filler-{index}", branch=f"filler-{index}")
+                for index in range(1, 101)
+            ],
+            2: [ruleset(ruleset_id=101, name="main-protection", branch="main")],
             3: [],
         })
         provider = GitHubRulesetProvider(
