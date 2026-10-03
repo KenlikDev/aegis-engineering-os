@@ -136,7 +136,7 @@ class ProtectionAuditTests(unittest.TestCase):
             "KenlikDev/aegis-engineering-os", "token", transport=transport
         )
         items = provider.list_active_rulesets()
-        self.assertEqual(2, len(items))
+        self.assertEqual(101, len(items))
         self.assertEqual(3, len(transport.calls))
 
     def test_preserves_unknown_bypass_actor_visibility(self):
