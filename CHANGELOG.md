@@ -3,6 +3,9 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- mark GitHub ruleset audit provenance as `unknown` when bypass-actor visibility is unavailable and ignore inactive/non-branch rulesets during branch auditing;
+- preserve unavailable GitHub ruleset bypass-actor visibility as explicit unknown evidence instead of treating an omitted field as an empty allowlist;
+- add a read-only live GitHub repository-ruleset audit with canonical evidence output;
 - bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
 - recheck the owner-gated develop promotion work-item lifecycle immediately before PR reuse/creation to narrow the final TOCTOU window;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;
