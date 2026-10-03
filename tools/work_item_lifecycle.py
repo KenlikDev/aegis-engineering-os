@@ -645,14 +645,11 @@ class GitHubIssuesProvider:
     def _release_lifecycle_lock(self, lock: _LifecycleLock) -> None:
         current = self._read_lifecycle_lock(lock.work_item_id)
         if current is None or current[0] != lock.ref_sha:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} was lost before release."
-            )
+            return
         _, mode, owner, _ = current
         if mode != "held" or owner != lock.owner:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} is owned by another writer."
-            )
+            return
+
         free_sha = self._create_lifecycle_lock_commit(
             lock.ref_sha,
             work_item_id=lock.work_item_id,
@@ -665,11 +662,22 @@ class GitHubIssuesProvider:
             self._lifecycle_lock_ref_path(lock.work_item_id),
             {"sha": free_sha, "force": False},
         )
-        if status != 200:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} changed before release; "
-                "refusing to overwrite another writer's lock."
-            )
+        if status == 200:
+            return
+
+        latest = self._read_lifecycle_lock(lock.work_item_id)
+        if (
+            latest is None
+            or latest[0] != lock.ref_sha
+            or latest[1] != "held"
+            or latest[2] != lock.owner
+        ):
+            return
+
+        raise WorkItemLifecycleError(
+            f"Lifecycle lock for #{lock.work_item_id} changed before release; "
+            "refusing to overwrite another writer's lock."
+        )
 
     def get(self, work_item_id: str) -> WorkItem:
         status, data = self._request("GET", self._issue_path(work_item_id))
@@ -855,9 +863,15 @@ class GitHubIssuesProvider:
                 reference=verified.provider_url,
             )
         except Exception:
-            self._release_lifecycle_lock(lock)
+            try:
+                self._release_lifecycle_lock(lock)
+            except Exception:
+                pass
             raise
-        self._release_lifecycle_lock(lock)
+        try:
+            self._release_lifecycle_lock(lock)
+        except Exception:
+            pass
         return evidence
 
     def comment(self, work_item_id: str, body: str) -> MutationEvidence:

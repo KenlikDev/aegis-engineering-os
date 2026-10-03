@@ -47,6 +47,8 @@ class FakeGitHubTransport:
         self.lock_sha: str | None = None
         self.lock_conflict = False
         self.mutate_after_first_issue_get = False
+        self.release_race = False
+        self.transition_error = False
         self.issue_get_count = 0
 
     def seed_stale_lock(self) -> None:
@@ -111,6 +113,25 @@ class FakeGitHubTransport:
                     self.lock_conflict = False
                     return 409, {}
                 new_sha = payload["sha"]
+                if (
+                    self.release_race
+                    and "mode: free" in self.git_commits[new_sha]["message"]
+                ):
+                    competitor = self._new_git_commit(
+                        parent_sha=self.lock_sha or self.integration_sha,
+                        message="\n".join(
+                            (
+                                LIFECYCLE_LOCK_HEADER,
+                                "work-item: 53",
+                                "mode: held",
+                                "owner: 87654321-4321-8765-4321-876543218765",
+                                "expires-at: 9999-01-01T00:00:00Z",
+                            )
+                        ),
+                    )
+                    self.lock_sha = competitor
+                    self.release_race = False
+                    return 409, {}
                 parents = self.git_commits[new_sha]["parents"]
                 if parents != [self.lock_sha]:
                     return 409, {}
@@ -157,6 +178,8 @@ class FakeGitHubTransport:
                     "labels": [{"name": name} for name in sorted(self.labels)],
                 }
             if method == "PATCH":
+                if self.transition_error:
+                    return 500, {}
                 self.state = payload["state"]
                 self.labels = set(payload["labels"])
                 return 200, {"ok": True}
@@ -405,6 +428,41 @@ class WorkItemLifecycleTests(unittest.TestCase):
             if method == "PATCH" and path.endswith("/issues/53")
         ]
         self.assertEqual([], patch_calls)
+
+    def test_verified_transition_survives_release_race_without_overwriting_competitor(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.release_race = True
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+
+        evidence = provider.transition("53", LifecycleState.PLANNED)
+
+        self.assertTrue(evidence.verified)
+        self.assertEqual(LifecycleState.PLANNED, provider.get("53").state)
+        competitor = transport.git_commits[transport.lock_sha]
+        self.assertIn(
+            "owner: 87654321-4321-8765-4321-876543218765",
+            competitor["message"],
+        )
+
+    def test_transition_error_is_preserved_when_lock_cleanup_also_fails(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.release_race = True
+        transport.transition_error = True
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+
+        with self.assertRaisesRegex(
+            WorkItemLifecycleError,
+            "Unable to transition GitHub issue #53; HTTP 500",
+        ):
+            provider.transition("53", LifecycleState.PLANNED)
 
     def test_github_transition_rejects_concurrent_state_change(self) -> None:
         transport = FakeGitHubTransport()

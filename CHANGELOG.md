@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- prevent lifecycle lock-release races and cleanup failures from masking already-verified mutations or the original transition error;
 - bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
 - recheck the owner-gated develop promotion work-item lifecycle immediately before PR reuse/creation to narrow the final TOCTOU window;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;
