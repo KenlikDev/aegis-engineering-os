@@ -132,6 +132,26 @@ class FakeWorkItemProvider:
         return self.item
 
 
+class LifecycleRecheckingWorkItemProvider(FakeWorkItemProvider):
+    def __init__(self, second_state=LifecycleState.REVIEW):
+        super().__init__(LifecycleState.INTEGRATION)
+        self.second_state = second_state
+        self.get_calls = 0
+
+    def get(self, work_item_id):
+        item = super().get(work_item_id)
+        self.get_calls += 1
+        if self.get_calls >= 2:
+            return WorkItem(
+                id=item.id,
+                title=item.title,
+                state=self.second_state,
+                provider=item.provider,
+                provider_url=item.provider_url,
+            )
+        return item
+
+
 class RecheckingProvider(GitHubDevelopPromotionProvider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -193,6 +213,21 @@ class DevelopPromotionTests(unittest.TestCase):
             f"- Verified source SHA: {SOURCE_SHA}",
             transport.created_payload["body"],
         )
+
+    def test_recheck_rejects_work_item_lifecycle_drift_before_pr_write(self):
+        transport = FakeTransport()
+        work_item_provider = LifecycleRecheckingWorkItemProvider()
+        with self.assertRaisesRegex(
+            DevelopPromotionError,
+            "requires the work item to be in integration state",
+        ):
+            prepare_develop_promotion(
+                self._provider(transport),
+                work_item_provider,
+                self._request(),
+            )
+        self.assertEqual(2, work_item_provider.get_calls)
+        self.assertFalse(transport.created_pr)
 
     def test_recheck_rejects_stale_source_before_pr_write(self):
         transport = FakeTransport()

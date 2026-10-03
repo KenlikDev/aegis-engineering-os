@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- recheck the owner-gated develop promotion work-item lifecycle immediately before PR reuse/creation to narrow the final TOCTOU window;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;
 - add canonical evidence output for owner-gated develop promotion preparation, including exact source and repository-origin provenance;
 - fail the required `Validate Aegis` path for direct `ai/integration -> develop` promotion when the live PR head drifts from the owner-verified source SHA;

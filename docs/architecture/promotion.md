@@ -41,9 +41,10 @@ The operation is intentionally conservative:
 5. require the source to remain exactly equal to the owner-verified SHA before any pull-request write;
 6. search for at most one existing open PR from ai/integration to develop;
 7. re-run the exact-SHA readiness check immediately before any PR write;
-8. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
-9. record the verified SHA in the PR body;
-10. reread the pull request and return structured metadata without credentials.
+8. re-read the authoritative work item immediately before PR reuse/creation and require it to remain in `integration` state;
+9. create or reuse the direct pull request only when its head SHA, base, target protection, and verification marker match the owner-verified SHA;
+10. record the verified SHA in the PR body;
+11. reread the pull request and return structured metadata without credentials.
 
 No temporary develop branch or synthetic merge commit is created. If ai/integration advances after the owner verification, the expected-source check fails closed and the develop PR is not created or reused as a verified checkpoint. While a develop PR remains open, the required `Validate Aegis` workflow also fails closed whenever the direct PR head SHA differs from its recorded owner-verified source SHA, so branch advancement invalidates the protected-branch check path.
 
