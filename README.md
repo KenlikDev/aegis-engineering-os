@@ -101,6 +101,19 @@ Verified work-item lifecycle mutations can be adapted into canonical provenance 
 
 An unverified mutation remains canonical `unknown` with explicit read-after-write uncertainty.
 
+## Live GitHub protection audit
+
+Before relying on repository protection documentation for a current decision, inspect the live rulesets:
+
+    GITHUB_TOKEN="$TOKEN" python3 tools/github_protection_audit.py OWNER/REPO
+
+The default audit checks `main`, `develop`, and `ai/integration`. Repeat `--branch` to narrow the scope. The command is read-only, fails closed on missing or ambiguous active branch rulesets, and can emit canonical provenance:
+
+    GITHUB_TOKEN="$TOKEN" python3 tools/github_protection_audit.py OWNER/REPO \
+      --canonical-evidence-output /tmp/github-ruleset-audit.json
+
+An omitted `bypass_actors` field is preserved as unknown rather than interpreted as an empty bypass list.
+
 ## Promotion readiness
 
 Before promoting \`ai/integration\`, run the read-only verifier against the explicit protected target:
