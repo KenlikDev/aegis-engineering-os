@@ -385,6 +385,74 @@ class PromotionSyncTests(unittest.TestCase):
                 target_branch="develop",
             )
 
+    def test_direct_develop_merge_rejects_work_item_marker_mismatch(self):
+        provider = FakePromotionProvider(
+            head="ai/integration",
+            base="develop",
+            target_branch="develop",
+        )
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head="ai/integration",
+            head_sha=HEAD_SHA,
+            base="develop",
+            base_sha=TARGET_SHA,
+            state="closed",
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
+            body="- Work item: #344\n- Verified source SHA: " + HEAD_SHA + "\n",
+            verified_source_sha=HEAD_SHA,
+            verified_work_item_id="344",
+        )
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "matching the synchronized work item",
+        ):
+            sync_promotion_merge(
+                provider,
+                FakeWorkItemProvider(),
+                "1",
+                PROMOTION_PR,
+                target_branch="develop",
+            )
+
+    def test_direct_develop_merge_rejects_duplicate_work_item_markers(self):
+        provider = FakePromotionProvider(
+            head="ai/integration",
+            base="develop",
+            target_branch="develop",
+        )
+        provider.pull_request = PromotionPullRequest(
+            number=provider.pull_request.number,
+            url=provider.pull_request.url,
+            head="ai/integration",
+            head_sha=HEAD_SHA,
+            base="develop",
+            base_sha=TARGET_SHA,
+            state="closed",
+            merged=True,
+            merge_commit_sha=MERGE_SHA,
+            head_repository=REPOSITORY,
+            base_repository=REPOSITORY,
+            body="- Work item: #1\n- Work item: #1\n- Verified source SHA: " + HEAD_SHA + "\n",
+            verified_source_sha=HEAD_SHA,
+            verified_work_item_id=None,
+        )
+        with self.assertRaisesRegex(
+            PromotionSyncError,
+            "matching the synchronized work item",
+        ):
+            sync_promotion_merge(
+                provider,
+                FakeWorkItemProvider(),
+                "1",
+                PROMOTION_PR,
+                target_branch="develop",
+            )
+
     def test_direct_develop_merge_rejects_verification_head_drift(self):
         provider = FakePromotionProvider(
             head="ai/integration",
@@ -403,8 +471,9 @@ class PromotionSyncTests(unittest.TestCase):
             merge_commit_sha=MERGE_SHA,
             head_repository=REPOSITORY,
             base_repository=REPOSITORY,
-            body=f"- Verified source SHA: {HEAD_SHA}\n",
+            body=f"- Work item: #1\n- Verified source SHA: {HEAD_SHA}\n",
             verified_source_sha=HEAD_SHA,
+            verified_work_item_id="1",
         )
         with self.assertRaisesRegex(
             PromotionSyncError,

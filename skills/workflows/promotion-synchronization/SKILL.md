@@ -13,7 +13,7 @@ Advance an integrated work item to done only after a promotion pull request has 
 
 1. The work item is in integration.
 2. The promotion pull request number is explicit.
-3. For develop, the pull-request head is ai/integration and its owner-verification marker names the same source SHA as the PR head. For main, the pull-request head matches ai/<work-item>-main-promotion.
+3. For develop, the pull-request head is ai/integration, the PR contains exactly one Work item marker matching the synchronized work item, and its owner-verification marker names the same source SHA as the PR head. For main, the pull-request head matches ai/<work-item>-main-promotion.
 4. The pull-request base matches the selected protected target.
 5. The pull request is closed and actually merged.
 6. A merge commit SHA is present.
