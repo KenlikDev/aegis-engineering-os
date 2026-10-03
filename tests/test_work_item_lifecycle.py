@@ -47,6 +47,8 @@ class FakeGitHubTransport:
         self.lock_sha: str | None = None
         self.lock_conflict = False
         self.mutate_after_first_issue_get = False
+        self.race_label_creation: set[str] = set()
+        self.race_label_creation_without_persist: set[str] = set()
         self.issue_get_count = 0
 
     def seed_stale_lock(self) -> None:
@@ -169,8 +171,17 @@ class FakeGitHubTransport:
 
         if path == "/repos/KenlikDev/aegis-engineering-os/labels":
             if method == "POST":
-                self.labels.add(payload["name"])
-                return 201, {"name": payload["name"]}
+                label_name = payload["name"]
+                if label_name in self.race_label_creation:
+                    self.race_label_creation.remove(label_name)
+                    if label_name not in self.race_label_creation_without_persist:
+                        self.labels.add(label_name)
+                    return 422, {
+                        "message": "Validation Failed",
+                        "errors": [{"resource": "Label", "code": "already_exists"}],
+                    }
+                self.labels.add(label_name)
+                return 201, {"name": label_name}
             raise AssertionError(f"Unexpected labels endpoint: {method} {path}")
 
         if path == "/repos/KenlikDev/aegis-engineering-os/issues/53/comments":
@@ -315,6 +326,36 @@ class WorkItemLifecycleTests(unittest.TestCase):
         self.assertEqual(1, len(patch_calls))
         self.assertEqual("open", patch_calls[0]["state"])
 
+    def test_github_transition_recovers_from_concurrent_status_label_creation(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.race_label_creation.add("aegis:status:planned")
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+
+        evidence = provider.transition("53", LifecycleState.PLANNED)
+
+        self.assertTrue(evidence.verified)
+        self.assertIn("aegis:status:planned", transport.labels)
+
+    def test_github_transition_fails_closed_when_concurrent_status_label_is_not_present(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.race_label_creation.add("aegis:status:planned")
+        transport.race_label_creation_without_persist.add("aegis:status:planned")
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+
+        with self.assertRaisesRegex(
+            WorkItemLifecycleError,
+            "was not readable after mutation",
+        ):
+            provider.transition("53", LifecycleState.PLANNED)
+
     def test_github_blocked_transition_persists_resume_target(self) -> None:
         transport = FakeGitHubTransport()
         transport.labels.add("aegis:status:in_progress")
@@ -337,6 +378,21 @@ class WorkItemLifecycleTests(unittest.TestCase):
         self.assertEqual("blocked", evidence.state_before)
         self.assertEqual("in_progress", evidence.state_after)
         self.assertNotIn("aegis:resume:in_progress", transport.labels)
+
+    def test_github_blocked_transition_recovers_from_concurrent_resume_label_creation(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.labels.add("aegis:status:in_progress")
+        transport.race_label_creation.add("aegis:resume:in_progress")
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+
+        evidence = provider.transition("53", LifecycleState.BLOCKED)
+
+        self.assertTrue(evidence.verified)
+        self.assertIn("aegis:resume:in_progress", transport.labels)
 
     def test_github_done_closes_issue_and_verifies_terminal_state(self) -> None:
         transport = FakeGitHubTransport()
