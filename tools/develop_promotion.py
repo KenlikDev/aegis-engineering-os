@@ -380,6 +380,27 @@ def _validate_request(request: DevelopPromotionRequest) -> None:
         raise DevelopPromotionError("Owner-verified source SHA is malformed.")
 
 
+def _require_integrated_work_item(
+    work_item_provider: WorkItemProvider,
+    work_item_id: str,
+) -> None:
+    try:
+        item = work_item_provider.get(work_item_id)
+    except WorkItemLifecycleError as exc:
+        raise DevelopPromotionError(
+            "Unable to verify the work item's lifecycle state."
+        ) from exc
+    if item.id != work_item_id:
+        raise DevelopPromotionError(
+            "Develop promotion work-item identity verification failed."
+        )
+    if item.state != LifecycleState.INTEGRATION:
+        raise DevelopPromotionError(
+            "Develop promotion requires the work item to be in integration state; "
+            f"got {item.state.value}."
+        )
+
+
 def _promotion_body(
     request: DevelopPromotionRequest,
     readiness: PromotionReadiness,
@@ -435,17 +456,7 @@ def prepare_develop_promotion(
 ) -> DevelopPromotionResult:
     """Create or reuse a direct develop PR only for an integrated work item."""
     _validate_request(request)
-    try:
-        item = work_item_provider.get(request.work_item_id)
-    except WorkItemLifecycleError as exc:
-        raise DevelopPromotionError(
-            "Unable to verify the work item's lifecycle state."
-        ) from exc
-    if item.state != LifecycleState.INTEGRATION:
-        raise DevelopPromotionError(
-            "Develop promotion requires the work item to be in integration state; "
-            f"got {item.state.value}."
-        )
+    _require_integrated_work_item(work_item_provider, request.work_item_id)
 
     readiness = provider.assess_readiness(
         source_branch=request.source_branch,
@@ -479,6 +490,10 @@ def prepare_develop_promotion(
             "Promotion readiness is blocked before develop PR write: "
             + "; ".join(final_readiness.blockers)
         )
+
+    # Re-read lifecycle state immediately before PR reuse/creation to narrow the
+    # remaining work-item TOCTOU window.
+    _require_integrated_work_item(work_item_provider, request.work_item_id)
 
     reused = bool(existing)
     if existing:
