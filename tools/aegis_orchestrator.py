@@ -34,7 +34,7 @@ from work_item_lifecycle import (
     require_verified_mutation,
 )
 
-DEFAULT_OLLAMA_VERSION = "0.34.3"
+DEFAULT_OLLAMA_VERSION = "0.34.2"
 DEFAULT_MODEL = "gemma4:31b"
 DEFAULT_OPENHANDS_VERSION = "1.49.5"
 DEFAULT_MAX_ITERATIONS = 500
