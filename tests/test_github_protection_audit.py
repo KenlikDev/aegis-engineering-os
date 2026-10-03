@@ -145,7 +145,23 @@ class ProtectionAuditTests(unittest.TestCase):
         summary = summarize_ruleset(item)
         self.assertIsNone(summary.bypass_actors)
 
-    def test_evidence_is_canonical(self):
+    def test_ignores_inactive_and_non_branch_rulesets(self):
+        inactive = ruleset(ruleset_id=10)
+        inactive["enforcement"] = "evaluate"
+        malformed_tag = ruleset(ruleset_id=11)
+        malformed_tag["target"] = "tag"
+        malformed_tag.pop("conditions")
+        result = audit_branches(
+            FakeProvider([
+                inactive,
+                malformed_tag,
+                ruleset(),
+            ]),
+            ("develop",),
+        )
+        self.assertEqual(1, result["branches"]["develop"]["ruleset"]["id"])
+
+    def test_evidence_is_verified_when_bypass_visibility_is_available(self):
         result = audit_branches(
             FakeProvider([
                 ruleset(branch=branch, ruleset_id=index)
@@ -158,6 +174,16 @@ class ProtectionAuditTests(unittest.TestCase):
         self.assertEqual("github-ruleset-audit", evidence.kind)
         self.assertEqual("verified", evidence.status)
         self.assertEqual("github:KenlikDev/aegis-engineering-os", evidence.source)
+
+    def test_evidence_is_unknown_when_bypass_visibility_is_unavailable(self):
+        item = ruleset()
+        item.pop("bypass_actors")
+        result = audit_branches(FakeProvider([item]), ("develop",))
+        evidence = build_audit_evidence(
+            result, observed_at="2026-10-03T12:00:00Z"
+        )
+        self.assertEqual("unknown", evidence.status)
+        self.assertIn("bypass_actor visibility", evidence.uncertainty[0])
 
     def test_rejects_invalid_repository_or_token(self):
         with self.assertRaises(RulesetAuditError):

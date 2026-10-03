@@ -339,7 +339,13 @@ def audit_branches(
     branches: tuple[str, ...] = DEFAULT_BRANCHES,
 ) -> dict[str, Any]:
     _validate_branches(branches)
-    summaries = [summarize_ruleset(item) for item in provider.list_active_rulesets()]
+    summaries = []
+    for item in provider.list_active_rulesets():
+        if not isinstance(item, Mapping):
+            raise RulesetAuditError("GitHub rulesets response contains a malformed entry.")
+        if item.get("enforcement") != "active" or item.get("target") != "branch":
+            continue
+        summaries.append(summarize_ruleset(item))
 
     result: dict[str, Any] = {}
     for branch in branches:
@@ -414,6 +420,18 @@ def build_audit_evidence(
         if isinstance(url, str) and HTTPS_URL_RE.fullmatch(url):
             references.append(url)
 
+    bypass_visibility_unknown = any(
+        isinstance(value, Mapping)
+        and isinstance(value.get("ruleset"), Mapping)
+        and value.get("bypass_actors") is None
+        for value in branches.values()
+    )
+    status = "unknown" if bypass_visibility_unknown else "verified"
+    uncertainty = (
+        ["GitHub ruleset bypass_actor visibility was unavailable for at least one audited branch."]
+        if bypass_visibility_unknown
+        else []
+    )
     return build_evidence(
         {
             "schema_version": 1,
@@ -422,9 +440,9 @@ def build_audit_evidence(
             "subject": f"rulesets:{repository}",
             "revision": None,
             "observed_at": timestamp,
-            "status": "verified",
+            "status": status,
             "result": dict(result),
-            "uncertainty": [],
+            "uncertainty": uncertainty,
             "references": sorted(set(references)),
             "artifact_sha256": None,
         }
