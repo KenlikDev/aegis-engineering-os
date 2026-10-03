@@ -404,7 +404,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         request = self._request(target="release")
         with self.assertRaisesRegex(
             PromotionSnapshotError,
-            "target must be develop or main",
+            "target must be main",
         ):
             prepare_promotion_snapshot(self._provider(transport), request)
         self.assertFalse(transport.created_branch)
@@ -415,7 +415,7 @@ class PromotionSnapshotTests(unittest.TestCase):
         request = self._request(target="develop")
         with self.assertRaisesRegex(
             PromotionSnapshotError,
-            "Develop promotion snapshots are disabled",
+            "target must be main",
         ):
             prepare_promotion_snapshot(self._provider(transport), request)
         self.assertFalse(transport.created_branch)
