@@ -91,6 +91,8 @@ It exposes only:
 
 The workflow is deliberately not a general command runner. It fixes the repository to `github.repository`, uses the workflow `GITHUB_TOKEN`, and scopes permissions to the GitHub APIs required by the canonical tools.
 
+**Availability note:** GitHub requires a `workflow_dispatch` file to exist on the repository default branch before the Actions UI exposes the manual-run control. `main` is the current default branch, so an owner-controlled default-branch bootstrap/promotion is still required; adding the workflow to `ai/integration` alone is not enough.
+
 ## Pull-request delivery
 
 After quality verification places a work item in \`review\`, use \`tools/delivery.py\` to create or reuse an explicit PR from the task branch into \`ai/integration\`:
