@@ -66,6 +66,12 @@ class AegisManagedExecutionWorkflowTests(unittest.TestCase):
         self.assertIn("--canonical-evidence-output", self.workflow)
         self.assertIn('test "$EXPECTED_STATE" = "review"', self.workflow)
 
+    def test_validation_workflow_is_pinned_to_the_canonical_path(self):
+        self.assertNotIn("validation_workflow:", self.workflow)
+        self.assertNotIn("${{ inputs.validation_workflow }}", self.workflow)
+        self.assertIn("VALIDATION_WORKFLOW: .github/workflows/validate.yml", self.workflow)
+        self.assertIn('--workflow "$VALIDATION_WORKFLOW"', self.workflow)
+
     def test_permissions_are_scoped_per_operation(self):
         top_level = self.workflow.split("jobs:", 1)[0]
         self.assertIn("contents: read", top_level)
