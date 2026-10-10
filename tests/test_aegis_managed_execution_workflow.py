@@ -35,6 +35,21 @@ class AegisManagedExecutionWorkflowTests(unittest.TestCase):
         block = self.workflow.split("expected_state:", 1)[1].split("target_state:", 1)[0]
         self.assertIn("required: true", block)
 
+    def test_target_state_options_include_the_full_lifecycle_state_set(self):
+        block = self.workflow.split("target_state:", 1)[1].split("head:", 1)[0]
+        for state in [
+            "intake",
+            "planned",
+            "ready",
+            "in_progress",
+            "verification",
+            "review",
+            "integration",
+            "blocked",
+            "done",
+        ]:
+            self.assertIn(f"- {state}", block)
+
     def test_transition_delegates_to_canonical_lifecycle_tool(self):
         self.assertIn(
             'python tools/work_item_lifecycle.py transition '
