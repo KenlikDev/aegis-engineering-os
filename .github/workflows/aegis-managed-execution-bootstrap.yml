@@ -57,7 +57,7 @@ on:
       validation_workflow:
         description: "Validation workflow name"
         required: false
-        default: "Aegis Validation"
+        default: ".github/workflows/validate.yml"
         type: string
 
 permissions:
