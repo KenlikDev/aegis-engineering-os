@@ -1,0 +1,146 @@
+name: Aegis Managed Execution Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Canonical Aegis operation"
+        required: true
+        type: choice
+        options:
+          - transition
+          - integrate
+      work_item_id:
+        description: "GitHub Issue number"
+        required: true
+        type: string
+      expected_state:
+        description: "Expected current Aegis lifecycle state"
+        required: true
+        type: choice
+        options:
+          - intake
+          - planned
+          - ready
+          - in_progress
+          - verification
+          - review
+          - integration
+          - blocked
+          - done
+      target_state:
+        description: "Target lifecycle state (transition only)"
+        required: false
+        type: choice
+        options:
+          - intake
+          - planned
+          - ready
+          - in_progress
+          - verification
+          - review
+          - integration
+          - blocked
+          - done
+      head:
+        description: "Aegis task branch (integrate only)"
+        required: false
+        type: string
+      title:
+        description: "Task PR title (integrate only)"
+        required: false
+        type: string
+      body:
+        description: "Task PR body (integrate only)"
+        required: false
+        type: string
+      validation_workflow:
+        description: "Validation workflow name"
+        required: false
+        default: ".github/workflows/validate.yml"
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  lifecycle-transition:
+    name: Aegis lifecycle transition
+    if: ${{ github.ref == 'refs/heads/main' && github.actor == 'KenlikDev' && inputs.operation == 'transition' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      WORK_ITEM_ID: ${{ inputs.work_item_id }}
+      EXPECTED_STATE: ${{ inputs.expected_state }}
+      TARGET_STATE: ${{ inputs.target_state }}
+    steps:
+      - name: Check out canonical tools from ai/integration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ai/integration
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Compile canonical lifecycle tools
+        run: python -m py_compile tools/work_item_lifecycle.py tools/github_http_security.py
+
+      - name: Execute read-after-write-verified lifecycle transition
+        run: |
+          test -n "$TARGET_STATE"
+          python tools/work_item_lifecycle.py transition "$REPOSITORY" "$WORK_ITEM_ID" "$TARGET_STATE" --expected-state "$EXPECTED_STATE"
+
+  integration-delivery:
+    name: Aegis integration delivery
+    if: ${{ github.ref == 'refs/heads/main' && github.actor == 'KenlikDev' && inputs.operation == 'integrate' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+      checks: read
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      WORK_ITEM_ID: ${{ inputs.work_item_id }}
+      EXPECTED_STATE: ${{ inputs.expected_state }}
+      HEAD_BRANCH: ${{ inputs.head }}
+      PR_TITLE: ${{ inputs.title }}
+      PR_BODY: ${{ inputs.body }}
+      VALIDATION_WORKFLOW: ${{ inputs.validation_workflow }}
+    steps:
+      - name: Check out canonical tools from ai/integration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ai/integration
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Compile canonical Aegis tools
+        run: python -m py_compile tools/*.py
+
+      - name: Execute canonical integration delivery
+        run: |
+          test "$EXPECTED_STATE" = "review"
+          test -n "$HEAD_BRANCH"
+          test -n "$PR_TITLE"
+          python tools/integration_delivery.py "$REPOSITORY" "$WORK_ITEM_ID" "$HEAD_BRANCH" "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --workflow "$VALIDATION_WORKFLOW" \
+            --canonical-evidence-output "$RUNNER_TEMP/aegis-integration-evidence.json"
+          cat "$RUNNER_TEMP/aegis-integration-evidence.json"
