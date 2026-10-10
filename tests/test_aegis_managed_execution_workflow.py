@@ -51,6 +51,22 @@ class AegisManagedExecutionWorkflowTests(unittest.TestCase):
         self.assertIn("--canonical-evidence-output", self.workflow)
         self.assertIn('test "$EXPECTED_STATE" = "review"', self.workflow)
 
+    def test_permissions_are_scoped_per_operation(self):
+        top_level = self.workflow.split("jobs:", 1)[0]
+        self.assertIn("contents: read", top_level)
+        self.assertIn("issues: read", top_level)
+        transition_job = self.workflow.split("  lifecycle-transition:", 1)[1].split(
+            "  integration-delivery:", 1
+        )[0]
+        integration_job = self.workflow.split("  integration-delivery:", 1)[1]
+        self.assertIn("contents: write", transition_job)
+        self.assertIn("issues: write", transition_job)
+        self.assertNotIn("pull-requests: write", transition_job)
+        self.assertNotIn("actions: read", transition_job)
+        self.assertIn("pull-requests: write", integration_job)
+        self.assertIn("actions: read", integration_job)
+        self.assertIn("checks: read", integration_job)
+
     def test_permissions_are_scoped_to_required_apis(self):
         expected = [
             "contents: write",
