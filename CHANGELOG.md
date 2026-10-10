@@ -3,6 +3,7 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+- pin managed integration delivery to the canonical `.github/workflows/validate.yml` workflow and reject caller-supplied alternative validation workflows;
 - add a manual Aegis Managed Execution workflow that delegates only to the canonical lifecycle and integration-delivery tools;
 - require explicit expected lifecycle state for managed workflow transitions and preserve exact validation/protected-branch checks for integration delivery;
 - bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
