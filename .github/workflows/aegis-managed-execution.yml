@@ -54,11 +54,6 @@ on:
         description: "Task PR body (used by integrate when creating a PR)"
         required: false
         type: string
-      validation_workflow:
-        description: "Validation workflow name"
-        required: false
-        default: ".github/workflows/validate.yml"
-        type: string
 
 # Default to read-only; mutating permissions are scoped to the selected operation.
 permissions:
@@ -119,7 +114,7 @@ jobs:
       HEAD_BRANCH: ${{ inputs.head }}
       PR_TITLE: ${{ inputs.title }}
       PR_BODY: ${{ inputs.body }}
-      VALIDATION_WORKFLOW: ${{ inputs.validation_workflow }}
+      VALIDATION_WORKFLOW: .github/workflows/validate.yml
     steps:
       - name: Check out the exact workflow revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
