@@ -179,6 +179,8 @@ The workflow does not accept arbitrary commands or evaluate user-provided shell.
 
 This workflow is an execution boundary, not a replacement for the canonical tools. Lifecycle transition rules, locking, read-after-write verification, integration merge authorization, and evidence contracts remain implemented in the Python tools.
 
+Important operational constraint: GitHub only exposes the Actions UI manual-run control for a `workflow_dispatch` workflow when its file exists on the repository default branch. The repository default branch is `main`, so adding this workflow to `ai/integration` alone does not make it UI-dispatchable. An owner-controlled default-branch bootstrap/promotion is still required before this becomes an available UI entrypoint. This workflow does not authorize the agent to promote or merge `main`.
+
 ## Promotion readiness boundary
 
 The runtime layer ends before protected-branch promotion. \`tools/promotion_readiness.py\` is a read-only release gate that consumes current GitHub state and does not mutate any branch or pull request.
