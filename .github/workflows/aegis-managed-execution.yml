@@ -33,6 +33,7 @@ on:
         required: false
         type: choice
         options:
+          - intake
           - planned
           - ready
           - in_progress
