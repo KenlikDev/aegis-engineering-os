@@ -90,53 +90,53 @@ class FakeGitHubTransport:
         if path == "/repos/KenlikDev/aegis-engineering-os/git/ref/heads/ai/integration":
             return 200, {"object": {"sha": self.integration_sha}}
 
-        if path == "/repos/KenlikDev/aegis-engineering-os/git/ref/aegis/locks/work-item/53":
-            if method == "GET":
-                if self.lock_sha is None:
-                    return 404, {}
-                return 200, {"object": {"sha": self.lock_sha}}
-            if method == "PATCH":
-                if self.lock_conflict:
-                    competitor = self._new_git_commit(
-                        parent_sha=self.lock_sha or self.integration_sha,
-                        message="\n".join(
-                            (
-                                LIFECYCLE_LOCK_HEADER,
-                                "work-item: 53",
-                                "mode: held",
-                                "owner: 87654321-4321-8765-4321-876543218765",
-                                "expires-at: 9999-01-01T00:00:00Z",
-                            )
-                        ),
-                    )
-                    self.lock_sha = competitor
-                    self.lock_conflict = False
-                    return 409, {}
-                new_sha = payload["sha"]
-                if (
-                    self.release_race
-                    and "mode: free" in self.git_commits[new_sha]["message"]
-                ):
-                    competitor = self._new_git_commit(
-                        parent_sha=self.lock_sha or self.integration_sha,
-                        message="\n".join(
-                            (
-                                LIFECYCLE_LOCK_HEADER,
-                                "work-item: 53",
-                                "mode: held",
-                                "owner: 87654321-4321-8765-4321-876543218765",
-                                "expires-at: 9999-01-01T00:00:00Z",
-                            )
-                        ),
-                    )
-                    self.lock_sha = competitor
-                    self.release_race = False
-                    return 409, {}
-                parents = self.git_commits[new_sha]["parents"]
-                if parents != [self.lock_sha]:
-                    return 409, {}
-                self.lock_sha = new_sha
-                return 200, {"object": {"sha": new_sha}}
+        if path == "/repos/KenlikDev/aegis-engineering-os/git/ref/aegis/locks/work-item/53" and method == "GET":
+            if self.lock_sha is None:
+                return 404, {}
+            return 200, {"object": {"sha": self.lock_sha}}
+
+        if path == "/repos/KenlikDev/aegis-engineering-os/git/refs/aegis/locks/work-item/53" and method == "PATCH":
+            if self.lock_conflict:
+                competitor = self._new_git_commit(
+                    parent_sha=self.lock_sha or self.integration_sha,
+                    message="\\n".join(
+                        (
+                            LIFECYCLE_LOCK_HEADER,
+                            "work-item: 53",
+                            "mode: held",
+                            "owner: 87654321-4321-8765-4321-876543218765",
+                            "expires-at: 9999-01-01T00:00:00Z",
+                        )
+                    ),
+                )
+                self.lock_sha = competitor
+                self.lock_conflict = False
+                return 409, {}
+            new_sha = payload["sha"]
+            if (
+                self.release_race
+                and "mode: free" in self.git_commits[new_sha]["message"]
+            ):
+                competitor = self._new_git_commit(
+                    parent_sha=self.lock_sha or self.integration_sha,
+                    message="\\n".join(
+                        (
+                            LIFECYCLE_LOCK_HEADER,
+                            "work-item: 53",
+                            "mode: held",
+                            "owner: 87654321-4321-8765-4321-876543218765",
+                            "expires-at: 9999-01-01T00:00:00Z",
+                        )
+                    ),
+                )
+                self.lock_sha = competitor
+                self.release_race = False
+                return 409, {}
+            parents = self.git_commits[new_sha]["parents"]
+            if parents != [self.lock_sha]:
+                return 409, {}
+            self.lock_sha = new_sha
+            return 200, {"object": {"sha": new_sha}}
 
         if path == "/repos/KenlikDev/aegis-engineering-os/git/commits" and method == "POST":
             new_sha = self._new_git_commit(
@@ -428,6 +428,36 @@ class WorkItemLifecycleTests(unittest.TestCase):
             if method == "PATCH" and path.endswith("/issues/53")
         ]
         self.assertEqual([], patch_calls)
+
+    def test_github_transition_reclaims_expired_lock_through_update_ref_endpoint(self) -> None:
+        transport = FakeGitHubTransport()
+        transport.labels.add("aegis:status:planned")
+        transport.seed_stale_lock()
+        provider = GitHubIssuesProvider(
+            "KenlikDev/aegis-engineering-os",
+            "test-token",
+            transport=transport,
+        )
+
+        evidence = provider.transition(
+            "53",
+            LifecycleState.READY,
+            expected_state=LifecycleState.PLANNED,
+        )
+
+        self.assertTrue(evidence.verified)
+        self.assertEqual("planned", evidence.state_before)
+        self.assertEqual("ready", evidence.state_after)
+        expected_update_path = (
+            "/repos/KenlikDev/aegis-engineering-os/git/refs/aegis/locks/work-item/53"
+        )
+        update_calls = [
+            (method, path)
+            for method, path, _ in transport.calls
+            if method == "PATCH" and "/git/refs/" in path
+        ]
+        self.assertEqual([( "PATCH", expected_update_path), ("PATCH", expected_update_path)], update_calls)
+        self.assertIn("mode: free", transport.git_commits[transport.lock_sha]["message"])
 
     def test_verified_transition_survives_release_race_without_overwriting_competitor(self) -> None:
         transport = FakeGitHubTransport()
