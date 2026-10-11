@@ -424,8 +424,14 @@ class GitHubIssuesProvider:
         return f"{LIFECYCLE_LOCK_REF_PREFIX}{int(work_item_id)}"
 
     def _lifecycle_lock_ref_path(self, work_item_id: str) -> str:
+        """Return the singular GitHub endpoint used to read one ref."""
         ref_name = self._lifecycle_lock_ref_name(work_item_id)
         return f"/repos/{self.repository}/git/ref/{quote(ref_name.removeprefix('refs/'), safe='/')}"
+
+    def _lifecycle_lock_ref_update_path(self, work_item_id: str) -> str:
+        """Return the plural GitHub endpoint used to conditionally update one ref."""
+        ref_name = self._lifecycle_lock_ref_name(work_item_id)
+        return f"/repos/{self.repository}/git/refs/{quote(ref_name.removeprefix('refs/'), safe='/')}"
 
     def _get_ref_sha(self, path: str) -> str:
         status, data = self._request("GET", path)
@@ -579,7 +585,7 @@ class GitHubIssuesProvider:
 
     def _acquire_lifecycle_lock(self, work_item_id: str) -> _LifecycleLock:
         ref_name = self._lifecycle_lock_ref_name(work_item_id)
-        ref_path = self._lifecycle_lock_ref_path(work_item_id)
+        ref_update_path = self._lifecycle_lock_ref_update_path(work_item_id)
         owner = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=self._lock_lease_seconds)
 
@@ -628,7 +634,7 @@ class GitHubIssuesProvider:
             )
             status, _ = self._request(
                 "PATCH",
-                ref_path,
+                ref_update_path,
                 {"sha": new_sha, "force": False},
             )
             if status == 200:
@@ -659,7 +665,7 @@ class GitHubIssuesProvider:
         )
         status, _ = self._request(
             "PATCH",
-            self._lifecycle_lock_ref_path(lock.work_item_id),
+            self._lifecycle_lock_ref_update_path(lock.work_item_id),
             {"sha": free_sha, "force": False},
         )
         if status == 200:
