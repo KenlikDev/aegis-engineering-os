@@ -81,8 +81,10 @@ def deliver_to_integration(
         raise IntegrationDeliveryError(
             "Validation provider must reference the same repository."
         )
-    if request.workflow.strip() == "":
-        raise IntegrationDeliveryError("Validation workflow must not be empty.")
+    if request.workflow != DEFAULT_WORKFLOW:
+        raise IntegrationDeliveryError(
+            "Integration delivery only accepts the canonical Aegis Validation workflow."
+        )
     if request.draft:
         raise IntegrationDeliveryError(
             "The composed integration delivery workflow does not accept draft PRs."

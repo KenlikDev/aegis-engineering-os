@@ -274,6 +274,28 @@ class IntegrationDeliveryTests(unittest.TestCase):
 
         self.assertEqual([], merge.merge_calls)
 
+    def test_rejects_noncanonical_validation_workflow(self):
+        pr, merge, validation, items = self.providers()
+        request = IntegrationDeliveryRequest(
+            repository=REPOSITORY,
+            work_item_id=WORK_ITEM,
+            head=self.request().head,
+            title="feat",
+            body="",
+            workflow="other-validation.yml",
+        )
+
+        with self.assertRaisesRegex(
+            IntegrationDeliveryError,
+            "only accepts the canonical Aegis Validation workflow",
+        ):
+            deliver_to_integration(pr, merge, validation, items, request)
+
+        self.assertEqual([], pr.created)
+        self.assertEqual([], merge.merge_calls)
+        self.assertEqual([], validation.calls)
+        self.assertEqual(LifecycleState.REVIEW, items.get(WORK_ITEM).state)
+
     def test_rejects_draft_request(self):
         pr, merge, validation, items = self.providers()
         request = IntegrationDeliveryRequest(
