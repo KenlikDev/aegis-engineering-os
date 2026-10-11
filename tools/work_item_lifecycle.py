@@ -424,8 +424,14 @@ class GitHubIssuesProvider:
         return f"{LIFECYCLE_LOCK_REF_PREFIX}{int(work_item_id)}"
 
     def _lifecycle_lock_ref_path(self, work_item_id: str) -> str:
+        """Return the singular GitHub endpoint used to read one ref."""
         ref_name = self._lifecycle_lock_ref_name(work_item_id)
         return f"/repos/{self.repository}/git/ref/{quote(ref_name.removeprefix('refs/'), safe='/')}"
+
+    def _lifecycle_lock_ref_update_path(self, work_item_id: str) -> str:
+        """Return the plural GitHub endpoint used to conditionally update one ref."""
+        ref_name = self._lifecycle_lock_ref_name(work_item_id)
+        return f"/repos/{self.repository}/git/refs/{quote(ref_name.removeprefix('refs/'), safe='/')}"
 
     def _get_ref_sha(self, path: str) -> str:
         status, data = self._request("GET", path)
@@ -579,7 +585,7 @@ class GitHubIssuesProvider:
 
     def _acquire_lifecycle_lock(self, work_item_id: str) -> _LifecycleLock:
         ref_name = self._lifecycle_lock_ref_name(work_item_id)
-        ref_path = self._lifecycle_lock_ref_path(work_item_id)
+        ref_update_path = self._lifecycle_lock_ref_update_path(work_item_id)
         owner = str(uuid.uuid4())
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=self._lock_lease_seconds)
 
@@ -628,7 +634,7 @@ class GitHubIssuesProvider:
             )
             status, _ = self._request(
                 "PATCH",
-                ref_path,
+                ref_update_path,
                 {"sha": new_sha, "force": False},
             )
             if status == 200:
@@ -645,14 +651,11 @@ class GitHubIssuesProvider:
     def _release_lifecycle_lock(self, lock: _LifecycleLock) -> None:
         current = self._read_lifecycle_lock(lock.work_item_id)
         if current is None or current[0] != lock.ref_sha:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} was lost before release."
-            )
+            return
         _, mode, owner, _ = current
         if mode != "held" or owner != lock.owner:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} is owned by another writer."
-            )
+            return
+
         free_sha = self._create_lifecycle_lock_commit(
             lock.ref_sha,
             work_item_id=lock.work_item_id,
@@ -662,14 +665,25 @@ class GitHubIssuesProvider:
         )
         status, _ = self._request(
             "PATCH",
-            self._lifecycle_lock_ref_path(lock.work_item_id),
+            self._lifecycle_lock_ref_update_path(lock.work_item_id),
             {"sha": free_sha, "force": False},
         )
-        if status != 200:
-            raise WorkItemLifecycleError(
-                f"Lifecycle lock for #{lock.work_item_id} changed before release; "
-                "refusing to overwrite another writer's lock."
-            )
+        if status == 200:
+            return
+
+        latest = self._read_lifecycle_lock(lock.work_item_id)
+        if (
+            latest is None
+            or latest[0] != lock.ref_sha
+            or latest[1] != "held"
+            or latest[2] != lock.owner
+        ):
+            return
+
+        raise WorkItemLifecycleError(
+            f"Lifecycle lock for #{lock.work_item_id} changed before release; "
+            "refusing to overwrite another writer's lock."
+        )
 
     def get(self, work_item_id: str) -> WorkItem:
         status, data = self._request("GET", self._issue_path(work_item_id))
@@ -855,9 +869,15 @@ class GitHubIssuesProvider:
                 reference=verified.provider_url,
             )
         except Exception:
-            self._release_lifecycle_lock(lock)
+            try:
+                self._release_lifecycle_lock(lock)
+            except Exception:
+                pass
             raise
-        self._release_lifecycle_lock(lock)
+        try:
+            self._release_lifecycle_lock(lock)
+        except Exception:
+            pass
         return evidence
 
     def comment(self, work_item_id: str, body: str) -> MutationEvidence:

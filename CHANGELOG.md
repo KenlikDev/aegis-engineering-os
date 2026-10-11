@@ -3,9 +3,14 @@
 All notable changes to Aegis Engineering OS will be documented here.
 
 ## Unreleased
+<<<<<<< HEAD
 - pin managed integration delivery to the canonical `.github/workflows/validate.yml` workflow and reject caller-supplied alternative validation workflows;
 - add a manual Aegis Managed Execution workflow that delegates only to the canonical lifecycle and integration-delivery tools;
 - require explicit expected lifecycle state for managed workflow transitions and preserve exact validation/protected-branch checks for integration delivery;
+=======
+- update lifecycle lock refs through GitHub's documented conditional-update endpoint while retaining the read endpoint for lookup; add expired-lock acquisition and release regression coverage;
+- prevent lifecycle lock-release races and cleanup failures from masking already-verified mutations or the original transition error;
+>>>>>>> origin/ai/integration
 - bind direct develop promotion work-item markers to a real repository issue in `integration` state during required validation;
 - recheck the owner-gated develop promotion work-item lifecycle immediately before PR reuse/creation to narrow the final TOCTOU window;
 - require an authoritative work-item marker in the direct develop promotion required-check gate;
