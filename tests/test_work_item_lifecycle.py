@@ -99,7 +99,7 @@ class FakeGitHubTransport:
             if self.lock_conflict:
                 competitor = self._new_git_commit(
                     parent_sha=self.lock_sha or self.integration_sha,
-                    message="\\n".join(
+                    message="\n".join(
                         (
                             LIFECYCLE_LOCK_HEADER,
                             "work-item: 53",
@@ -119,7 +119,7 @@ class FakeGitHubTransport:
             ):
                 competitor = self._new_git_commit(
                     parent_sha=self.lock_sha or self.integration_sha,
-                    message="\\n".join(
+                    message="\n".join(
                         (
                             LIFECYCLE_LOCK_HEADER,
                             "work-item: 53",
@@ -456,7 +456,13 @@ class WorkItemLifecycleTests(unittest.TestCase):
             for method, path, _ in transport.calls
             if method == "PATCH" and "/git/refs/" in path
         ]
-        self.assertEqual([( "PATCH", expected_update_path), ("PATCH", expected_update_path)], update_calls)
+        self.assertEqual(
+            [
+                ("PATCH", expected_update_path),
+                ("PATCH", expected_update_path),
+            ],
+            update_calls,
+        )
         self.assertIn("mode: free", transport.git_commits[transport.lock_sha]["message"])
 
     def test_verified_transition_survives_release_race_without_overwriting_competitor(self) -> None:
