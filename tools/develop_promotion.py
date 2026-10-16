@@ -43,6 +43,9 @@ HTTPS_URL_RE = re.compile(r"^https://[^\s]+$")
 VERIFIED_SOURCE_RE = re.compile(
     r"(?m)^- Verified source SHA: (?P<sha>[0-9a-f]{40})$"
 )
+WORK_ITEM_MARKER_RE = re.compile(
+    r"(?m)^- Work item: #(?P<id>[1-9][0-9]*)$"
+)
 
 
 class DevelopPromotionError(RuntimeError):
@@ -431,7 +434,20 @@ def _verify_pull_request(
     pull_request: DevelopPromotionPullRequest,
     request: DevelopPromotionRequest,
 ) -> None:
-    match = VERIFIED_SOURCE_RE.search(pull_request.body)
+    source_matches = list(VERIFIED_SOURCE_RE.finditer(pull_request.body))
+    work_item_matches = list(WORK_ITEM_MARKER_RE.finditer(pull_request.body))
+
+    if len(source_matches) != 1:
+        raise DevelopPromotionError(
+            "Develop promotion pull request must contain exactly one "
+            "owner-verified source SHA marker."
+        )
+    if len(work_item_matches) != 1:
+        raise DevelopPromotionError(
+            "Develop promotion pull request must contain exactly one "
+            "authoritative work-item marker."
+        )
+
     if (
         pull_request.state != "open"
         or pull_request.merged
@@ -440,12 +456,12 @@ def _verify_pull_request(
         or pull_request.head_sha != request.owner_verified_source_sha
         or pull_request.head_repository != request.repository
         or pull_request.base_repository != request.repository
-        or match is None
-        or match.group("sha") != request.owner_verified_source_sha
+        or source_matches[0].group("sha") != request.owner_verified_source_sha
+        or work_item_matches[0].group("id") != request.work_item_id
     ):
         raise DevelopPromotionError(
-            "Develop promotion pull request verification failed or the owner-verified "
-            "source SHA is stale."
+            "Develop promotion pull request verification failed or its provenance "
+            "does not match the requested work item and owner-verified source SHA."
         )
 
 
